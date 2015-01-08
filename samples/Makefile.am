@@ -1,7 +1,9 @@
 ########################################################################
 #  Makefile.am
 #  Source code file for G-Code generation, simulation, and visualization
-#  library. This software is Copyright (C) 2006 by Justin Shumaker
+#  library.
+#
+#  Copyright (C) 2006 - 2010 by Justin Shumaker
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

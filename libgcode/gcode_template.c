@@ -1,192 +1,252 @@
-/*
-*  gcode_template.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gcode_template.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "gui_define.h"
 #include "gcode_template.h"
 #include "gcode.h"
 
 void
-gcode_template_init (GCODE_INIT_PARAMETERS)
+gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_template_t *template;
 
-  *block = (gcode_block_t *) malloc (sizeof (gcode_block_t));
-  gcode_internal_init (*block, parent, gcode, GCODE_TYPE_TEMPLATE, 0);
+  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+
+  gcode_internal_init (*block, gcode, parent, GCODE_TYPE_TEMPLATE, 0);
 
   (*block)->free = gcode_template_free;
   (*block)->make = gcode_template_make;
   (*block)->save = gcode_template_save;
   (*block)->load = gcode_template_load;
   (*block)->draw = gcode_template_draw;
-  (*block)->duplicate = gcode_template_duplicate;
+  (*block)->clone = gcode_template_clone;
   (*block)->scale = gcode_template_scale;
+  (*block)->parse = gcode_template_parse;
+
   (*block)->pdata = malloc (sizeof (gcode_template_t));
+
+  (*block)->offset = &gcode->zero_offset;
 
   strcpy ((*block)->comment, "Template");
   strcpy ((*block)->status, "OK");
-  GCODE_INIT((*block));
-  GCODE_CLEAR((*block));
+  GCODE_INIT ((*block));
+  GCODE_CLEAR ((*block));
 
-  /* defaults */
+  /* Defaults */
+
   template = (gcode_template_t *)(*block)->pdata;
-  template->list = NULL;
+
   template->position[0] = 0.0;
   template->position[1] = 0.0;
   template->rotation = 0.0;
 
-  /* offset */
-  template->offset.origin[0] = 0.0;
-  template->offset.origin[1] = 0.0;
   template->offset.side = 0.0;
   template->offset.tool = 0.0;
   template->offset.eval = 0.0;
   template->offset.rotation = 0.0;
-}
+  template->offset.origin[0] = 0.0;
+  template->offset.origin[1] = 0.0;
+  template->offset.z[0] = 0.0;
+  template->offset.z[1] = 0.0;
 
+  (*block)->offref = &template->offset;
+}
 
 void
 gcode_template_free (gcode_block_t **block)
 {
+  gcode_block_t *index_block, *tmp;
+
+  /* Walk the list and free */
+  index_block = (*block)->listhead;
+
+  while (index_block)
+  {
+    tmp = index_block;
+    index_block = index_block->next;
+    tmp->free (&tmp);
+  }
+
+  free ((*block)->code);
+  free ((*block)->pdata);
   free (*block);
   *block = NULL;
 }
-
 
 void
 gcode_template_make (gcode_block_t *block)
 {
   gcode_template_t *template;
-  gcode_block_t *iter_block;
+  gcode_block_t *index_block;
+  gcode_vec2d_t xform_origin;
   char string[256];
 
-  GCODE_CLEAR(block);
+  template = (gcode_template_t *)block->pdata;
+
+  GCODE_CLEAR (block);
+
   if (block->flags & GCODE_FLAGS_SUPPRESS)
     return;
 
-  template = (gcode_template_t *) block->pdata;
+  // Inherit whatever offset this block acquires from its parent, if any,
+  // and compound it with whatever offset this block generates on its own
 
-  template->offset.origin[0] = template->position[0];
-  template->offset.origin[1] = template->position[1];
-  template->offset.rotation = template->rotation;
+  GCODE_MATH_VEC2D_SET (xform_origin, template->position[0], template->position[1]);
+  GCODE_MATH_ROTATE (xform_origin, xform_origin, block->offset->rotation);
+  GCODE_MATH_TRANSLATE (xform_origin, xform_origin, block->offset->origin);
+
+  template->offset.origin[0] = xform_origin[0];
+  template->offset.origin[1] = xform_origin[1];
+  template->offset.rotation = fmod (block->offset->rotation + template->rotation, 360.0);
 
   GCODE_APPEND (block, "\n");
+
   sprintf (string, "TEMPLATE: %s", block->comment);
   GCODE_COMMENT (block, string);
-  GCODE_APPEND (block, "\n");
 
-  iter_block = template->list;
+  index_block = block->listhead;
 
-  while (iter_block)
+  while (index_block)
   {
-    iter_block->offset = &template->offset;
-    iter_block->make (iter_block);
-    GCODE_APPEND(block, iter_block->code);
-    iter_block = iter_block->next;
+    index_block->make (index_block);
+
+    GCODE_APPEND (block, index_block->code);
+
+    index_block = index_block->next;
   }
 }
-
 
 void
 gcode_template_save (gcode_block_t *block, FILE *fh)
 {
+  gcode_block_t *index_block;
   gcode_template_t *template;
-  gcode_block_t *child_block;
   uint32_t size, num, marker;
   uint8_t data;
 
-  template = (gcode_template_t *) block->pdata;
+  template = (gcode_template_t *)block->pdata;
 
-  child_block = template->list;
-  num = 0;
-  while (child_block)
+  if (block->gcode->format == GCODE_FORMAT_XML)                                 // Save to new xml format
   {
-    num++;
-    child_block = child_block->next;
+    int indent = GCODE_XML_BASE_INDENT;
+
+    index_block = block->parent;
+
+    while (index_block)
+    {
+      indent++;
+
+      index_block = index_block->parent;
+    }
+
+    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
+    GCODE_WRITE_XML_HEAD_OF_TAG (fh, GCODE_XML_TAG_TEMPLATE);
+    GCODE_WRITE_XML_ATTR_STRING (fh, GCODE_XML_ATTR_BLOCK_COMMENT, block->comment);
+    GCODE_WRITE_XML_ATTR_AS_HEX (fh, GCODE_XML_ATTR_BLOCK_FLAGS, block->flags);
+    GCODE_WRITE_XML_ATTR_2D_FLT (fh, GCODE_XML_ATTR_TEMPLATE_POSITION, template->position);
+    GCODE_WRITE_XML_ATTR_1D_FLT (fh, GCODE_XML_ATTR_TEMPLATE_ROTATION, template->rotation);
+    GCODE_WRITE_XML_OP_TAG_TAIL (fh);
+    GCODE_WRITE_XML_END_OF_LINE (fh);
+
+    /**
+     * In the XML branch the parent does NOT save even the common attributes
+     * of its child blocks (as the binary branch does): saving some attributes
+     * here and some (custom) attributes in the child would get rather messy
+     */
+
+    index_block = block->listhead;
+
+    while (index_block)
+    {
+      index_block->save (index_block, fh);
+
+      index_block = index_block->next;
+    }
+
+    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
+    GCODE_WRITE_XML_END_TAG_FOR (fh, GCODE_XML_TAG_TEMPLATE);
+    GCODE_WRITE_XML_END_OF_LINE (fh);
   }
-
-  data = GCODE_DATA_TEMPLATE_NUM;
-  size = sizeof (uint32_t);
-  fwrite (&data, sizeof (uint8_t), 1, fh);
-  fwrite (&size, sizeof (uint32_t), 1, fh);
-  fwrite (&num, size, 1, fh);
-
-  child_block = template->list;
-  num = 0;
-  while (child_block)
+  else                                                                          // Save to legacy binary format
   {
-    /* Write block type */
-    fwrite (&child_block->type, sizeof (uint8_t), 1, fh);
-    marker = ftell (fh);
-    size = 0;
-    fwrite (&size, sizeof (uint32_t), 1, fh);
+    num = 0;
+    index_block = block->listhead;
 
-    /* Write comment */
-    data = GCODE_DATA_BLOCK_COMMENT;
-    size = strlen (child_block->comment) + 1;
-    fwrite (&data, sizeof (uint8_t), 1, fh);
-    fwrite (&size, sizeof (uint32_t), 1, fh);
-    fwrite (child_block->comment, sizeof (char), size, fh);
+    while (index_block)
+    {
+      num++;
 
-    /* Write flags */
-    data = GCODE_DATA_BLOCK_FLAGS;
-    size = 1;
-    fwrite (&data, sizeof (uint8_t), 1, fh);
-    fwrite (&size, sizeof (uint32_t), 1, fh);
-    fwrite (&child_block->flags, 1, 1, fh);
+      index_block = index_block->next;
+    }
 
-    child_block->save (child_block, fh);
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_TEMPLATE_NUMBER, sizeof (uint32_t), &num);
 
-    size = ftell (fh) - marker - sizeof (uint32_t);
-    fseek (fh, marker, SEEK_SET);
-    fwrite (&size, sizeof (uint32_t), 1, fh);
-    fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
+    num = 0;
+    index_block = block->listhead;
 
-    child_block = child_block->next;
+    while (index_block)
+    {
+      /* Write block type */
+      fwrite (&index_block->type, sizeof (uint8_t), 1, fh);
+      marker = ftell (fh);
+      size = 0;
+      fwrite (&size, sizeof (uint32_t), 1, fh);
+
+      /* Write comment */
+      GCODE_WRITE_BINARY_STR_DATA (fh, GCODE_BIN_DATA_BLOCK_COMMENT, index_block->comment);
+
+      /* Write flags */
+      GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_BLOCK_FLAGS, sizeof (uint8_t), &index_block->flags);
+
+      index_block->save (index_block, fh);
+
+      size = ftell (fh) - marker - sizeof (uint32_t);
+      fseek (fh, marker, SEEK_SET);
+      fwrite (&size, sizeof (uint32_t), 1, fh);
+      fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
+
+      index_block = index_block->next;
+    }
+
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_TEMPLATE_POSITION, 2 * sizeof (gfloat_t), template->position);
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_TEMPLATE_ROTATION, sizeof (gfloat_t), &template->rotation);
   }
-
-  data = GCODE_DATA_TEMPLATE_POSITION;
-  size = 2 * sizeof (gfloat_t);
-  fwrite (&data, sizeof (uint8_t), 1, fh);
-  fwrite (&size, sizeof (uint32_t), 1, fh);
-  fwrite (template->position, size, 1, fh);
-
-  data = GCODE_DATA_TEMPLATE_ROTATION;
-  size = sizeof (gfloat_t);
-  fwrite (&data, sizeof (uint8_t), 1, fh);
-  fwrite (&size, sizeof (uint32_t), 1, fh);
-  fwrite (&template->rotation, size, 1, fh);
 }
-
 
 void
 gcode_template_load (gcode_block_t *block, FILE *fh)
 {
   gcode_template_t *template;
-  gcode_block_t *child_block, *last_block;
+  gcode_block_t *new_block;
   uint32_t bsize, dsize, start, num, i;
   uint8_t data, type;
 
-  template = (gcode_template_t *) block->pdata;
-  gcode_list_free (&template->list);
+  template = (gcode_template_t *)block->pdata;
+  gcode_list_free (&block->listhead);
 
   fread (&bsize, sizeof (uint32_t), 1, fh);
 
   start = ftell (fh);
-  
+
   while (ftell (fh) - start < bsize)
   {
     fread (&data, sizeof (uint8_t), 1, fh);
@@ -194,168 +254,196 @@ gcode_template_load (gcode_block_t *block, FILE *fh)
 
     switch (data)
     {
-      case GCODE_DATA_BLOCK_COMMENT:
+      case GCODE_BIN_DATA_BLOCK_COMMENT:
         fread (block->comment, sizeof (char), dsize, fh);
         break;
 
-      case GCODE_DATA_BLOCK_FLAGS:
+      case GCODE_BIN_DATA_BLOCK_FLAGS:
         fread (&block->flags, sizeof (uint8_t), dsize, fh);
         break;
 
-      case GCODE_DATA_TEMPLATE_NUM:
+      case GCODE_BIN_DATA_TEMPLATE_NUMBER:
         fread (&num, sizeof (uint32_t), 1, fh);
- 
+
         for (i = 0; i < num; i++)
         {
           /* Read Data */
           fread (&type, sizeof (uint8_t), 1, fh);
+
           switch (type)
           {
             case GCODE_TYPE_TOOL:
-              gcode_tool_init (block->gcode, &child_block, block);
+              gcode_tool_init (&new_block, block->gcode, block);
               break;
 
             case GCODE_TYPE_TEMPLATE:
-              gcode_template_init (block->gcode, &child_block, block);
+              gcode_template_init (&new_block, block->gcode, block);
               break;
 
             case GCODE_TYPE_SKETCH:
-              gcode_sketch_init (block->gcode, &child_block, block);
+              gcode_sketch_init (&new_block, block->gcode, block);
               break;
 
             case GCODE_TYPE_BOLT_HOLES:
-              gcode_bolt_holes_init (block->gcode, &child_block, block);
+              gcode_bolt_holes_init (&new_block, block->gcode, block);
               break;
 
             case GCODE_TYPE_DRILL_HOLES:
-              gcode_drill_holes_init (block->gcode, &child_block, block);
+              gcode_drill_holes_init (&new_block, block->gcode, block);
               break;
 
             default:
               break;
           }
 
-          child_block->load (child_block, fh);
+          gcode_append_as_listtail (block, new_block);                          // Append 'new_block' to the end of 'block's list (as head if the list is NULL)
 
-          /* Add to the end of the list */
-          if (template->list)
-          {
-            gcode_list_insert (&last_block, child_block);
-          }
-          else
-          {
-            gcode_list_insert (&template->list, child_block);
-          }
-
-          child_block->parent_list = &template->list;
-          last_block = child_block;
+          new_block->load (new_block, fh);
         }
         break;
 
-      case GCODE_DATA_TEMPLATE_POSITION:
+      case GCODE_BIN_DATA_TEMPLATE_POSITION:
         fread (template->position, dsize, 1, fh);
         break;
 
-      case GCODE_DATA_TEMPLATE_ROTATION:
+      case GCODE_BIN_DATA_TEMPLATE_ROTATION:
         fread (&template->rotation, dsize, 1, fh);
         break;
 
       default:
         fseek (fh, dsize, SEEK_CUR);
-        break;   
+        break;
     }
   }
 }
 
+void
+gcode_template_parse (gcode_block_t *block, const char **xmlattr)
+{
+  gcode_template_t *template;
+
+  template = (gcode_template_t *)block->pdata;
+
+  for (int i = 0; xmlattr[i]; i += 2)
+  {
+    int m;
+    unsigned int n;
+    double xyz[3], w;
+    const char *name, *value;
+
+    name = xmlattr[i];
+    value = xmlattr[i + 1];
+
+    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    {
+      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
+        block->flags = n;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_POSITION) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          template->position[j] = (gfloat_t)xyz[j];
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_ROTATION) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
+        template->rotation = (gfloat_t)w;
+    }
+  }
+}
 
 void
 gcode_template_draw (gcode_block_t *block, gcode_block_t *selected)
 {
 #if GCODE_USE_OPENGL
   gcode_template_t *template;
-  gcode_block_t *block_iter;
+  gcode_block_t *index_block;
+  gcode_vec2d_t xform_origin;
 
   if (block->flags & GCODE_FLAGS_SUPPRESS)
     return;
 
-  template = (gcode_template_t *) block->pdata;
+  template = (gcode_template_t *)block->pdata;
 
-  template->offset.origin[0] = template->position[0];
-  template->offset.origin[1] = template->position[1];
-  template->offset.rotation = template->rotation;
+  // Inherit whatever offset this block acquires from its parent, if any,
+  // and compound it with whatever offset this block generates on its own
 
-  block_iter = template->list;
-  while (block_iter)
+  GCODE_MATH_VEC2D_SET (xform_origin, template->position[0], template->position[1]);
+  GCODE_MATH_ROTATE (xform_origin, xform_origin, block->offset->rotation);
+  GCODE_MATH_TRANSLATE (xform_origin, xform_origin, block->offset->origin);
+
+  template->offset.origin[0] = xform_origin[0];
+  template->offset.origin[1] = xform_origin[1];
+  template->offset.rotation = fmod (block->offset->rotation + template->rotation, 360.0);
+
+  index_block = block->listhead;
+
+  while (index_block)
   {
-    block_iter->offset = &template->offset;
-
-    if (block_iter->draw)
+    if (index_block->draw)
     {
       if (selected == block)
       {
-        block_iter->draw (block_iter, block_iter);
+        index_block->draw (index_block, index_block);
       }
       else
       {
-        block_iter->draw (block_iter, selected);
+        index_block->draw (index_block, selected);
       }
     }
 
-    block_iter = block_iter->next;
+    index_block = index_block->next;
   }
 
-  glPointSize (7);
-  glColor3f (0.0, 1.0, 1.0);
+  glPointSize (GCODE_OPENGL_DATUM_POINT_SIZE);
+  glColor3f (GCODE_OPENGL_DATUM_POINT_COLOR[0],
+             GCODE_OPENGL_DATUM_POINT_COLOR[1],
+             GCODE_OPENGL_DATUM_POINT_COLOR[2]);
   glBegin (GL_POINTS);
-    glVertex3f (template->position[0], template->position[1], 0.0);
+  glVertex3f (template->offset.origin[0], template->offset.origin[1], 0.0);
   glEnd ();
 #endif
 }
 
-
 void
-gcode_template_duplicate (gcode_block_t *block, gcode_block_t **duplicate)
+gcode_template_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
-  gcode_template_t *template, *duplicate_template;
-  gcode_block_t *child_block, *new_block, *last_block;
+  gcode_template_t *template, *model_template;
+  gcode_block_t *index_block, *new_block;
 
-  template = (gcode_template_t *) block->pdata;
+  model_template = (gcode_template_t *)model->pdata;
 
-  gcode_template_init (block->gcode, duplicate, block->parent);
-  (*duplicate)->name = block->name;
+  gcode_template_init (block, gcode, model->parent);
 
-  strcpy ((*duplicate)->comment, block->comment);
-  (*duplicate)->parent = block->parent;
+  (*block)->flags = model->flags;
 
-  duplicate_template = (gcode_template_t *) (*duplicate)->pdata;
+  strcpy ((*block)->comment, model->comment);
 
-  duplicate_template->position[0] = template->position[0];
-  duplicate_template->position[1] = template->position[1];
-  duplicate_template->rotation = template->rotation;
-  duplicate_template->offset = template->offset;
-          
-  duplicate_template->list = NULL;
-    
-  child_block = template->list;
-  while (child_block)
+  (*block)->offset = model->offset;
+
+  template = (gcode_template_t *)(*block)->pdata;
+
+  template->position[0] = model_template->position[0];
+  template->position[1] = model_template->position[1];
+  template->rotation = model_template->rotation;
+  template->offset = model_template->offset;
+
+  index_block = model->listhead;
+
+  while (index_block)
   {
-    child_block->duplicate (child_block, &new_block);
-    new_block->parent = *duplicate;
-    new_block->offset = &duplicate_template->offset;
-    if (!duplicate_template->list)
-    {
-      gcode_list_insert (&duplicate_template->list, new_block);
-    }
-    else
-    {
-      gcode_list_insert (&last_block, new_block);
-    }
+    index_block->clone (&new_block, gcode, index_block);
 
-    last_block = new_block;
-    child_block = child_block->next;
+    gcode_append_as_listtail (*block, new_block);                               // Append 'new_block' to the end of 'block's list (as head if the list is NULL)
+
+    index_block = index_block->next;
   }
 }
-
 
 void
 gcode_template_scale (gcode_block_t *block, gfloat_t scale)
@@ -363,15 +451,18 @@ gcode_template_scale (gcode_block_t *block, gfloat_t scale)
   gcode_template_t *template;
   gcode_block_t *index_block;
 
-  template = (gcode_template_t *) block->pdata;
+  template = (gcode_template_t *)block->pdata;
+
   template->position[0] *= scale;
   template->position[1] *= scale;
 
-  index_block = template->list;
+  index_block = block->listhead;
+
   while (index_block)
   {
-    if (index_block->scale) /* Because a Tool could be part of this list */
+    if (index_block->scale)                                                     /* Because a Tool could be part of this list */
       index_block->scale (index_block, scale);
+
     index_block = index_block->next;
   }
 }

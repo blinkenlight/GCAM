@@ -1,26 +1,34 @@
-/*
-*  gui_endmills.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gui_endmills.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gui_endmills.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <expat.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 void
 gui_endmills_init (gui_endmill_list_t *endmill_list)
@@ -28,7 +36,6 @@ gui_endmills_init (gui_endmill_list_t *endmill_list)
   endmill_list->num = 0;
   endmill_list->endmill = NULL;
 }
-
 
 void
 gui_endmills_free (gui_endmill_list_t *endmill_list)
@@ -38,111 +45,139 @@ gui_endmills_free (gui_endmill_list_t *endmill_list)
   endmill_list->endmill = NULL;
 }
 
-
 static void
-start (void *data, const char *el, const char **attr)
+start (void *data, const char *xmlelem, const char **xmlattr)
 {
   gui_endmill_list_t *endmill_list;
+  char tag[256], name[256];
+  char *value;
   int i;
 
+  endmill_list = (gui_endmill_list_t *)data;
 
-  endmill_list = (gui_endmill_list_t *) data;
-  if (strcmp ("endmill", el))
-    return;
+  strcpy (tag, xmlelem);
+  strswp (tag, '_', '-');
 
-  endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->num+1) * sizeof (gui_endmill_t));
-  strcpy (endmill_list->endmill[endmill_list->num].description, "");
-
-  for (i = 0; attr[i]; i+= 2)
+  if (strcmp (tag, GCODE_XML_TAG_ENDMILL) == 0)
   {
-    if (!strcmp ("number", attr[i]))
-      endmill_list->endmill[endmill_list->num].number = (uint8_t) atoi (attr[i+1]);
+    endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->num + 1) * sizeof (gui_endmill_t));
+    strcpy (endmill_list->endmill[endmill_list->num].description, "");
 
-    if (!strcmp ("diameter", attr[i]))
-      endmill_list->endmill[endmill_list->num].diameter = atof (attr[i+1]);
-
-    if (!strcmp ("unit", attr[i]))
+    for (i = 0; xmlattr[i]; i += 2)
     {
-      if (!strcmp ("inch", attr[i+1]))
+      strcpy (name, xmlattr[i]);
+      strswp (name, '_', '-');
+
+      value = (char *)xmlattr[i + 1];
+
+      if (strcmp (name, GCODE_XML_ATTR_ENDMILL_NUMBER) == 0)
       {
-        endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_INCH;
+        endmill_list->endmill[endmill_list->num].number = (uint8_t)atoi (value);
       }
-      else if (!strcmp ("millimeter", attr[i+1]))
+      else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DIAMETER) == 0)
       {
-        endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_MILLIMETER;
+        endmill_list->endmill[endmill_list->num].diameter = atof (value);
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_UNIT) == 0)
+      {
+        if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_INCH) == 0)
+        {
+          endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_INCH;
+        }
+        else if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_MILLIMETER) == 0)
+        {
+          endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_MILLIMETER;
+        }
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DESCRIPTION) == 0)
+      {
+        strcpy (endmill_list->endmill[endmill_list->num].description, value);
       }
     }
 
-    if (!strcmp ("description", attr[i]))
-      strcpy (endmill_list->endmill[endmill_list->num].description, attr[i+1]);
+    endmill_list->num++;
   }
-
-  endmill_list->num++;
 }
-
 
 static void
-end (void *data, const char *el)
+end (void *data, const char *xmlelem)
 {
 }
-
 
 int
 gui_endmills_read (gui_endmill_list_t *endmill_list, gcode_t *gcode)
 {
-  XML_Parser p = XML_ParserCreate ("US-ASCII");
-  FILE *fh;
-  int len, i;
-  char endmills_file[256], *buffer;
+  FILE *fh = NULL;
+  int length, nomore, i;
+  char fullpath[256], *filename, *buffer;
+
+  filename = (char *)GCODE_XML_ENDMILLS_FILENAME;
+
+  XML_Parser parser = XML_ParserCreate ("UTF-8");
 
   endmill_list->num = 0;
 
-  if (!p)
+  if (!parser)
   {
-    fprintf (stderr, "Couldn't allocate memory for parser\n");
+    REMARK ("Failed to allocate memory for XML parser\n");
     return (1);
   }
 
-  XML_SetElementHandler (p, start, end);
-  XML_SetUserData (p, endmill_list);
+  XML_SetElementHandler (parser, start, end);
+  XML_SetUserData (parser, endmill_list);
 
-  /* Read in endmills.xml file */
+  /* Open and read the file 'endmills.xml' */
 
-  sprintf (endmills_file, "%s%s", SHARE_PREFIX, "endmills.xml");
-  fh = fopen (endmills_file, "r");
+#ifdef WIN32
+  GetModuleFileName (NULL, fullpath, 230);                                      // Try to open from where the executable runs;
+  sprintf (fullpath, "%s\\share\\%s", dirname (fullpath), filename);
+#else
+  sprintf (fullpath, "%s%s", SHARE_PREFIX, filename);                           // Try to open from formal Linux install path;
+#endif
 
-  /* Try to open from current working directory */
-  if (!fh)
+  fh = fopen (fullpath, "r");
+
+  if (!fh)                                                                      // Try to open from current working directory;
   {
-    getcwd (endmills_file, 255);
-    sprintf (endmills_file, "%s/share/%s", endmills_file, "endmills.xml");
-    fh = fopen (endmills_file, "r");
+    getcwd (fullpath, 230);
+
+#ifdef WIN32
+    sprintf (fullpath, "%s\\share\\%s", fullpath, filename);                    // Rather astonishingly this isn't actually necessary: forward slashes work ok,
+#else
+    sprintf (fullpath, "%s/share/%s", fullpath, filename);                      // even in WIN32; but that doesn't mean we shouldn't act in a civilized manner.
+#endif
+
+    fh = fopen (fullpath, "r");
   }
 
-  if (!fh)
+  if (!fh)                                                                      // Shiver me timbers! Plan C - proceed to panic at flank speed, aaaarrrrrgh...!
   {
-    XML_ParserFree (p);
+    REMARK ("Failed to open file '%s'\n", filename);
+    XML_ParserFree (parser);
     return (1);
   }
-
 
   fseek (fh, 0, SEEK_END);
-  len = ftell (fh);
-  buffer = (char *) malloc (len);
+  length = ftell (fh);
+  buffer = (char *)malloc (length);
   fseek (fh, 0, SEEK_SET);
-  fread (buffer, len, 1, fh);
+  nomore = fread (buffer, 1, length, fh);
 
-  if (XML_Parse (p, buffer, len, 1) == XML_STATUS_ERROR)
+  if (XML_Parse (parser, buffer, nomore, 1) == XML_STATUS_ERROR)
   {
-    fprintf(stderr, "Parse error at line %d:\n%s\n", (int) XML_GetCurrentLineNumber(p), XML_ErrorString(XML_GetErrorCode(p)));
+    REMARK ("XML parse error in file '%s' at line %d: %s\n", filename, (int)XML_GetCurrentLineNumber (parser), XML_ErrorString (XML_GetErrorCode (parser)));
+    XML_ParserFree (parser);
+    free (buffer);
+    fclose (fh);
     return (1);
   }
 
-  fclose (fh);
+  XML_ParserFree (parser);
   free (buffer);
-  XML_ParserFree (p);
+  fclose (fh);
 
   /* Alter diameter of end mill to match current unit system */
+
   for (i = 0; i < endmill_list->num; i++)
   {
     if (endmill_list->endmill[i].unit == GCODE_UNITS_INCH && gcode->units == GCODE_UNITS_MILLIMETER)

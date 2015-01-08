@@ -1,6 +1,9 @@
 README
 Source code file for G-Code generation, simulation, and visualization
-library. This software is Copyright (C) 2006 by Justin Shumaker
+library.
+
+Copyright (C) 2006 - 2010 by Justin Shumaker
+Copyright (C) 2014 by Asztalos Attila Oszkár
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -9,40 +12,47 @@ the Free Software Foundation, either version 3 of the License, or
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-GCAM - GNU Computer Aided Manufacturing 
-=======================================
+GCAM Special Edition - GNU Computer Aided Manufacturing 
+=======================================================
 GCAM is a free CNC milling package that was designed to make generating 
-g-code a fast and robust process.  New projects in GCAM start by asking 
+g-code a fast and robust process. New projects in GCAM start by asking 
 the user to enter in a set of parameters that correspond to the material 
-and machine being used.  Once completed, a block of virtual material 
-appears in a 3d window.  This block of material represents the same 
-block of material that will be cut on the CNC mill.  In addition, a set 
-of default "code blocks" appear in the block list.  Additional code 
+and machine being used. Once completed, a block of virtual material 
+appears in a 3d window. This block of material represents the same 
+block of material that will be cut on the CNC mill. In addition, a set 
+of default "code blocks" appear in the block list. Additional code 
 blocks must be inserted to mill away material from the block to achieve 
-the desired part.  After completing this process the user can export the 
+the desired part. After completing this process the user can export the 
 corresponding g-code for use on their CNC mill.
 
 
 History
 =======
-GCAM was started by Justin Shumaker in February 2006.  He had recently 
+GCAM was started by Justin Shumaker in February 2006. He had recently 
 purchased a CNC mill and wanted to download a free CAM package that 
-would allow him to generate tool paths through a GUI.  After discovering 
+would allow him to generate tool paths through a GUI. After discovering 
 a plethora of $100 - $200 packages and only a handful of free packages 
 in the form of command line scripts he endeavored to make a robust CAM 
-package free to everyone.  His hope is that free CAM software and low 
+package free to everyone. His hope is that free CAM software and low 
 cost CNC hardware will motivate individuals to create parts in their own 
 workshop.
 
-CNC Milling is not a particularly inexpensive hobby to get into.  A 
-micro CNC mill can cost on average between $1,000 - $2,000 USD.  
+Nearly a decade later very little seems to have changed - easy to use, 
+free CAM software for simple 2.5D milling is still exceedingly scarce, 
+which means maintenance of GCAM continues to make sense even if it isn't 
+expected to compete with professional CAM packages available today. 
+By 2014 the original website was gone, so an archived copy of GCAM was 
+picked up by Asztalos Attila Oszkár and GCAM Special Edition was born.
+
+CNC Milling is not a particularly inexpensive hobby to get into. A 
+micro CNC mill can cost on average between $1,000 - $2,000 USD. 
 Commercial Off The Shelf (COTS) milling software can cost between $100 
 and $10,000 USD. The purpose of creating this software was to help make 
 CNC Milling as affordable as possible for anyone to get into.

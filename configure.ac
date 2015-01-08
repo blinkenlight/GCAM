@@ -1,7 +1,10 @@
 ########################################################################
 #  configure.ac
 #  Source code file for G-Code generation, simulation, and visualization
-#  library. This software is Copyright (C) 2006 by Justin Shumaker
+#  library.
+#
+#  Copyright (C) 2006 - 2010 by Justin Shumaker
+#  Copyright (C) 2014 by Asztalos Attila Oszkár
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,8 +22,9 @@
 AC_INIT
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([gcam.c])
+AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT([/usr/local/gcam])
-AM_INIT_AUTOMAKE(gcam, 2010.07.27)
+AM_INIT_AUTOMAKE(gcam, 2014.05.23)
 
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -42,10 +46,13 @@ AC_ARG_ENABLE(windows-console,
         [
                 if test "x$enableval" = "xno"
                 then
+                        want_windows_console=no
                         extra_C_flags="-mwindows"
                 fi
         ]
 )
+
+AC_MSG_RESULT($want_windows_console)
 
 
 ##
@@ -64,17 +71,16 @@ AC_ARG_ENABLE(debug,
 )
 
 AC_MSG_RESULT($want_debug)
+
 if test "x$want_debug" = "xyes"
 then
-        export CFLAGS="-O2 -g -Wall -Wmissing-prototypes -pedantic -pg $extra_C_flags"
+        export CFLAGS="-O0 -std=gnu99 -g -ggdb -Wall -Wmissing-prototypes -Wunused-function -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -pedantic -pg $extra_C_flags"
 else
-        export CFLAGS="-O3 -std=gnu99 -Wmissing-prototypes -pedantic -ffast-math -fomit-frame-pointer $extra_C_flags"
+        export CFLAGS="-O3 -std=gnu99 -Wmissing-prototypes -Wno-unused-function -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -pedantic -ffast-math -fomit-frame-pointer $extra_C_flags"
 fi
-
 
 ## Support for European mantissa issues concerning ',' and '.'
 export LC_NUMERIC="POSIX"
-
 
 ##
 ## GTK
@@ -110,6 +116,10 @@ else
 	AC_SUBST(PNG_LIBS)
 fi
 
+##
+## Define the configuration date
+##
+AC_DEFINE_UNQUOTED([CONFIG_DATE], ["$(date +%Y.%m.%d)"], Config date)
 
 AC_CONFIG_FILES([Makefile \
 		libgcode/Makefile \

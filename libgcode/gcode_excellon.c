@@ -1,21 +1,25 @@
-/*
-*  gcode_excellon.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gcode_excellon.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gcode_gerber.h"
 #include "gcode_drill_holes.h"
 #include "gcode_point.h"
@@ -25,153 +29,157 @@
 #include "gcode_util.h"
 #include "gcode.h"
 
+/**
+ * Open the Excellon drill file 'filename' and import its contents into a series
+ * of alternating 'tool' and 'drill holes' blocks (adding the actual drill holes
+ * as points under these), then insert these under the supplied template block;
+ */
 
 int
-gcode_excellon_import (gcode_t *gcode, gcode_block_t ***block_array, int *block_num, char *filename)
+gcode_excellon_import (gcode_block_t *template_block, char *filename)
 {
   FILE *fh;
-  gcode_drill_holes_t *drill_holes;
-  gcode_point_t *point;
+  gcode_t *gcode;
+  gcode_block_t *tool_block, *drill_block, *point_block;
   gcode_tool_t *tool;
-  gcode_excellon_tool_t *tool_array;
-  gcode_block_t *point_block, *index_block;
-  char *file_buf = NULL, buf[10], mesg[64];
-  int i, file_buf_ind, file_buf_size, buf_ind, start, tool_num, tool_ind, hole_num;
+  gcode_point_t *point;
+  gcode_excellon_tool_t *tool_set;
+  char *buffer = NULL, buf[10];
+  long int length, nomore, index;
+  int buf_ind, start, tool_num, tool_ind;
 
+  gcode = template_block->gcode;
 
-  *block_num = 0;
   start = 0;
-  tool_array = NULL;
+  tool_set = NULL;
   tool_num = 0;
   tool_ind = 0;
-  hole_num = 0;
 
   fh = fopen (filename, "r");
+
   if (!fh)
     return (1);
 
   fseek (fh, 0, SEEK_END);
-  file_buf_size = ftell (fh);
+  length = ftell (fh);
   fseek (fh, 0, SEEK_SET);
-  file_buf = (char *) malloc (file_buf_size);
-  fread (file_buf, 1, file_buf_size, fh);
-  file_buf_ind = 0;
+  buffer = (char *)malloc (length);
+  nomore = fread (buffer, 1, length, fh);
 
-  while (file_buf_ind < file_buf_size)
+  index = 0;
+
+  while (index < nomore)
   {
-    if (file_buf[file_buf_ind] == 'T')
+    if (buffer[index] == 'T')
     {
-      file_buf_ind++;
+      index++;
 
-      buf[0] = file_buf[file_buf_ind];
-      buf[1] = file_buf[file_buf_ind+1];
+      buf[0] = buffer[index];
+      buf[1] = buffer[index + 1];
       buf[2] = 0;
+
       if (start)
       {
-        for (i = 0; i < tool_num && atoi (buf) != tool_array[i].index; i++);
-          tool_ind = i;
+        for (tool_ind = 0; tool_ind < tool_num; tool_ind++)
+          if (atoi (buf) == tool_set[tool_ind].index)
+            break;
 
         /* Create both a tool and drill holes block */
-        *block_array = (gcode_block_t **) realloc (*block_array, (*block_num + 2) * sizeof (gcode_block_t *));
-        gcode_tool_init (gcode, &(*block_array)[*block_num+0], NULL);
-        gcode_drill_holes_init (gcode, &(*block_array)[*block_num+1], NULL);
+        gcode_tool_init (&tool_block, gcode, NULL);
+        gcode_drill_holes_init (&drill_block, gcode, NULL);
 
-        tool = (gcode_tool_t *) (*block_array)[*block_num+0]->pdata;
-        tool->diam = tool_array[tool_ind].diameter;
+        tool = (gcode_tool_t *)tool_block->pdata;
+
+        tool->diameter = tool_set[tool_ind].diameter;
         tool->feed = 1.0;
         tool->prompt = 1;
-        sprintf ((*block_array)[*block_num+0]->comment, "T%d %.4f\"", tool_array[tool_ind].index, tool->diam);
-        sprintf (tool->label, "T%d %.4f\"", tool_array[tool_ind].index, tool->diam);
-        drill_holes = (gcode_drill_holes_t *) (*block_array)[*block_num+1]->pdata;
-        (*block_num) += 2;
+        sprintf (tool_block->comment, "%.4f\" drill (T%d)", tool->diameter, tool_set[tool_ind].index);
+        sprintf (tool->label, "%.4f\" drill (T%d)", tool->diameter, tool_set[tool_ind].index);
+
+        gcode_append_as_listtail (template_block, tool_block);                  // Append 'tool_block' to the end of 'template_block's list (as head if the list is NULL)
+        gcode_append_as_listtail (template_block, drill_block);                 // Append 'drill_block' to the end of 'template_block's list (as head if the list is NULL)
       }
       else
       {
-        tool_array = (gcode_excellon_tool_t *) realloc (tool_array, (tool_num + 1) * sizeof (gcode_excellon_tool_t));
-        tool_array[tool_num].index = atoi (buf);
+        tool_set = (gcode_excellon_tool_t *) realloc (tool_set, (tool_num + 1) * sizeof (gcode_excellon_tool_t));
+        tool_set[tool_num].index = atoi (buf);
 
-        file_buf_ind += 2;
+        index += 2;
 
         /* Skip over 'C' */
-        file_buf_ind++;
+        index++;
 
         buf_ind = 0;
-        while (file_buf[file_buf_ind] != '\n')
+
+        while (buffer[index] != '\n')
         {
-          buf[buf_ind] = file_buf[file_buf_ind];
+          buf[buf_ind] = buffer[index];
           buf_ind++;
-          file_buf_ind++;
+          index++;
         }
 
-        tool_array[tool_num].diameter = atof (buf);
+        tool_set[tool_num].diameter = atof (buf);
         tool_num++;
       }
     }
-    else if (file_buf[file_buf_ind] == '%')
+    else if (buffer[index] == '%')
     {
       if (tool_num > 0)
         start = 1;
-      file_buf_ind++;
+
+      index++;
     }
-    else if (file_buf[file_buf_ind] == 'X')
+    else if (buffer[index] == 'X')
     {
       gfloat_t x, y;
-      file_buf_ind++;
+
+      index++;
 
       buf_ind = 0;
-      while (file_buf[file_buf_ind] != 'Y')
+
+      while (buffer[index] != 'Y')
       {
-        buf[buf_ind] = file_buf[file_buf_ind];
+        buf[buf_ind] = buffer[index];
         buf_ind++;
-        file_buf_ind++;
+        index++;
       }
+
       x = 0.0001 * atof (buf);
-      file_buf_ind++;
+      index++;
 
       buf_ind = 0;
-      while (file_buf[file_buf_ind] != '\n')
-      {
-        buf[buf_ind] = file_buf[file_buf_ind];
-        buf_ind++;
-        file_buf_ind++;
-      }
-      y = 0.0001 * atof (buf);
-      file_buf_ind++;
 
-      gcode_point_init (gcode, &point_block, NULL);
-      point_block->offset = &drill_holes->offset;
-      point = (gcode_point_t *) point_block->pdata;
+      while (buffer[index] != '\n')
+      {
+        buf[buf_ind] = buffer[index];
+        buf_ind++;
+        index++;
+      }
+
+      y = 0.0001 * atof (buf);
+      index++;
+
+      gcode_point_init (&point_block, gcode, drill_block);
+
+      point = (gcode_point_t *)point_block->pdata;
+
       point->p[0] = x;
       point->p[1] = y;
-      /* Append to the end of the current drill_holes list */
-      if (drill_holes->list)
-      {
-        index_block = drill_holes->list;
-        while (index_block->next)
-          index_block = index_block->next;
 
-        gcode_list_insert (&index_block, point_block);
-      }
-      else
-      {
-        gcode_list_insert (&drill_holes->list, point_block);
-      }
-      hole_num++;
+      gcode_append_as_listtail (drill_block, point_block);                      // Append 'point_block' to the end of 'drill_block's list (as head if the list is NULL)
     }
     else
     {
-      while (file_buf[file_buf_ind] != '\n' && file_buf_ind < file_buf_size)
-        file_buf_ind++;
-      file_buf_ind++;
+      while ((buffer[index] != '\n') && (index < nomore))
+        index++;
+
+      index++;
     }
   }
 
-
-  sprintf (mesg, "%d Drill Holes using %d different Tools\n", hole_num, tool_num);
-  gcode->message_callback (gcode->gui, mesg);
-
-  free (tool_array);
-  free (file_buf);
+  free (tool_set);
+  free (buffer);
   fclose (fh);
+
   return (0);
 }

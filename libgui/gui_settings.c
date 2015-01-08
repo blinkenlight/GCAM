@@ -1,118 +1,150 @@
-/*
-*  gui_settings.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gui_settings.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gui_settings.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <expat.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 void
 gui_settings_init (gui_settings_t *settings)
 {
- settings->voxel_resolution = 250;
+  settings->voxel_resolution = 250;
 }
-
 
 void
 gui_settings_free (gui_settings_t *settings)
 {
 }
 
-
 static void
-start (void *data, const char *el, const char **attr)
+start (void *data, const char *xmlelem, const char **xmlattr)
 {
   gui_settings_t *settings;
+  char tag[256], name[256];
+  char *value;
   int i;
 
+  settings = (gui_settings_t *)data;
 
-  settings = (gui_settings_t *) data;
-  if (strcmp ("setting", el))
-    return;
+  strcpy (tag, xmlelem);
+  strswp (tag, '_', '-');
 
-  for (i = 0; attr[i]; i+= 2)
+  if (strcmp (tag, GCODE_XML_TAG_SETTING) == 0)
   {
-    if (!strcmp ("voxel_resolution", attr[i]))
-      settings->voxel_resolution = atoi (attr[i+1]);
+    for (i = 0; xmlattr[i]; i += 2)
+    {
+      strcpy (name, xmlattr[i]);
+      strswp (name, '_', '-');
+
+      value = (char *)xmlattr[i + 1];
+
+      if (strcmp (name, GCODE_XML_ATTR_SETTING_VOXEL_RESOLUTION) == 0)
+      {
+        settings->voxel_resolution = atoi (value);
+      }
+    }
   }
 }
 
-
 static void
-end (void *data, const char *el)
+end (void *data, const char *xmlelem)
 {
 }
-
 
 int
 gui_settings_read (gui_settings_t *settings)
 {
-  XML_Parser p = XML_ParserCreate ("US-ASCII");
-  FILE *fh;
-  int len;
-  char settings_file[256], *buffer;
+  FILE *fh = NULL;
+  int length, nomore;
+  char fullpath[256], *filename, *buffer;
 
+  filename = (char *)GCODE_XML_SETTINGS_FILENAME;
 
-  if (!p)
+  XML_Parser parser = XML_ParserCreate ("UTF-8");
+
+  if (!parser)
   {
-    fprintf (stderr, "Couldn't allocate memory for parser\n");
+    REMARK ("Failed to allocate memory for XML parser\n");
     return (1);
   }
 
-  XML_SetElementHandler (p, start, end);
-  XML_SetUserData (p, settings);
+  XML_SetElementHandler (parser, start, end);
+  XML_SetUserData (parser, settings);
 
-  /* Read in settings.xml file */
+  /* Open and read the file 'settings.xml' */
 
-  sprintf (settings_file, "%s%s", SHARE_PREFIX, "settings.xml");
-  fh = fopen (settings_file, "r");
+#ifdef WIN32
+  GetModuleFileName (NULL, fullpath, 230);                                      // Try to open from where the executable runs;
+  sprintf (fullpath, "%s\\share\\%s", dirname (fullpath), filename);
+#else
+  sprintf (fullpath, "%s%s", SHARE_PREFIX, filename);                           // Try to open from formal Linux install path;
+#endif
 
-  /* Try to open from current working directory */
-  if (!fh)
+  fh = fopen (fullpath, "r");
+
+  if (!fh)                                                                      // Try to open from current working directory;
   {
-    getcwd (settings_file, 255);
-    sprintf (settings_file, "%s/share/%s", settings_file, "settings.xml");
-    fh = fopen (settings_file, "r");
+    getcwd (fullpath, 230);
+
+#ifdef WIN32
+    sprintf (fullpath, "%s\\share\\%s", fullpath, filename);                    // Rather astonishingly this isn't actually necessary: forward slashes work ok,
+#else
+    sprintf (fullpath, "%s/share/%s", fullpath, filename);                      // even in WIN32; but that doesn't mean we shouldn't act in a civilized manner.
+#endif
+
+    fh = fopen (fullpath, "r");
   }
 
-  if (!fh)
+  if (!fh)                                                                      // Shiver me timbers! Plan C - proceed to panic at flank speed, aaaarrrrrgh...!
   {
-    XML_ParserFree (p);
+    REMARK ("Failed to open file '%s'\n", filename);
+    XML_ParserFree (parser);
     return (1);
   }
-
 
   fseek (fh, 0, SEEK_END);
-  len = ftell (fh);
-  buffer = (char *) malloc (len);
+  length = ftell (fh);
+  buffer = (char *)malloc (length);
   fseek (fh, 0, SEEK_SET);
-  fread (buffer, len, 1, fh);
+  nomore = fread (buffer, 1, length, fh);
 
-  if (XML_Parse (p, buffer, len, 1) == XML_STATUS_ERROR)
+  if (XML_Parse (parser, buffer, nomore, 1) == XML_STATUS_ERROR)
   {
-    fprintf(stderr, "Parse error at line %d:\n%s\n", (int) XML_GetCurrentLineNumber(p), XML_ErrorString(XML_GetErrorCode(p)));
+    REMARK ("XML parse error in file '%s' at line %d: %s\n", filename, (int)XML_GetCurrentLineNumber (parser), XML_ErrorString (XML_GetErrorCode (parser)));
+    XML_ParserFree (parser);
+    free (buffer);
+    fclose (fh);
     return (1);
   }
 
-  fclose (fh);
+  XML_ParserFree (parser);
   free (buffer);
-  XML_ParserFree (p);
+  fclose (fh);
 
   return (0);
 }
