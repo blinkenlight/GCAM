@@ -19,10 +19,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _GCAM_ICON_H
+#define _GCAM_ICON_H
+
 /* *INDENT-OFF* */
 
 /* XPM */
-const char * gcam_icon_xpm[] = {
+const char *gcam_icon_xpm[] = {
 "128 128 232 2",
 "   c None",
 ".  c #E6E6E6",
@@ -386,3 +389,5 @@ const char * gcam_icon_xpm[] = {
 "                                                                                                                                                                                                                                                                "};
 
 /* *INDENT-ON* */
+
+#endif

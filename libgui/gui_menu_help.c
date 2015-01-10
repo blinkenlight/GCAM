@@ -38,21 +38,32 @@ void
 gui_menu_help_about_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   gui_t *gui;
-  char message[512];
+  GdkPixbuf *logo;
+  char comments[512];
+  char copyright[512];
 
   gui = (gui_t *)data;
 
-  /* *INDENT-OFF* */
+  logo = gtk_window_get_icon (GTK_WINDOW (gui->window));
 
-  sprintf (message, "GCAM Special Edition v%s\n( package build date %s )\n\n"
-                    "AUTHOR: Justin Shumaker\n"
-                    "WEBSITE: http://gcam.js.cx\n"
-                    "EMAIL: justin@js.cx\n\n"
-                    "EDITOR: Asztalos Attila Oszk\u00E1r\n"
-                    "GIT: http://github.com/blinkenlight/gcam",
-                    VERSION, BUILD_DATE);
+  sprintf (comments,
+           "version %s, built on %s\n\n"
+           "2.5D CAD/CAM and G-code generator\n\n"
+           "http://gcam.js.cx\n"
+           "http://github.com/blinkenlight/gcam\n",
+           VERSION, BUILD_DATE);
 
-  /* *INDENT-ON* */
+  sprintf (copyright,
+           "Copyright (C) 2006 - 2010 Justin Shumaker\n"
+           "justin@js.cx\n\n"
+           "Copyright (C) 2014 Asztalos Attila Oszkár\n"
+           "attila.asztalos@gmail.com");
 
-  generic_dialog (gui, message);
+  gtk_show_about_dialog (GTK_WINDOW (gui->window),
+                         "program-name", "  GCAM Special Edition  ",
+                         "title", "About GCAM Special Edition",
+                         "comments", comments,
+                         "copyright", copyright,
+                         "logo", logo,
+                         NULL);
 }
