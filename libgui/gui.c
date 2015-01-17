@@ -887,10 +887,61 @@ gui_init (char *filename)
 
   /* Create menu bar */
   {
+    GtkIconSet *icon_set;
+    GtkIconFactory *icon_factory;
     GtkActionGroup *action_group;
     GtkAccelGroup *accel_group;
     GtkWidget *menubar;
     GError *error;
+
+    icon_factory = gtk_icon_factory_new ();
+
+    /* Add "insert" menu icons */
+
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_tool_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_TOOL, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_template_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_TEMPLATE, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_sketch_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_SKETCH, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_arc_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_ARC, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_line_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_LINE, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_bolt_holes_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_BOLT_HOLES, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_drill_holes_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_DRILL_HOLES, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_point_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_POINT, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (insert_image_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_INSERT_IMAGE, icon_set);
+
+    /* Add "assistant" menu icons */
+
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (assist_polygon_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_ASSIST_POLYGON, icon_set);
+
+    /* Add "view" menu icons */
+
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_perspective_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_PERSPECTIVE, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_orthographic_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_ORTHOGRAPHIC, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_top_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_TOP, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_left_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_LEFT, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_right_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_RIGHT, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_front_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_FRONT, icon_set);
+    icon_set = gtk_icon_set_new_from_pixbuf (gdk_pixbuf_new_from_xpm_data (view_back_xpm));
+    gtk_icon_factory_add (icon_factory, GCAM_STOCK_VIEW_BACK, icon_set);
+
+    gtk_icon_factory_add_default (icon_factory);
+
+    /* Create the application menu */
 
     action_group = gtk_action_group_new ("MenuActions");
     gtk_action_group_add_actions (action_group, gui_menu_entries, G_N_ELEMENTS (gui_menu_entries), &gui);

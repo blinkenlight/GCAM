@@ -137,7 +137,7 @@ polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Polygon");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_ASSIST_POLYGON, GTK_ICON_SIZE_DIALOG, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
   g_object_unref (pixbuf);
 }

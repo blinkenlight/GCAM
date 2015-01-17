@@ -4,6 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,4 +20,5 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "gui_define.h"
 #include "gui_menu.h"
