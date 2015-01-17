@@ -69,6 +69,7 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 #define PANEL_BOTTOM_H                  260
 
 #define TABLE_SPACING                   3
+#define BORDER_WIDTH                    12
 
 #define MANTISSA                        5                                       /* Length of Mantissa */
 

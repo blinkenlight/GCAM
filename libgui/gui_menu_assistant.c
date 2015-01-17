@@ -29,24 +29,13 @@
 static void
 polygon_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
 {
+  gui_t *gui;
+
+  gui = (gui_t *)data;
+
   gtk_widget_destroy (widget);
-}
 
-static void
-polygon_on_assistant_prepare (GtkWidget *widget, GtkWidget *page, gpointer data)
-{
-  gint current_page, n_pages;
-  gchar *title;
-
-  current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (widget));
-
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (widget), gtk_assistant_get_nth_page (GTK_ASSISTANT (widget), 0), TRUE);
-
-  n_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (widget));
-
-  title = g_strdup_printf ("Polygon");
-  gtk_window_set_title (GTK_WINDOW (widget), title);
-  g_free (title);
+  free (gui->generic_ptr);
 }
 
 static void
@@ -98,20 +87,18 @@ polygon_on_assistant_apply (GtkWidget *widget, gpointer data)
   gui_opengl_context_redraw (&gui->opengl, selected_block);
 
   update_project_modified_flag (gui, 1);
-
-  free (gui->generic_ptr);
 }
 
-static void
+static GtkWidget *
 polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
 {
   GtkWidget *table, *label, *sides_spin, *radius_spin;
   GdkPixbuf *pixbuf;
 
-  table = gtk_table_new (2, 2, FALSE);
+  table = gtk_table_new (2, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
 
   label = gtk_label_new ("Sides");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
@@ -137,20 +124,25 @@ polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Polygon");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
 
-  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_ASSIST_POLYGON, GTK_ICON_SIZE_DIALOG, NULL);
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_ASSIST_POLYGON, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
   g_object_unref (pixbuf);
+
+  return (table);
 }
 
 void
 gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget *assistant;
+  GtkWidget *page;
   gui_t *gui;
 
   gui = (gui_t *)data;
 
   assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Polygon");
   gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
@@ -158,12 +150,13 @@ gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
   /* Setup Global Widgets */
   gui->generic_ptr = malloc (2 * sizeof (GtkWidget *));
 
-  polygon_create_page1 (gui, assistant);
+  page = polygon_create_page1 (gui, assistant);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (polygon_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (polygon_on_assistant_prepare), NULL);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), gui);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (polygon_on_assistant_close_cancel), gui);
   g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (polygon_on_assistant_apply), gui);
+
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
 
   gtk_widget_show (assistant);
 }
