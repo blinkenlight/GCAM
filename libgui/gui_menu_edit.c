@@ -658,24 +658,13 @@ gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data)
 static void
 scale_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
 {
+  gui_t *gui;
+
+  gui = (gui_t *)data;
+
   gtk_widget_destroy (widget);
-}
 
-static void
-scale_on_assistant_prepare (GtkWidget *widget, GtkWidget *page, gpointer data)
-{
-  gint current_page, n_pages;
-  gchar *title;
-
-  current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (widget));
-
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (widget), gtk_assistant_get_nth_page (GTK_ASSISTANT (widget), 0), TRUE);
-
-  n_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (widget));
-
-  title = g_strdup_printf ("Scale");
-  gtk_window_set_title (GTK_WINDOW (widget), title);
-  g_free (title);
+  free (gui->generic_ptr);
 }
 
 static void
@@ -698,12 +687,10 @@ scale_on_assistant_apply (GtkWidget *widget, gpointer data)
 
   update_project_modified_flag (gui, 1);
 
-  free (gui->generic_ptr);
-
   gui_tab_display (gui, selected_block, 1);
 }
 
-static void
+static GtkWidget *
 scale_create_page1 (gui_t *gui, GtkWidget *assistant)
 {
   gcode_block_t *selected_block;
@@ -713,16 +700,16 @@ scale_create_page1 (gui_t *gui, GtkWidget *assistant)
 
   get_selected_block (gui, &selected_block, &selected_iter);
 
-  hbox = gtk_hbox_new (FALSE, 12);
-  gtk_container_set_border_width (GTK_CONTAINER (hbox), 12);
+  hbox = gtk_hbox_new (TRUE, TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (hbox), BORDER_WIDTH);
 
   label = gtk_label_new ("Factor");
-  gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (hbox), label, TRUE, TRUE, 0);
 
   factor_spin = gtk_spin_button_new_with_range (0.0001, SCALED_INCHES (10.0), 0.001);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (factor_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (factor_spin), 1.0);
-  gtk_box_pack_start (GTK_BOX (hbox), factor_spin, FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (hbox), factor_spin, TRUE, TRUE, 0);
   ((GtkWidget **)gui->generic_ptr)[0] = factor_spin;
 
   gtk_widget_show_all (hbox);
@@ -731,20 +718,25 @@ scale_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), hbox, "Scale");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), hbox, GTK_ASSISTANT_PAGE_CONFIRM);
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_SCALE, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
   g_object_unref (pixbuf);
+
+  return (hbox);
 }
 
 void
 gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget *assistant;
+  GtkWidget *page;
   gui_t *gui;
 
   gui = (gui_t *)data;
 
   assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Scale");
   gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
@@ -752,12 +744,13 @@ gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
   /* Setup Global Widgets */
   gui->generic_ptr = malloc (sizeof (GtkWidget *));
 
-  scale_create_page1 (gui, assistant);
+  page = scale_create_page1 (gui, assistant);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (scale_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (scale_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (scale_on_assistant_prepare), NULL);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (scale_on_assistant_close_cancel), gui);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (scale_on_assistant_close_cancel), gui);
   g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (scale_on_assistant_apply), gui);
+
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
 
   gtk_widget_show (assistant);
 }
@@ -834,24 +827,13 @@ gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data)
 static void
 fillet_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
 {
+  gui_t *gui;
+
+  gui = (gui_t *)data;
+
   gtk_widget_destroy (widget);
-}
 
-static void
-fillet_on_assistant_prepare (GtkWidget *widget, GtkWidget *page, gpointer data)
-{
-  gint current_page, n_pages;
-  gchar *title;
-
-  current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (widget));
-
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (widget), gtk_assistant_get_nth_page (GTK_ASSISTANT (widget), 0), TRUE);
-
-  n_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (widget));
-
-  title = g_strdup_printf ("Fillet");
-  gtk_window_set_title (GTK_WINDOW (widget), title);
-  g_free (title);
+  free (gui->generic_ptr);
 }
 
 static void
@@ -900,7 +882,6 @@ fillet_previous_on_assistant_apply (GtkWidget *widget, gpointer data)
   update_project_modified_flag (gui, 1);
 
   gtk_tree_path_free (path);
-  free (gui->generic_ptr);
 }
 
 static void
@@ -931,11 +912,9 @@ fillet_next_on_assistant_apply (GtkWidget *widget, gpointer data)
   gui_opengl_context_redraw (&gui->opengl, selected_block);
 
   update_project_modified_flag (gui, 1);
-
-  free (gui->generic_ptr);
 }
 
-static void
+static GtkWidget *
 fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
 {
   gcode_block_t *selected_block;
@@ -947,16 +926,16 @@ fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
   get_selected_block (gui, &selected_block, &selected_iter);
   tool = gcode_tool_find (selected_block);
 
-  hbox = gtk_hbox_new (FALSE, 12);
-  gtk_container_set_border_width (GTK_CONTAINER (hbox), 12);
+  hbox = gtk_hbox_new (TRUE, TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (hbox), BORDER_WIDTH);
 
   label = gtk_label_new ("Radius");
-  gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (hbox), label, TRUE, TRUE, 0);
 
   radius_spin = gtk_spin_button_new_with_range (0.0001, SCALED_INCHES (10.0), 0.001);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), SCALED_INCHES (0.5 * tool->diameter));
-  gtk_box_pack_start (GTK_BOX (hbox), radius_spin, FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (hbox), radius_spin, TRUE, TRUE, 0);
   ((GtkWidget **)gui->generic_ptr)[0] = radius_spin;
 
   gtk_widget_show_all (hbox);
@@ -965,20 +944,35 @@ fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), hbox, "Fillet");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), hbox, GTK_ASSISTANT_PAGE_CONFIRM);
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
-  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
-  g_object_unref (pixbuf);
+  if (strstr (gtk_window_get_title (GTK_WINDOW (assistant)), "prev"))
+  {
+    pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_FILLET_PREV, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+    gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
+    g_object_unref (pixbuf);
+  }
+
+  if (strstr (gtk_window_get_title (GTK_WINDOW (assistant)), "next"))
+  {
+    pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_FILLET_NEXT, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+    gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
+    g_object_unref (pixbuf);
+  }
+
+  return (hbox);
 }
 
 void
 gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget *assistant;
+  GtkWidget *page;
   gui_t *gui;
 
   gui = (gui_t *)data;
 
   assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Fillet previous");
   gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
@@ -986,12 +980,13 @@ gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer dat
   /* Setup Global Widgets */
   gui->generic_ptr = malloc (sizeof (GtkWidget *));
 
-  fillet_create_page1 (gui, assistant);
+  page = fillet_create_page1 (gui, assistant);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (fillet_on_assistant_prepare), NULL);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
   g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_previous_on_assistant_apply), gui);
+
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
 
   gtk_widget_show (assistant);
 }
@@ -1000,11 +995,14 @@ void
 gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget *assistant;
+  GtkWidget *page;
   gui_t *gui;
 
   gui = (gui_t *)data;
 
   assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Fillet next");
   gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
@@ -1012,12 +1010,13 @@ gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
   /* Setup Global Widgets */
   gui->generic_ptr = malloc (sizeof (GtkWidget *));
 
-  fillet_create_page1 (gui, assistant);
+  page = fillet_create_page1 (gui, assistant);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (fillet_on_assistant_prepare), NULL);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
   g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_next_on_assistant_apply), gui);
+
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
 
   gtk_widget_show (assistant);
 }
