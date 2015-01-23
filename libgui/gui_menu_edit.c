@@ -111,18 +111,29 @@ gui_menu_edit_optimize_order_menuitem_callback (GtkWidget *widget, gpointer data
   update_project_modified_flag (gui, 1);
 }
 
+static void
+pattern_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
+{
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
 /**
  * Generate a periodic pattern from the contents of the currently selected block
  */
 
 static void
-generate_pattern_callback (GtkWidget *widget, gpointer data)
+pattern_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
+  gui_t *gui;
   GtkWidget **wlist;
   GtkTreeIter selected_iter, new_iter;
   gcode_block_t *selected_block;
-  gui_t *gui;
-  int i;
 
   wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
 
@@ -135,29 +146,25 @@ generate_pattern_callback (GtkWidget *widget, gpointer data)
   if (selected_block->type == GCODE_TYPE_SKETCH)                                // If it's a 'sketch' block, call the sketch pattern generator;
   {
     gcode_sketch_pattern (selected_block,
+      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
+      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
   }
   else if (selected_block->type == GCODE_TYPE_DRILL_HOLES)                      // If it's a 'drill holes' block, call the drill holes pattern generator;
   {
     gcode_drill_holes_pattern (selected_block,
+      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4])),
       gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
+      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
   }
 
   /* *INDENT-ON* */
-
-  gtk_widget_destroy (wlist[1]);                                                // Destroy the window along with all of its widgets - it's no longer needed;
-
-  free (wlist);                                                                 // Free the GUI context;
 
   new_iter = gui_insert_after_iter (gui, &selected_iter, selected_block);       // Make a sub-tree from the updated block and insert it after the original iter;
 
@@ -173,10 +180,10 @@ generate_pattern_callback (GtkWidget *widget, gpointer data)
   update_project_modified_flag (gui, 1);                                        // Finally, mark the project as 'changed'.
 }
 
-void
-gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer data)
+static GtkWidget *
+pattern_create_page1 (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *window;
+  gui_t *gui;
   GtkWidget *table;
   GtkWidget *label;
   GtkWidget *iterations_spin;
@@ -185,89 +192,116 @@ gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer da
   GtkWidget *rotate_aboutx_spin;
   GtkWidget *rotate_abouty_spin;
   GtkWidget *rotation_spin;
-  GtkWidget *generate_button;
   GtkWidget **wlist;
-  gui_t *gui;
-  int row = 0;
+  GdkPixbuf *pixbuf;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;
 
-  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
+  gui = (gui_t *)wlist[0];
 
-  window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_modal (GTK_WINDOW (window), TRUE);
-  gtk_window_set_transient_for (GTK_WINDOW (window), GTK_WINDOW (gui->window));
-  gtk_window_set_position (GTK_WINDOW (window), GTK_WIN_POS_MOUSE);
-  gtk_window_set_title (GTK_WINDOW (window), "Generate Pattern");
-  gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
-
-  table = gtk_table_new (8, 4, FALSE);
+  table = gtk_table_new (6, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
-  gtk_container_add (GTK_CONTAINER (window), table);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
 
   label = gtk_label_new ("Iterations");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
-  iterations_spin = gtk_spin_button_new_with_range (1, 100, 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
+  iterations_spin = gtk_spin_button_new_with_range (2, 100, 1);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (iterations_spin), 0);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (iterations_spin), 1);
-  gtk_table_attach_defaults (GTK_TABLE (table), iterations_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (iterations_spin), 2);
+  gtk_table_attach_defaults (GTK_TABLE (table), iterations_spin, 1, 2, 0, 1);
 
   label = gtk_label_new ("Translate(X)");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
+
   translatex_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatex_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 1, 2);
 
   label = gtk_label_new ("Translate(Y)");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
+
   translatey_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatey_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 2, 3);
 
   label = gtk_label_new ("Rotate About(X)");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
+
   rotate_aboutx_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 3, 4);
 
   label = gtk_label_new ("Rotate About(Y)");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
+
   rotate_abouty_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 4, 5);
 
   label = gtk_label_new ("Rotation");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
+
   rotation_spin = gtk_spin_button_new_with_range (-180.0, 180.0, 0.1);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), rotation_spin, 1, 2, row, row + 1);
-  row++;
+  gtk_table_attach_defaults (GTK_TABLE (table), rotation_spin, 1, 2, 5, 6);
+
+  wlist[1] = iterations_spin;
+  wlist[2] = translatex_spin;
+  wlist[3] = translatey_spin;
+  wlist[4] = rotate_aboutx_spin;
+  wlist[5] = rotate_abouty_spin;
+  wlist[6] = rotation_spin;
+
+  gtk_widget_show_all (table);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Pattern");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_GENERATE_PATTERN, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+
+  return (table);
+}
+
+void
+gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget *page;
+  GtkWidget **wlist;
+
+  gui = (gui_t *)data;
+
+  assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Generate Pattern");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
+
+  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
 
   wlist[0] = (GtkWidget *)gui;
-  wlist[1] = window;
-  wlist[2] = iterations_spin;
-  wlist[3] = translatex_spin;
-  wlist[4] = translatey_spin;
-  wlist[5] = rotate_aboutx_spin;
-  wlist[6] = rotate_abouty_spin;
-  wlist[7] = rotation_spin;
 
-  generate_button = gtk_button_new_with_label ("Generate");
-  gtk_table_attach_defaults (GTK_TABLE (table), generate_button, 0, 2, row, row + 1);
-  g_signal_connect (G_OBJECT (generate_button), "clicked", G_CALLBACK (generate_pattern_callback), wlist);
-  gtk_widget_show_all (window);
+  page = pattern_create_page1 (assistant, wlist);
+
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (pattern_on_assistant_apply), wlist);
+
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
+
+  gtk_widget_show (assistant);
 }
 
 void
