@@ -1181,32 +1181,39 @@ gui_menu_file_import_gcam_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 /**
- * Destroy or free every dynamic resource related to the Gerber import assistant;
- * NOTE: This is a callback for the Gerber import assistant's "cancel" event
+ * Destroy/free any dynamic resources related to the Gerber import assistant;
+ * NOTE: This is a callback for the Gerber import assistant's "cancel" event,
+ * but it is also called after a normal "apply", when the assistant closes.
  */
 
 static void
-gerber_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
+gerber_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
-  gtk_widget_destroy (widget);                                                  // Destroy the Gerber import assistant;
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
 }
 
 /**
  * Init/update the current page of the Gerber import assistant on a page change;
- * NOTE: This is a callback for the Gerber import assistant's "prepare" event
+ * NOTE: This is a callback for the Gerber import assistant's "prepare" event.
  */
 
 static void
-gerber_on_assistant_prepare (GtkWidget *widget, GtkWidget *page, gpointer data)
+gerber_on_assistant_prepare (GtkWidget *assistant, GtkWidget *page, gpointer data)
 {
-  gint current_page, n_pages;
+  gint current_page, number_pages;
   gchar *title;
 
-  current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (widget));
-  n_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (widget));
+  current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (assistant));
+  number_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (assistant));
 
-  title = g_strdup_printf ("Import RS274X (Gerber) Step (%d of %d)", current_page + 1, n_pages);
-  gtk_window_set_title (GTK_WINDOW (widget), title);
+  title = g_strdup_printf ("Import RS274X (Gerber) - Step %d of %d", current_page + 1, number_pages);
+  gtk_window_set_title (GTK_WINDOW (assistant), title);
   g_free (title);
 }
 
@@ -1218,15 +1225,16 @@ gerber_on_assistant_prepare (GtkWidget *widget, GtkWidget *page, gpointer data)
  * the currently selected object (or a suitable parent) in the main tree view;
  * Notably, in this context, "import" implies creation of a number successively 
  * widening isolation contours around the outline of the imported Gerber traces;
- * NOTE: This is a callback for the Gerber import assistant's "apply" event
+ * NOTE: This is a callback for the Gerber import assistant's "apply" event.
  */
 
 static void
-gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
+gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
+  gui_t *gui;
+  GtkWidget **wlist;
   GtkTreeModel *model;
   GtkTreeIter template_iter, parent_iter, selected_iter;
-  gui_t *gui;
   gcode_block_t *template_block, *tool_block, *sketch_block, *selected_block;
   gcode_tool_t *tool;
   gfloat_t depth, offset, initial, step, max, tool_diameter;
@@ -1234,9 +1242,11 @@ gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
   gcode_vec2d_t aabb_min, aabb_max;
   char *text_field, filename[256];
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
 
-  strcpy (filename, gtk_entry_get_text (GTK_ENTRY (((GtkWidget **)gui->generic_ptr)[0])));
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
+
+  strcpy (filename, gtk_entry_get_text (GTK_ENTRY (wlist[1])));
 
   /* Perform a Test Run to see if File passes without errors */
   gcode_sketch_init (&sketch_block, &gui->gcode, NULL);
@@ -1248,7 +1258,7 @@ gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
     return;
   }
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (((GtkWidget **)gui->generic_ptr)[1]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   {
     gui_endmill_list_t endmill_list;
@@ -1313,22 +1323,22 @@ gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
   insert_primitive (gui, tool_block, template_block, &template_iter, GUI_INSERT_UNDER);
 
   tool = (gcode_tool_t *)tool_block->pdata;
-  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[2]));
+  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
   tool->diameter = tool_diameter;
   tool->number = tool_number;
   strcpy (tool->label, text_field);
 
   g_free (text_field);
 
-  depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[3]));
+  depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
 
   gcode_sketch_init (&sketch_block, &gui->gcode, template_block);
   gcode_gerber_import (sketch_block, filename, depth, tool_diameter);
   insert_primitive (gui, sketch_block, template_block, &template_iter, GUI_APPEND_UNDER);
 
-  initial = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[4]));
-  step = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[5]));
-  max = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[6]));
+  initial = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  step = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+  max = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
 
   for (offset = initial; offset < max; offset += step)
   {
@@ -1368,8 +1378,6 @@ gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, selected_block);
-
-  free (gui->generic_ptr);
 }
 
 /**
@@ -1382,10 +1390,12 @@ gerber_on_assistant_apply (GtkWidget *widget, gpointer data)
 static void
 gerber_on_entry_changed (GtkWidget *widget, gpointer data)
 {
-  GtkAssistant *assistant = GTK_ASSISTANT (data);
+  GtkAssistant *assistant;
   GtkWidget *current_page;
   gint page_number;
   const gchar *text;
+
+  assistant = GTK_ASSISTANT (data);
 
   page_number = gtk_assistant_get_current_page (assistant);
   current_page = gtk_assistant_get_nth_page (assistant, page_number);
@@ -1410,11 +1420,14 @@ gerber_on_entry_changed (GtkWidget *widget, gpointer data)
 static void
 gerber_browse_file_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *dialog;
-  GtkFileFilter *filter;
   gui_t *gui;
+  GtkWidget *dialog;
+  GtkWidget **wlist;
+  GtkFileFilter *filter;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
 
   dialog = gtk_file_chooser_dialog_new ("Select Gerber File",
                                         GTK_WINDOW (gui->window),
@@ -1447,7 +1460,7 @@ gerber_browse_file_callback (GtkWidget *widget, gpointer data)
 
     filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
 
-    gtk_entry_set_text (GTK_ENTRY (((GtkWidget **)gui->generic_ptr)[0]), filename);
+    gtk_entry_set_text (GTK_ENTRY (wlist[1]), filename);
 
     g_free (filename);
   }
@@ -1461,38 +1474,58 @@ gerber_browse_file_callback (GtkWidget *widget, gpointer data)
  */
 
 static void
-gerber_create_page1 (GtkWidget *assistant, gui_t *gui)
+gerber_create_page1 (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *hbox, *bbox, *label, *browse_button;
+  gui_t *gui;
+  GtkWidget *vbox;
+  GtkWidget *hbox;
+  GtkWidget *align1;
+  GtkWidget *align2;
+  GtkWidget *label;
+  GtkWidget *file_entry;
+  GtkWidget *browse_button;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
-  hbox = gtk_hbox_new (FALSE, 12);
-  gtk_container_set_border_width (GTK_CONTAINER (hbox), 12);
+  wlist = (GtkWidget **)data;
 
-  label = gtk_label_new ("File:");
-  gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
+  gui = (gui_t *)wlist[0];
 
-  ((GtkWidget **)gui->generic_ptr)[0] = gtk_entry_new ();
-  gtk_box_pack_start (GTK_BOX (hbox), ((GtkWidget **)gui->generic_ptr)[0], TRUE, TRUE, 0);
-  g_signal_connect (G_OBJECT (((GtkWidget **)gui->generic_ptr)[0]), "changed", G_CALLBACK (gerber_on_entry_changed), assistant);
+  vbox = gtk_vbox_new (FALSE, TABLE_SPACING);                                   // New vertical 3-cell box 'vbox'
+  gtk_container_set_border_width (GTK_CONTAINER (vbox), BORDER_WIDTH);
 
-  bbox = gtk_hbutton_box_new ();
-  gtk_button_box_set_layout (GTK_BUTTON_BOX (bbox), GTK_BUTTONBOX_SPREAD);
-  gtk_box_set_spacing (GTK_BOX (bbox), 0);
-  gtk_container_set_border_width (GTK_CONTAINER (bbox), 0);
-  gtk_box_pack_start (GTK_BOX (hbox), bbox, FALSE, FALSE, 0);
+  align1 = gtk_alignment_new (0, 1, 0, 0);
+  gtk_box_pack_start (GTK_BOX (vbox), align1, TRUE, TRUE, 0);                   // 'vbox' cell 1 <- spacer 'align1'
+
+  hbox = gtk_hbox_new (FALSE, TABLE_SPACING);                                   // New horizontal 2-cell box 'hbox'
+  gtk_container_set_border_width (GTK_CONTAINER (hbox), 0);
+  gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);                   // 'vbox' cell 2 <- horizontal box 'hbox'
+
+  align2 = gtk_alignment_new (0, 0, 1, 0);
+  gtk_box_pack_start (GTK_BOX (vbox), align2, TRUE, TRUE, 0);                   // 'vbox' cell 3 <- spacer 'align2'
+
+  label = gtk_label_new ("File to import:");
+  gtk_container_add (GTK_CONTAINER (align1), label);                            // 'align1' <- label 'label'
+
+  file_entry = gtk_entry_new ();
+  gtk_box_pack_start (GTK_BOX (hbox), file_entry, TRUE, TRUE, 0);               // 'hbox' cell 1 <- entry field 'file_entry'
+  g_signal_connect (G_OBJECT (file_entry), "changed", G_CALLBACK (gerber_on_entry_changed), assistant);
 
   browse_button = gtk_button_new_from_stock (GTK_STOCK_OPEN);
-  g_signal_connect (G_OBJECT (browse_button), "clicked", G_CALLBACK (gerber_browse_file_callback), gui);
-  gtk_container_add (GTK_CONTAINER (bbox), browse_button);
+  gtk_box_pack_start (GTK_BOX (hbox), browse_button, FALSE, FALSE, 0);          // 'hbox' cell 2 <- button 'browse_button'
+  g_signal_connect (G_OBJECT (browse_button), "clicked", G_CALLBACK (gerber_browse_file_callback), wlist);
 
-  gtk_widget_show_all (hbox);
-  gtk_assistant_append_page (GTK_ASSISTANT (assistant), hbox);
-  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), hbox, "Choose RS274X (Gerber) File");
-  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), hbox, GTK_ASSISTANT_PAGE_INTRO);
+  wlist[1] = file_entry;
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
-  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
+  gtk_widget_show_all (vbox);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), vbox);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), vbox, "Select File to Import");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), vbox, GTK_ASSISTANT_PAGE_INTRO);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), vbox, FALSE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_OPEN, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), vbox, pixbuf);
   g_object_unref (pixbuf);
 }
 
@@ -1501,21 +1534,51 @@ gerber_create_page1 (GtkWidget *assistant, gui_t *gui)
  */
 
 static void
-gerber_create_page2 (GtkWidget *assistant, gui_t *gui)
+gerber_create_page2 (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *table, *label;
+  gui_t *gui;
+  GtkWidget *vbox1;
+  GtkWidget *vbox2;
+  GtkWidget *hbox1;
+  GtkWidget *hbox2;
+  GtkWidget *hbox3;
+  GtkWidget *label;
+  GtkWidget *tool_combo;
+  GtkWidget *feed_spin;
+  GtkWidget *depth_spin;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
-  table = gtk_table_new (4, 2, FALSE);
-  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
+  wlist = (GtkWidget **)data;
 
-  label = gtk_label_new ("The end mill diameter affects the RS274X to G-Code conversion process.\n"
-                         "Changing this diameter after the conversion will not update the sketches.\n"
-                         "It is recommended that a \"V\" type end mill with a fine point be used.");
+  gui = (gui_t *)wlist[0];
 
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 2, 0, 1);
+  vbox1 = gtk_vbox_new (FALSE, BORDER_WIDTH);                                   // New vertical 2-cell box 'vbox1'
+  gtk_container_set_border_width (GTK_CONTAINER (vbox1), BORDER_WIDTH);
+
+  label = gtk_label_new ("The end mill diameter affects the RS274X to G-Code conversion process. "
+                         "Changing this diameter after the conversion will not update the sketches. "
+                         "The best tool to use is a \"V\"-tip engraving toolbit with a fine point.");
+
+  gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+  gtk_label_set_justify (GTK_LABEL (label), GTK_JUSTIFY_FILL);
+  gtk_box_pack_start (GTK_BOX (vbox1), label, TRUE, TRUE, 0);                   // 'vbox1' cell 1 <- label 'label'
+
+  vbox2 = gtk_vbox_new (FALSE, TABLE_SPACING);                                  // New vertical 3-cell box 'vbox2' (to space other controls away from 'label')
+  gtk_container_set_border_width (GTK_CONTAINER (vbox2), 0);
+  gtk_box_pack_start (GTK_BOX (vbox1), vbox2, FALSE, FALSE, 0);                 // 'vbox1' cell 2 <- vertical box 'vbox2'
+
+  hbox1 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox1' (to space label and control 50% : 50%)
+  gtk_container_set_border_width (GTK_CONTAINER (hbox1), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox1, FALSE, FALSE, 0);                 // 'vbox2' cell 1 <- horizontal box 'hbox1'
+
+  hbox2 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox2'
+  gtk_container_set_border_width (GTK_CONTAINER (hbox2), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox2, FALSE, FALSE, 0);                 // 'vbox2' cell 2 <- horizontal box 'hbox2'
+
+  hbox3 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox3'
+  gtk_container_set_border_width (GTK_CONTAINER (hbox3), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   {
     gui_endmill_list_t endmill_list;
@@ -1525,39 +1588,48 @@ gerber_create_page2 (GtkWidget *assistant, gui_t *gui)
     gui_endmills_read (&endmill_list, &gui->gcode);
 
     label = gtk_label_new ("End Mill");
-    gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
-    ((GtkWidget **)gui->generic_ptr)[1] = gtk_combo_box_new_text ();
+    gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                 // 'hbox1' cell 1 <- label 'label'
+
+    tool_combo = gtk_combo_box_new_text ();
 
     for (i = 0; i < endmill_list.num; i++)
-      gtk_combo_box_append_text (GTK_COMBO_BOX (((GtkWidget **)gui->generic_ptr)[1]), endmill_list.endmill[i].description);
+      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), endmill_list.endmill[i].description);
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (((GtkWidget **)gui->generic_ptr)[1]), 0);
-    gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[1], 1, 2, 1, 2);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
+    gtk_box_pack_start (GTK_BOX (hbox1), tool_combo, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'tool_combo'
 
     gui_endmills_free (&endmill_list);
   }
 
   label = gtk_label_new ("Feed Rate");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
-  ((GtkWidget **)gui->generic_ptr)[2] = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (30.0), SCALED_INCHES (0.01));
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[2]), 2);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[2]), 10.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[2], 1, 2, 2, 3);
+  gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
+
+  feed_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (30.0), SCALED_INCHES (0.01));
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (feed_spin), 2);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), 10.0);
+  gtk_box_pack_start (GTK_BOX (hbox2), feed_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'feed_spin'
 
   label = gtk_label_new ("Cutting Depth");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
-  ((GtkWidget **)gui->generic_ptr)[3] = gtk_spin_button_new_with_range (-SCALED_INCHES (gui->gcode.material_size[2]), 0.0, SCALED_INCHES (0.0001));
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[3]), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[3]), SCALED_INCHES (-0.0045));
-  gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[3], 1, 2, 3, 4);
+  gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
-  gtk_widget_show_all (table);
-  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
-  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Etching Parameters");
+  depth_spin = gtk_spin_button_new_with_range (-SCALED_INCHES (gui->gcode.material_size[2]), 0.0, SCALED_INCHES (0.0001));
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depth_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), SCALED_INCHES (-0.0045));
+  gtk_box_pack_start (GTK_BOX (hbox3), depth_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'depth_spin'
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
-  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  wlist[2] = tool_combo;
+  wlist[3] = feed_spin;
+  wlist[4] = depth_spin;
+
+  gtk_widget_show_all (vbox1);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), vbox1);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), vbox1, "Etching Parameters");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), vbox1, GTK_ASSISTANT_PAGE_CONTENT);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), vbox1, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_OPEN, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), vbox1, pixbuf);
   g_object_unref (pixbuf);
 }
 
@@ -1566,51 +1638,89 @@ gerber_create_page2 (GtkWidget *assistant, gui_t *gui)
  */
 
 static void
-gerber_create_page3 (GtkWidget *assistant, gui_t *gui)
+gerber_create_page3 (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *table, *label;
+  gui_t *gui;
+  GtkWidget *vbox1;
+  GtkWidget *vbox2;
+  GtkWidget *hbox1;
+  GtkWidget *hbox2;
+  GtkWidget *hbox3;
+  GtkWidget *label;
+  GtkWidget *initial_spin;
+  GtkWidget *step_spin;
+  GtkWidget *max_spin;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
-  table = gtk_table_new (3, 2, FALSE);
-  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
+  wlist = (GtkWidget **)data;
 
-  label = gtk_label_new ("The isolation values control the measure of separation between traces\n"
-                         "and surrounding copper.  The Step value should typically be less than the\n"
-                         "diameter of the end mill.  A sketch for each isolation pass will be generated.");
+  gui = (gui_t *)wlist[0];
 
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 2, 0, 1);
+  vbox1 = gtk_vbox_new (FALSE, BORDER_WIDTH);                                   // New vertical 2-cell box 'vbox1'
+  gtk_container_set_border_width (GTK_CONTAINER (vbox1), BORDER_WIDTH);
+
+  label = gtk_label_new ("The isolation values control the separation between traces and surrounding copper. "
+                         "The Step value should typically be less than the tip diameter of the selected tool. "
+                         "A sketch for each isolation pass will be generated.");
+
+  gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+  gtk_label_set_justify (GTK_LABEL (label), GTK_JUSTIFY_FILL);
+  gtk_box_pack_start (GTK_BOX (vbox1), label, TRUE, TRUE, 0);                   // 'vbox1' cell 1 <- label 'label'
+
+  vbox2 = gtk_vbox_new (FALSE, TABLE_SPACING);                                  // New vertical 3-cell box 'vbox2' (to space other controls away from 'label')
+  gtk_container_set_border_width (GTK_CONTAINER (vbox2), 0);
+  gtk_box_pack_start (GTK_BOX (vbox1), vbox2, FALSE, FALSE, 0);                 // 'vbox1' cell 2 <- vertical box 'vbox2'
+
+  hbox1 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox1' (to space label and control 50% : 50%)
+  gtk_container_set_border_width (GTK_CONTAINER (hbox1), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox1, FALSE, FALSE, 0);                 // 'vbox2' cell 1 <- horizontal box 'hbox1'
+
+  hbox2 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox2'
+  gtk_container_set_border_width (GTK_CONTAINER (hbox2), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox2, FALSE, FALSE, 0);                 // 'vbox2' cell 2 <- horizontal box 'hbox2'
+
+  hbox3 = gtk_hbox_new (TRUE, 0);                                               // New horizontal 2-cell box 'hbox3'
+  gtk_container_set_border_width (GTK_CONTAINER (hbox3), 0);
+  gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   label = gtk_label_new ("Initial");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
-  ((GtkWidget **)gui->generic_ptr)[4] = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[4]), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[4]), 0.0002);
-  gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[4], 1, 2, 1, 2);
+  gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                   // 'hbox1' cell 1 <- label 'label'
+
+  initial_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (initial_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (initial_spin), 0.0002);
+  gtk_box_pack_start (GTK_BOX (hbox1), initial_spin, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'initial_spin'
 
   label = gtk_label_new ("Step");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
-  ((GtkWidget **)gui->generic_ptr)[5] = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[5]), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[5]), 0.004);
-  gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[5], 1, 2, 2, 3);
+  gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
+
+  step_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (step_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (step_spin), 0.004);
+  gtk_box_pack_start (GTK_BOX (hbox2), step_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'step_spin'
 
   label = gtk_label_new ("Max");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
-  ((GtkWidget **)gui->generic_ptr)[6] = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[6]), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[6]), 0.02);
-  gtk_table_attach_defaults (GTK_TABLE (table), ((GtkWidget **)gui->generic_ptr)[6], 1, 2, 3, 4);
+  gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
-  gtk_widget_show_all (table);
-  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
-  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Isolation Details");
-  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  max_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (max_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (max_spin), 0.02);
+  gtk_box_pack_start (GTK_BOX (hbox3), max_spin, TRUE, TRUE, 0);                // 'hbox3' cell 2 <- spin 'max_spin'
 
-  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_DIALOG_INFO, GTK_ICON_SIZE_DIALOG, NULL);
-  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  wlist[5] = initial_spin;
+  wlist[6] = step_spin;
+  wlist[7] = max_spin;
+
+  gtk_widget_show_all (vbox1);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), vbox1);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), vbox1, TRUE);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), vbox1, "Isolation Details");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), vbox1, GTK_ASSISTANT_PAGE_CONFIRM);
+
+  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_OPEN, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), vbox1, pixbuf);
   g_object_unref (pixbuf);
 }
 
@@ -1624,26 +1734,31 @@ gerber_create_page3 (GtkWidget *assistant, gui_t *gui)
 void
 gui_menu_file_import_gerber_menuitem_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *assistant;
   gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
   assistant = gtk_assistant_new ();
+
   gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  gui->generic_ptr = malloc (7 * sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
 
-  gerber_create_page1 (assistant, gui);
-  gerber_create_page2 (assistant, gui);
-  gerber_create_page3 (assistant, gui);
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (gerber_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (gerber_on_assistant_close_cancel), &assistant);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (gerber_on_assistant_prepare), NULL);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (gerber_on_assistant_apply), gui);
+  wlist[0] = (void *)gui;
+
+  gerber_create_page1 (assistant, wlist);
+  gerber_create_page2 (assistant, wlist);
+  gerber_create_page3 (assistant, wlist);
+
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (gerber_on_assistant_prepare), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (gerber_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }

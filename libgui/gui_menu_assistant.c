@@ -27,34 +27,37 @@
 #include "gcode.h"
 
 static void
-polygon_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
+polygon_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
-  gui_t *gui;
+  GtkWidget **wlist;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;
 
-  gtk_widget_destroy (widget);
+  gtk_widget_destroy (assistant);
 
-  free (gui->generic_ptr);
+  free (wlist);
 }
 
 static void
-polygon_on_assistant_apply (GtkWidget *widget, gpointer data)
+polygon_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
+  gui_t *gui;
+  GtkWidget **wlist;
   GtkTreeIter selected_iter, sketch_iter;
   gcode_block_t *selected_block, *sketch_block, *line_block;
   gcode_sketch_t *sketch;
   gcode_line_t *line;
   gfloat_t sides, radius, angle;
-  gui_t *gui;
   int i, si;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
 
   get_selected_block (gui, &selected_block, &selected_iter);
 
-  sides = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[0]));
-  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[1]));
+  sides = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
+  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
 
   /* Create Sketch */
   gcode_sketch_init (&sketch_block, &gui->gcode, selected_block);
@@ -89,11 +92,20 @@ polygon_on_assistant_apply (GtkWidget *widget, gpointer data)
   update_project_modified_flag (gui, 1);
 }
 
-static GtkWidget *
-polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
+static void
+polygon_create_page1 (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *table, *label, *sides_spin, *radius_spin;
+  gui_t *gui;
+  GtkWidget *table;
+  GtkWidget *label;
+  GtkWidget *sides_spin;
+  GtkWidget *radius_spin;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
 
   table = gtk_table_new (2, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
@@ -107,7 +119,6 @@ polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sides_spin), 0);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sides_spin), 6);
   gtk_table_attach_defaults (GTK_TABLE (table), sides_spin, 1, 2, 0, 1);
-  ((GtkWidget **)gui->generic_ptr)[0] = sides_spin;
 
   label = gtk_label_new ("Radius");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
@@ -116,27 +127,28 @@ polygon_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), GCODE_UNITS ((&gui->gcode), 0.5));
   gtk_table_attach_defaults (GTK_TABLE (table), radius_spin, 1, 2, 1, 2);
-  ((GtkWidget **)gui->generic_ptr)[1] = radius_spin;
+
+  wlist[1] = sides_spin;
+  wlist[2] = radius_spin;
 
   gtk_widget_show_all (table);
 
   gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Polygon");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
 
   pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_ASSIST_POLYGON, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
   g_object_unref (pixbuf);
-
-  return (table);
 }
 
 void
 gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *assistant;
-  GtkWidget *page;
   gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
@@ -148,15 +160,15 @@ gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  gui->generic_ptr = malloc (2 * sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
 
-  page = polygon_create_page1 (gui, assistant);
+  wlist[0] = (void *)gui;
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (polygon_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (polygon_on_assistant_apply), gui);
+  polygon_create_page1 (assistant, wlist);
 
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (polygon_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }

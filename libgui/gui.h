@@ -64,8 +64,6 @@ typedef struct gui_s
 
   char current_folder[256];
 
-  void *generic_ptr;
-
   int ignore_signals;
 
   int first_render;

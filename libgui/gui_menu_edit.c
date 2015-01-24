@@ -180,7 +180,7 @@ pattern_on_assistant_apply (GtkWidget *assistant, gpointer data)
   update_project_modified_flag (gui, 1);                                        // Finally, mark the project as 'changed'.
 }
 
-static GtkWidget *
+static void
 pattern_create_page1 (GtkWidget *assistant, gpointer data)
 {
   gui_t *gui;
@@ -264,12 +264,11 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Pattern");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
 
   pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_GENERATE_PATTERN, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
   g_object_unref (pixbuf);
-
-  return (table);
 }
 
 void
@@ -277,7 +276,6 @@ gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer da
 {
   gui_t *gui;
   GtkWidget *assistant;
-  GtkWidget *page;
   GtkWidget **wlist;
 
   gui = (gui_t *)data;
@@ -289,17 +287,15 @@ gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer da
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
-  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (7 * sizeof (GtkWidget *));
 
   wlist[0] = (GtkWidget *)gui;
 
-  page = pattern_create_page1 (assistant, wlist);
+  pattern_create_page1 (assistant, wlist);
 
   g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
   g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
   g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (pattern_on_assistant_apply), wlist);
-
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
 
   gtk_widget_show (assistant);
 }
@@ -690,29 +686,33 @@ gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 static void
-scale_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
+scale_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
-  gui_t *gui;
+  GtkWidget **wlist;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;
 
-  gtk_widget_destroy (widget);
+  gtk_widget_destroy (assistant);
 
-  free (gui->generic_ptr);
+  free (wlist);
 }
 
 static void
-scale_on_assistant_apply (GtkWidget *widget, gpointer data)
+scale_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
-  gfloat_t factor;
+  gui_t *gui;
+  GtkWidget **wlist;
   GtkTreeIter selected_iter;
   gcode_block_t *selected_block;
-  gui_t *gui;
+  gfloat_t factor;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
 
   get_selected_block (gui, &selected_block, &selected_iter);
-  factor = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[0]));
+
+  factor = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
 
   selected_block->scale (selected_block, factor);
 
@@ -724,13 +724,21 @@ scale_on_assistant_apply (GtkWidget *widget, gpointer data)
   gui_tab_display (gui, selected_block, 1);
 }
 
-static GtkWidget *
-scale_create_page1 (gui_t *gui, GtkWidget *assistant)
+static void
+scale_create_page1 (GtkWidget *assistant, gpointer data)
 {
-  gcode_block_t *selected_block;
-  GtkWidget *hbox, *label, *factor_spin;
+  gui_t *gui;
+  GtkWidget *hbox;
+  GtkWidget *label;
+  GtkWidget *factor_spin;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
   GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
 
   get_selected_block (gui, &selected_block, &selected_iter);
 
@@ -744,27 +752,27 @@ scale_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (factor_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (factor_spin), 1.0);
   gtk_box_pack_start (GTK_BOX (hbox), factor_spin, TRUE, TRUE, 0);
-  ((GtkWidget **)gui->generic_ptr)[0] = factor_spin;
+
+  wlist[1] = factor_spin;
 
   gtk_widget_show_all (hbox);
 
   gtk_assistant_append_page (GTK_ASSISTANT (assistant), hbox);
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), hbox, "Scale");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), hbox, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), hbox, TRUE);
 
   pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_SCALE, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
   gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
   g_object_unref (pixbuf);
-
-  return (hbox);
 }
 
 void
 gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *assistant;
-  GtkWidget *page;
   gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
@@ -776,15 +784,15 @@ gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  gui->generic_ptr = malloc (sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
 
-  page = scale_create_page1 (gui, assistant);
+  wlist[0] = (void *)gui;
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (scale_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (scale_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (scale_on_assistant_apply), gui);
+  scale_create_page1 (assistant, wlist);
 
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (scale_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -859,31 +867,35 @@ gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 static void
-fillet_on_assistant_close_cancel (GtkWidget *widget, gpointer data)
+fillet_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
-  gui_t *gui;
+  GtkWidget **wlist;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;
 
-  gtk_widget_destroy (widget);
+  gtk_widget_destroy (assistant);
 
-  free (gui->generic_ptr);
+  free (wlist);
 }
 
 static void
-fillet_previous_on_assistant_apply (GtkWidget *widget, gpointer data)
+fillet_previous_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
-  gfloat_t radius;
-  gcode_block_t *selected_block, *prev_connected_block, *fillet_block;
-  GtkTreeIter selected_iter;
-  GtkTreePath *path;
-  GtkTreeModel *model;
   gui_t *gui;
+  GtkWidget **wlist;
+  GtkTreeModel *model;
+  GtkTreePath *path;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block, *prev_connected_block, *fillet_block;
+  gfloat_t radius;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
 
   get_selected_block (gui, &selected_block, &selected_iter);
-  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[0]));
+
+  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
 
   prev_connected_block = gcode_sketch_prev_connected (selected_block);
 
@@ -919,17 +931,21 @@ fillet_previous_on_assistant_apply (GtkWidget *widget, gpointer data)
 }
 
 static void
-fillet_next_on_assistant_apply (GtkWidget *widget, gpointer data)
+fillet_next_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
-  gfloat_t radius;
-  gcode_block_t *selected_block, *next_connected_block, *fillet_block;
-  GtkTreeIter selected_iter;
   gui_t *gui;
+  GtkWidget **wlist;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block, *next_connected_block, *fillet_block;
+  gfloat_t radius;
 
-  gui = (gui_t *)data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
 
   get_selected_block (gui, &selected_block, &selected_iter);
-  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (((GtkWidget **)gui->generic_ptr)[0]));
+
+  radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
 
   next_connected_block = gcode_sketch_next_connected (selected_block);
 
@@ -948,14 +964,22 @@ fillet_next_on_assistant_apply (GtkWidget *widget, gpointer data)
   update_project_modified_flag (gui, 1);
 }
 
-static GtkWidget *
-fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
+static void
+fillet_create_page1 (GtkWidget *assistant, gpointer data)
 {
-  gcode_block_t *selected_block;
-  GtkWidget *hbox, *label, *radius_spin;
+  gui_t *gui;
+  GtkWidget *hbox;
+  GtkWidget *label;
+  GtkWidget *radius_spin;
+  GtkWidget **wlist;
   GdkPixbuf *pixbuf;
-  gcode_tool_t *tool;
   GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+  gcode_tool_t *tool;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
 
   get_selected_block (gui, &selected_block, &selected_iter);
   tool = gcode_tool_find (selected_block);
@@ -970,13 +994,15 @@ fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), SCALED_INCHES (0.5 * tool->diameter));
   gtk_box_pack_start (GTK_BOX (hbox), radius_spin, TRUE, TRUE, 0);
-  ((GtkWidget **)gui->generic_ptr)[0] = radius_spin;
+
+  wlist[1] = radius_spin;
 
   gtk_widget_show_all (hbox);
 
   gtk_assistant_append_page (GTK_ASSISTANT (assistant), hbox);
   gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), hbox, "Fillet");
   gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), hbox, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), hbox, TRUE);
 
   if (strstr (gtk_window_get_title (GTK_WINDOW (assistant)), "prev"))
   {
@@ -991,16 +1017,14 @@ fillet_create_page1 (gui_t *gui, GtkWidget *assistant)
     gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), hbox, pixbuf);
     g_object_unref (pixbuf);
   }
-
-  return (hbox);
 }
 
 void
 gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *assistant;
-  GtkWidget *page;
   gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
@@ -1012,15 +1036,15 @@ gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer dat
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  gui->generic_ptr = malloc (sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
 
-  page = fillet_create_page1 (gui, assistant);
+  wlist[0] = (void *)gui;
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_previous_on_assistant_apply), gui);
+  fillet_create_page1 (assistant, wlist);
 
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_previous_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -1028,9 +1052,10 @@ gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer dat
 void
 gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
 {
+  gui_t *gui;
   GtkWidget *assistant;
   GtkWidget *page;
-  gui_t *gui;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
@@ -1042,15 +1067,15 @@ gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  gui->generic_ptr = malloc (sizeof (GtkWidget *));
+  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
 
-  page = fillet_create_page1 (gui, assistant);
+  wlist[0] = (void *)gui;
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), gui);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_next_on_assistant_apply), gui);
+  fillet_create_page1 (assistant, wlist);
 
-  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), page, TRUE);
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_next_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
