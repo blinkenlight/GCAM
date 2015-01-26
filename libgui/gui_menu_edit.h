@@ -32,9 +32,9 @@ void gui_menu_edit_attract_previous_menuitem_callback (GtkWidget *widget, gpoint
 void gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data);
+void gui_menu_edit_flip_direction_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_optimize_order_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer data);
-void gui_menu_edit_flip_direction_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_project_settings_menuitem_callback (GtkWidget *widget, gpointer data);
 
 #endif

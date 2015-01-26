@@ -36,6 +36,22 @@
 #define GCAM_STOCK_CLOSE "Close _without Saving"
 
 /**
+ * Destroy the "new project" assistant on "cancel" or "close" and free "wlist"
+ */
+
+static void
+new_project_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
+{
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
+/**
  * Initialize cleanly the 'gcode' object of 'gui' and set it up according to the
  * data collected by the new project dialog, populate it with a 'begin', 'tool'
  * and 'end' block then update everything in the GUI to reflect the new project;
@@ -43,10 +59,10 @@
  */
 
 static void
-create_project_callback (GtkWidget *widget, gpointer data)
+new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget **wlist;
   gui_t *gui;
+  GtkWidget **wlist;
   gcode_block_t *block;
   gfloat_t tool_diameter;
   int chosen_unit, material_type, tool_number;
@@ -59,9 +75,9 @@ create_project_callback (GtkWidget *widget, gpointer data)
   gcode_init (&gui->gcode);
   gui_attach (&gui->gcode, gui);
 
-  strcpy (project_name, gtk_entry_get_text (GTK_ENTRY (wlist[2])));
+  strcpy (project_name, gtk_entry_get_text (GTK_ENTRY (wlist[1])));
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   if (strcmp (text_field, "inch") == 0)
     chosen_unit = GCODE_UNITS_INCH;
@@ -70,7 +86,7 @@ create_project_callback (GtkWidget *widget, gpointer data)
 
   g_free (text_field);
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[4]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
 
   if (strcmp (text_field, "aluminium") == 0)
   {
@@ -107,18 +123,18 @@ create_project_callback (GtkWidget *widget, gpointer data)
 
   gui->gcode.material_type = material_type;
 
-  gui->gcode.material_size[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
-  gui->gcode.material_size[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
-  gui->gcode.material_size[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
+  gui->gcode.material_size[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  gui->gcode.material_size[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  gui->gcode.material_size[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
 
-  gui->gcode.material_origin[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
-  gui->gcode.material_origin[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
-  gui->gcode.material_origin[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
+  gui->gcode.material_origin[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
+  gui->gcode.material_origin[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
+  gui->gcode.material_origin[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
 
-  gui->gcode.ztraverse = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[11]));
+  gui->gcode.ztraverse = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
 
   /* Machine Name */
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[12]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
 
   {
     gui_machine_list_t machine_list;
@@ -142,7 +158,7 @@ create_project_callback (GtkWidget *widget, gpointer data)
   g_free (text_field);
 
   /* Endmill Label */
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[13]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[12]));
   strcpy (tool_name, &text_field[6]);
 
   g_free (text_field);
@@ -168,11 +184,6 @@ create_project_callback (GtkWidget *widget, gpointer data)
 
     gui_endmills_free (&endmill_list);
   }
-
-  /* Destroy the window along with all of its widgets */
-  gtk_widget_destroy (wlist[1]);
-
-  free (wlist);
 
   /**
    * Setup G-Code Block List and Populate with a Begin, Initial Tool, and End.
@@ -214,19 +225,16 @@ create_project_callback (GtkWidget *widget, gpointer data)
 }
 
 /**
- * Construct a dialog that allows configuration of the various parameters of a 
- * new project, populate it with default values and hook up a callback for the 
- * dialog's "create" event, supplied with a context list of relevant objects;
+ * Populate the "new project" assistant with all the controls required to set
+ * up a new project, then hook up a callback for the "unit" selection combo;
  * WARNING: Any change in the structure of "wlist" affecting the spin buttons 
  * will break "base_unit_changed_callback" unless it gets updated accordingly
- * NOTE: This is a callback for the "New Project" item of the "File" menu
  */
 
-void
-gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
+static void
+new_project_create_page1 (GtkWidget *assistant, gpointer data)
 {
   gui_t *gui;
-  GtkWidget *window;
   GtkWidget *table;
   GtkWidget *label;
   GtkWidget *name_entry;
@@ -241,33 +249,26 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
   GtkWidget *end_mill_combo;
   GtkWidget *machine_combo;
   GtkWidget *ztraverse_spin;
-  GtkWidget *create_button;
   GtkWidget **wlist;
+  GdkPixbuf *pixbuf;
 
   int active_unit = DEF_UNITS;
 
-  gui = (gui_t *)data;
-  wlist = (GtkWidget **)malloc (14 * sizeof (GtkWidget *));
+  wlist = (GtkWidget **)data;
 
-  window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_modal (GTK_WINDOW (window), TRUE);
-  gtk_window_set_transient_for (GTK_WINDOW (window), GTK_WINDOW (gui->window));
-  gtk_window_set_position (GTK_WINDOW (window), GTK_WIN_POS_MOUSE);
-  gtk_window_set_title (GTK_WINDOW (window), "New Project");
-  gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
+  gui = (gui_t *)wlist[0];
 
-  table = gtk_table_new (9, 4, FALSE);
+  table = gtk_table_new (8, 4, FALSE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
-  gtk_container_add (GTK_CONTAINER (window), table);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
 
   label = gtk_label_new ("Project Name");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
 
   name_entry = gtk_entry_new ();
   gtk_entry_set_max_length (GTK_ENTRY (name_entry), 32);
-  gtk_table_attach_defaults (GTK_TABLE (table), name_entry, 1, 4, 0, 1);
+  gtk_table_attach (GTK_TABLE (table), name_entry, 1, 4, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
   gtk_entry_set_text (GTK_ENTRY (name_entry), "Part");
 
   label = gtk_label_new ("Base Unit");
@@ -283,7 +284,7 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
     gtk_combo_box_set_active (GTK_COMBO_BOX (base_unit_combo), 1);
 
   g_signal_connect (base_unit_combo, "changed", G_CALLBACK (base_unit_changed_callback), wlist);
-  gtk_table_attach_defaults (GTK_TABLE (table), base_unit_combo, 1, 4, 1, 2);
+  gtk_table_attach (GTK_TABLE (table), base_unit_combo, 1, 4, 1, 2, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   label = gtk_label_new ("Material Type");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
@@ -295,7 +296,7 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_combo_box_append_text (GTK_COMBO_BOX (material_type_combo), "steel");
   gtk_combo_box_append_text (GTK_COMBO_BOX (material_type_combo), "wood");
   gtk_combo_box_set_active (GTK_COMBO_BOX (material_type_combo), 0);
-  gtk_table_attach_defaults (GTK_TABLE (table), material_type_combo, 1, 4, 2, 3);
+  gtk_table_attach (GTK_TABLE (table), material_type_combo, 1, 4, 2, 3, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   label = gtk_label_new ("Material Size (XYZ)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
@@ -339,7 +340,7 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
   ztraverse_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_CLR_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (ztraverse_spin), 2);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.05));
-  gtk_table_attach_defaults (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6);
+  gtk_table_attach (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   {
     gui_endmill_list_t endmill_list;
@@ -360,7 +361,7 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
     }
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), 0);
-    gtk_table_attach_defaults (GTK_TABLE (table), end_mill_combo, 1, 4, 6, 7);
+    gtk_table_attach (GTK_TABLE (table), end_mill_combo, 1, 4, 6, 7, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
     gui_endmills_free (&endmill_list);
   }
@@ -380,31 +381,71 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
       gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), machine_list.machine[i].name);
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (machine_combo), 0);
-    gtk_table_attach_defaults (GTK_TABLE (table), machine_combo, 1, 4, 7, 8);
+    gtk_table_attach (GTK_TABLE (table), machine_combo, 1, 4, 7, 8, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
     gui_machines_free (&machine_list);
   }
 
-  wlist[0] = (GtkWidget *)gui;
-  wlist[1] = window;
-  wlist[2] = name_entry;
-  wlist[3] = base_unit_combo;
-  wlist[4] = material_type_combo;
-  wlist[5] = material_sizex_spin;
-  wlist[6] = material_sizey_spin;
-  wlist[7] = material_sizez_spin;
-  wlist[8] = material_originx_spin;
-  wlist[9] = material_originy_spin;
-  wlist[10] = material_originz_spin;
-  wlist[11] = ztraverse_spin;
-  wlist[12] = machine_combo;
-  wlist[13] = end_mill_combo;
+  wlist[1] = name_entry;
+  wlist[2] = base_unit_combo;
+  wlist[3] = material_type_combo;
+  wlist[4] = material_sizex_spin;
+  wlist[5] = material_sizey_spin;
+  wlist[6] = material_sizez_spin;
+  wlist[7] = material_originx_spin;
+  wlist[8] = material_originy_spin;
+  wlist[9] = material_originz_spin;
+  wlist[10] = ztraverse_spin;
+  wlist[11] = machine_combo;
+  wlist[12] = end_mill_combo;
 
-  create_button = gtk_button_new_with_label ("Create");
-  gtk_table_attach_defaults (GTK_TABLE (table), create_button, 3, 4, 8, 9);
-  g_signal_connect (G_OBJECT (create_button), "clicked", G_CALLBACK (create_project_callback), wlist);
+  gtk_widget_show_all (table);
 
-  gtk_widget_show_all (window);
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "New Project");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_NEW, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+}
+
+/**
+ * Construct an assistant and call another routine that will populate it with
+ * controls to configure the various parameters of a new project, then hook up 
+ * callbacks for the assistant's "cancel", "close" and "apply" events;
+ * NOTE: This is a callback for the "New Project" item of the "File" menu
+ */
+
+void
+gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
+
+  gui = (gui_t *)data;
+
+  assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "New Project");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
+
+  /* Setup Global Widgets */
+  wlist = (GtkWidget **)malloc (13 * sizeof (GtkWidget *));
+
+  wlist[0] = (void *)gui;
+
+  new_project_create_page1 (assistant, wlist);
+
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (new_project_on_assistant_apply), wlist);
+
+  gtk_widget_show (assistant);
 }
 
 /**
@@ -590,12 +631,12 @@ gui_menu_file_save_project_as_menuitem_callback (GtkWidget *widget, gpointer dat
  */
 
 static void
-close_callback (GtkDialog *dialog, gint response, gpointer ptr)
+close_callback (GtkDialog *dialog, gint response, gpointer data)
 {
   gui_t *gui;
   gint result;
 
-  gui = (gui_t *)ptr;
+  gui = (gui_t *)data;
 
   gtk_widget_destroy (GTK_WIDGET (dialog));
 
@@ -711,26 +752,42 @@ gui_menu_file_close_project_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 /**
- * Select a file to export generated g-code into then perform the actual export;
- * NOTE: This is a callback for the export dialog's "export" event
+ * Destroy the "export g-code" assistant on "cancel"/"close" and free "wlist"
  */
 
 static void
-export_gcode_file_selector (GtkWidget *widget, gpointer ptr)
+export_gcode_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
-  GtkWidget *dialog;
   GtkWidget **wlist;
-  GtkFileFilter *filter;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
+/**
+ * Select a file to export generated g-code into then perform the actual export;
+ * NOTE: This is a callback for the export assistant's "apply" event
+ */
+
+static void
+export_gcode_on_assistant_apply (GtkWidget *assistant, gpointer data)
+{
   gui_t *gui;
+  GtkWidget **wlist;
+  GtkWidget *dialog;
+  GtkFileFilter *filter;
   char proposed_filename[64];
   char *text_field;
 
-  wlist = (GtkWidget **)ptr;
+  wlist = (GtkWidget **)data;
 
   gui = (gui_t *)wlist[0];
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
-  gui->gcode.project_number = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[1]));
+  gui->gcode.project_number = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
 
   if (strcmp (text_field, "LinuxCNC") == 0)
   {
@@ -745,9 +802,7 @@ export_gcode_file_selector (GtkWidget *widget, gpointer ptr)
     gui->gcode.driver = GCODE_DRIVER_HAAS;
   }
 
-  gtk_widget_destroy (wlist[1]);
   g_free (text_field);
-  free (wlist);
 
   dialog = gtk_file_chooser_dialog_new ("Export G-Code",
                                         GTK_WINDOW (gui->window),
@@ -787,102 +842,129 @@ export_gcode_file_selector (GtkWidget *widget, gpointer ptr)
 
 /**
  * Enable/disable a widget in the g-code export dialog based on selected format;
- * NOTE: This is a callback for the export dialog's "format changed" event
+ * NOTE: This is a callback for the export assistant's "format changed" event
  */
 
 static void
-export_format_callback (GtkWidget *widget, gpointer data)
+export_format_changed_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget **wlist;
   gui_t *gui;
+  GtkWidget **wlist;
   char *text_field;
 
   wlist = (GtkWidget **)data;
 
   gui = (gui_t *)wlist[0];
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[1]));
 
   if (strcmp (text_field, "EMC") == 0)
   {
-    gtk_widget_set_sensitive (wlist[3], 0);
+    gtk_widget_set_sensitive (wlist[2], 0);
   }
   else if (strcmp (text_field, "TurboCNC") == 0)
   {
-    gtk_widget_set_sensitive (wlist[3], 0);
+    gtk_widget_set_sensitive (wlist[2], 0);
   }
   else if (strcmp (text_field, "Haas") == 0)
   {
-    gtk_widget_set_sensitive (wlist[3], 1);
+    gtk_widget_set_sensitive (wlist[2], 1);
   }
 
   g_free (text_field);
 }
 
+static void
+export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *table;
+  GtkWidget *label;
+  GtkWidget *export_format_combo;
+  GtkWidget *project_number_spin;
+  GtkWidget **wlist;
+  GdkPixbuf *pixbuf;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  table = gtk_table_new (2, 2, FALSE);
+  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
+
+  label = gtk_label_new ("Format");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
+  export_format_combo = gtk_combo_box_new_text ();
+  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "EMC");
+  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "TurboCNC");
+  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "Haas");
+  gtk_combo_box_set_active (GTK_COMBO_BOX (export_format_combo), 0);
+  g_signal_connect (export_format_combo, "changed", G_CALLBACK (export_format_changed_callback), wlist);
+  gtk_table_attach (GTK_TABLE (table), export_format_combo, 1, 2, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  label = gtk_label_new ("Project Number");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
+
+  project_number_spin = gtk_spin_button_new_with_range (0.0, 99999.0, 1.0);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (project_number_spin), 0);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (project_number_spin), 100.0);
+  gtk_table_attach (GTK_TABLE (table), project_number_spin, 1, 2, 1, 2, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  wlist[1] = export_format_combo;
+  wlist[2] = project_number_spin;
+
+  gtk_widget_set_sensitive (project_number_spin, 0);
+
+  gtk_widget_show_all (table);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Export G-code");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GTK_STOCK_CONVERT, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+}
+
 /**
- * Construct a dialog that allows configuration of the various g-code export 
- * parameters, and hook up suitable handlers for the dialog's "format changed" 
- * and "export" events, supplied with a context list of the relevant objects;
+ * Construct an assistant and call another routine that will populate it with
+ * controls to configure g-code export parameters of a new project, then hook
+ * up callbacks for the assistant's "cancel", "close" and "apply" events;
  * NOTE: This is a callback for the "Export G-Code" item of the "File" menu
  */
 
 void
 gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget *window;
-  GtkWidget *table;
-  GtkWidget *label;
-  GtkWidget *export_format_combo;
-  GtkWidget *project_number_spin;
-  GtkWidget *export_button;
-  GtkWidget **wlist;
   gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
 
   gui = (gui_t *)data;
 
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+  assistant = gtk_assistant_new ();
 
-  window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_modal (GTK_WINDOW (window), TRUE);
-  gtk_window_set_transient_for (GTK_WINDOW (window), GTK_WINDOW (gui->window));
-  gtk_window_set_position (GTK_WINDOW (window), GTK_WIN_POS_MOUSE);
-  gtk_window_set_title (GTK_WINDOW (window), "Export Format");
-  gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
+  gtk_window_set_title (GTK_WINDOW (assistant), "Export G-code");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
-  table = gtk_table_new (3, 2, FALSE);
-  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
-  gtk_container_set_border_width (GTK_CONTAINER (table), 4);
-  gtk_container_add (GTK_CONTAINER (window), table);
+  /* Setup Global Widgets */
+  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
 
-  label = gtk_label_new ("Format");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
-  export_format_combo = gtk_combo_box_new_text ();
-  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "EMC");
-  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "TurboCNC");
-  gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "Haas");
-  gtk_combo_box_set_active (GTK_COMBO_BOX (export_format_combo), 0);
-  g_signal_connect (export_format_combo, "changed", G_CALLBACK (export_format_callback), wlist);
-  gtk_table_attach_defaults (GTK_TABLE (table), export_format_combo, 1, 2, 0, 1);
+  wlist[0] = (void *)gui;
 
-  label = gtk_label_new ("Project Number");
-  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
-  project_number_spin = gtk_spin_button_new_with_range (0.0, 99999.0, 1.0);
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (project_number_spin), 0);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (project_number_spin), 100.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), project_number_spin, 1, 2, 1, 2);
+  export_gcode_create_page1 (assistant, wlist);
 
-  wlist[0] = (GtkWidget *)gui;
-  wlist[1] = window;
-  wlist[2] = export_format_combo;
-  wlist[3] = project_number_spin;
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (export_gcode_on_assistant_apply), wlist);
 
-  gtk_widget_set_sensitive (wlist[3], 0);
-
-  export_button = gtk_button_new_with_label ("Export");
-  gtk_table_attach_defaults (GTK_TABLE (table), export_button, 0, 2, 2, 3);
-  g_signal_connect (G_OBJECT (export_button), "clicked", G_CALLBACK (export_gcode_file_selector), wlist);
-  gtk_widget_show_all (window);
+  gtk_widget_show (assistant);
 }
 
 /**
@@ -891,11 +973,11 @@ gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
  */
 
 static void
-cancel_import_gcam_callback (GtkWidget *widget, gpointer ptr)
+cancel_import_gcam_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
 
-  wlist = (GtkWidget **)ptr;                                                    // Retrieve a reference to the graphic context data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the graphic context data;
 
   gtk_widget_destroy (GTK_WIDGET (wlist[1]));                                   // Destroy the import block list dialog;
 
@@ -911,7 +993,7 @@ cancel_import_gcam_callback (GtkWidget *widget, gpointer ptr)
  */
 
 static void
-import_gcam_block_callback (GtkWidget *widget, gpointer ptr)
+import_gcam_block_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
   GtkTreeModel *model;
@@ -921,7 +1003,7 @@ import_gcam_block_callback (GtkWidget *widget, gpointer ptr)
   gui_t *gui;
   gcode_block_t *selected_block, *duplicate_block;
 
-  wlist = (GtkWidget **)ptr;                                                    // Retrieve a reference to the graphic context data;
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the graphic context data;
 
   gui = (gui_t *)wlist[0];                                                      // From that, retrieve a reference to 'gui';
 
@@ -2087,12 +2169,12 @@ gui_menu_file_import_stl_menuitem_callback (GtkWidget *widget, gpointer data)
  */
 
 static void
-quit_callback (GtkDialog *dialog, gint response, gpointer ptr)
+quit_callback (GtkDialog *dialog, gint response, gpointer data)
 {
   gui_t *gui;
   gint result;
 
-  gui = (gui_t *)ptr;
+  gui = (gui_t *)data;
 
   gtk_widget_destroy (GTK_WIDGET (dialog));
 

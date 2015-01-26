@@ -39,10 +39,10 @@
 void
 base_unit_changed_callback (GtkWidget *widget, gpointer data)
 {
+  gui_t *gui;
   GtkWidget **wlist;
   GtkSpinButton *spinner;
   gcode_block_t *index_block;
-  gui_t *gui;
   gfloat_t value;
   gfloat_t min, max;
   gfloat_t step, page;
@@ -58,14 +58,14 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
 
   scale_factor = 1.0;
 
-  gtk_spin_button_get_range (GTK_SPIN_BUTTON (wlist[11]), NULL, &max_clr_z);
+  gtk_spin_button_get_range (GTK_SPIN_BUTTON (wlist[10]), NULL, &max_clr_z);
 
   if (fabs (max_clr_z - MAX_CLR_Z) < GCODE_PRECISION)
     unit_in_use = GCODE_UNITS_INCH;
   else
     unit_in_use = GCODE_UNITS_MILLIMETER;
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   if (strcmp (text_field, "inch") == 0)
     chosen_unit = GCODE_UNITS_INCH;
@@ -83,7 +83,7 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
   if (scale_factor == 1.0)
     return;
 
-  for (int i = 5; i <= 11; i++)
+  for (int i = 4; i <= 10; i++)
   {
     spinner = GTK_SPIN_BUTTON (wlist[i]);
 
