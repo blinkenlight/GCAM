@@ -319,7 +319,9 @@ gcode_sketch_trim_intersections (gcode_block_t *listhead, int closed)
           ip[0] = ip_array[ip_index][0];                                        // Retrieve the chosen intersection point as 'ip';
           ip[1] = ip_array[ip_index][1];
 
-          old_angle = fmod (arc->start_angle + arc->sweep_angle + 360.0, 360.0);        // The original ending angle is the wrapped sum of 'start' and 'sweep';
+          old_angle = arc->start_angle + arc->sweep_angle;                      // The original ending angle is the wrapped sum of 'start' and 'sweep';
+
+          GCODE_MATH_WRAP_TO_360_DEGREES (old_angle);
 
           gcode_math_xy_to_angle (center, ip, &new_angle);                      // The new ending angle results from the relation of 'ip' and the arc center;
 
@@ -1479,6 +1481,7 @@ gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t transl
             new_arc->sweep_angle = arc->sweep_angle;
             new_arc->radius = arc->radius;
             new_arc->start_angle = arc->start_angle + inc_rotation;
+            GCODE_MATH_WRAP_TO_360_DEGREES (new_arc->start_angle);
 
             break;
           }

@@ -195,6 +195,11 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
         if (_angle < -180.0) \
           _angle += 360.0; }
 
+#define GCODE_MATH_WRAP_TO_360_DEGREES(_angle) {\
+        _angle = fmod (_angle + 360.0, 360.0); \
+        if (_angle >= 360.0) \
+          _angle = 0.0; }
+
 #define GCODE_MATH_SNAP_TO_360_DEGREES(_angle) {\
         if (_angle > 360.0 - GCODE_ANGULAR_PRECISION) \
           _angle = 0.0; \

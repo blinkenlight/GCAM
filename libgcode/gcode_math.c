@@ -71,8 +71,7 @@ gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t *ang
   if (sqrt (dx * dx + dy * dy) < GCODE_PRECISION)                               // If the radius is practically zero, bail out by returning zero;
     *angle = 0.0;
   else                                                                          // If the radius looks valid,
-    *angle = fmod (GCODE_RAD2DEG * atan2 (dy, dx) + 360.0, 360.0);              // get the arc tangent of the slope, and wrap it around to a positive value;
+    *angle = GCODE_RAD2DEG * atan2 (dy, dx);                                    // get the arc tangent of the slope...
 
-  if (*angle >= 360.0)                                                          // Oh, you think fmod() can never return the modulus itself? Think again...
-    *angle = 0.0;
+  GCODE_MATH_WRAP_TO_360_DEGREES (*angle);                                      // ...and wrap it around to a positive value between 0 and 360;
 }

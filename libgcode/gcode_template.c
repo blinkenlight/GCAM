@@ -116,7 +116,9 @@ gcode_template_make (gcode_block_t *block)
 
   template->offset.origin[0] = xform_origin[0];
   template->offset.origin[1] = xform_origin[1];
-  template->offset.rotation = fmod (block->offset->rotation + template->rotation, 360.0);
+  template->offset.rotation = block->offset->rotation + template->rotation;
+
+  GCODE_MATH_WRAP_TO_360_DEGREES (template->offset.rotation);
 
   GCODE_APPEND (block, "\n");
 
@@ -379,7 +381,9 @@ gcode_template_draw (gcode_block_t *block, gcode_block_t *selected)
 
   template->offset.origin[0] = xform_origin[0];
   template->offset.origin[1] = xform_origin[1];
-  template->offset.rotation = fmod (block->offset->rotation + template->rotation, 360.0);
+  template->offset.rotation = block->offset->rotation + template->rotation;
+
+  GCODE_MATH_WRAP_TO_360_DEGREES (template->offset.rotation);
 
   index_block = block->listhead;
 

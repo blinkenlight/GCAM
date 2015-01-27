@@ -281,7 +281,8 @@ gcode_svg_create_arc (void *context, double pt[], double r, double start, double
   arc->p[0] = (gfloat_t)pt[0] * svg->scale[0];                                  // The incoming numbers are as-read (unscaled) - they need to be scaled;
   arc->p[1] = svg->size[1] - (gfloat_t)pt[1] * svg->scale[1];                   // Also, SVG (0,0) is top-left - convert to our bottom-left system;
   arc->radius = (gfloat_t)r * ((svg->scale[0] + svg->scale[1]) / 2);            // This will fail big-time if the scales differ - so check for that;
-  arc->start_angle = fmod ((gfloat_t)start + 360.0, 360.0);                     // A negative start angle is not valid in GCAM - make sure it isn't;
+  arc->start_angle = (gfloat_t)start;
+  GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);                            // A negative start angle is not valid in GCAM - make sure it isn't;
   GCODE_MATH_SNAP_TO_360_DEGREES (arc->start_angle);                            // Try to prevent rounding fuzz and fmod() fuck-ups (360.0 returned);
   arc->sweep_angle = (gfloat_t)sweep;                                           // Sweeps are valid between +/-360 degrees, no need to correct this;
   gcode_append_as_listtail (svg->sketch_block, arc_block);                      // Append the new arc block under the current sketch block.

@@ -283,6 +283,9 @@ gcode_arc_parse (gcode_block_t *block, const char **xmlattr)
       if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
         arc->native_mode = m;
     }
+
+    GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);                          // No, you can't start at 5000 degrees...
+    GCODE_MATH_SNAP_TO_720_DEGREES (arc->sweep_angle);                          // ...nor can you sweep 1000000 degrees;
   }
 }
 
@@ -737,9 +740,10 @@ gcode_arc_with_offset (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t cen
   GCODE_MATH_TRANSLATE (xform_cp, xform_cp, block->offset->origin);             // remember that we're NOT rotating the center AROUND ITSELF.
 
   /* Transform start angle with rotation from block offset */
-  xform_start_angle = fmod (arc->start_angle + block->offset->rotation + 360.0, 360.0);
+  xform_start_angle = arc->start_angle + block->offset->rotation;
 
   /* Prevent rounding fuzz and fmod() fuck-ups */
+  GCODE_MATH_WRAP_TO_360_DEGREES (xform_start_angle);
   GCODE_MATH_SNAP_TO_360_DEGREES (xform_start_angle);
 
   /* Create side selection factor depending on offset direction/side */
@@ -792,9 +796,10 @@ gcode_arc_flip_direction (gcode_block_t *block)
   arc->p[0] = center[0] + arc->radius * cos ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
   arc->p[1] = center[1] + arc->radius * sin ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
 
-  arc->start_angle = fmod (arc->start_angle + arc->sweep_angle + 360.0, 360.0);
+  arc->start_angle = arc->start_angle + arc->sweep_angle;
 
-  GCODE_MATH_SNAP_TO_360_DEGREES (arc->start_angle);                            // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.
+  GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);                            // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.
+  GCODE_MATH_SNAP_TO_360_DEGREES (arc->start_angle);
 
   arc->sweep_angle *= -1.0;
 }
@@ -862,9 +867,10 @@ gcode_arc_radius_to_sweep (gcode_arcdata_t *arc)
 
   theta = ((ux * vy - uy * vx) < 0) ? 0 - theta : theta;
 
-  theta = fmod (GCODE_RAD2DEG * theta + 360.0, 360.0);
+  theta = GCODE_RAD2DEG * theta;
 
-  GCODE_MATH_SNAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.
+  GCODE_MATH_WRAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.  
+  GCODE_MATH_SNAP_TO_360_DEGREES (theta);
 
   ux = vx;
   uy = vy;
@@ -952,9 +958,10 @@ gcode_arc_center_to_sweep (gcode_arcdata_t *arc)
 
   theta = ((ux * vy - uy * vx) < 0) ? 0 - theta : theta;
 
-  theta = fmod (GCODE_RAD2DEG * theta + 360.0, 360.0);
+  theta = GCODE_RAD2DEG * theta;
 
-  GCODE_MATH_SNAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.  
+  GCODE_MATH_WRAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.
+  GCODE_MATH_SNAP_TO_360_DEGREES (theta);
 
   ux = vx;
   uy = vy;
