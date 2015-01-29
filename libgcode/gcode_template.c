@@ -34,13 +34,16 @@ gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *paren
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_TEMPLATE, 0);
 
   (*block)->free = gcode_template_free;
-  (*block)->make = gcode_template_make;
   (*block)->save = gcode_template_save;
   (*block)->load = gcode_template_load;
+  (*block)->make = gcode_template_make;
   (*block)->draw = gcode_template_draw;
-  (*block)->clone = gcode_template_clone;
+  (*block)->aabb = gcode_template_aabb;
+  (*block)->move = gcode_template_move;
+  (*block)->spin = gcode_template_spin;
   (*block)->scale = gcode_template_scale;
   (*block)->parse = gcode_template_parse;
+  (*block)->clone = gcode_template_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_template_t));
 
@@ -90,51 +93,6 @@ gcode_template_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_template_make (gcode_block_t *block)
-{
-  gcode_template_t *template;
-  gcode_block_t *index_block;
-  gcode_vec2d_t xform_origin;
-  char string[256];
-
-  template = (gcode_template_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  // Inherit whatever offset this block acquires from its parent, if any,
-  // and compound it with whatever offset this block generates on its own
-
-  GCODE_MATH_VEC2D_SET (xform_origin, template->position[0], template->position[1]);
-  GCODE_MATH_ROTATE (xform_origin, xform_origin, block->offset->rotation);
-  GCODE_MATH_TRANSLATE (xform_origin, xform_origin, block->offset->origin);
-
-  template->offset.origin[0] = xform_origin[0];
-  template->offset.origin[1] = xform_origin[1];
-  template->offset.rotation = block->offset->rotation + template->rotation;
-
-  GCODE_MATH_WRAP_TO_360_DEGREES (template->offset.rotation);
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "TEMPLATE: %s", block->comment);
-  GCODE_COMMENT (block, string);
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    index_block->make (index_block);
-
-    GCODE_APPEND (block, index_block->code);
-
-    index_block = index_block->next;
-  }
 }
 
 void
@@ -320,42 +278,47 @@ gcode_template_load (gcode_block_t *block, FILE *fh)
 }
 
 void
-gcode_template_parse (gcode_block_t *block, const char **xmlattr)
+gcode_template_make (gcode_block_t *block)
 {
   gcode_template_t *template;
+  gcode_block_t *index_block;
+  gcode_vec2d_t xform_origin;
+  char string[256];
 
   template = (gcode_template_t *)block->pdata;
 
-  for (int i = 0; xmlattr[i]; i += 2)
+  GCODE_CLEAR (block);
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  // Inherit whatever offset this block acquires from its parent, if any,
+  // and compound it with whatever offset this block generates on its own
+
+  GCODE_MATH_VEC2D_SET (xform_origin, template->position[0], template->position[1]);
+  GCODE_MATH_ROTATE (xform_origin, xform_origin, block->offset->rotation);
+  GCODE_MATH_TRANSLATE (xform_origin, xform_origin, block->offset->origin);
+
+  template->offset.origin[0] = xform_origin[0];
+  template->offset.origin[1] = xform_origin[1];
+  template->offset.rotation = block->offset->rotation + template->rotation;
+
+  GCODE_MATH_WRAP_TO_360_DEGREES (template->offset.rotation);
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "TEMPLATE: %s", block->comment);
+  GCODE_COMMENT (block, string);
+
+  index_block = block->listhead;
+
+  while (index_block)
   {
-    int m;
-    unsigned int n;
-    double xyz[3], w;
-    const char *name, *value;
+    index_block->make (index_block);
 
-    name = xmlattr[i];
-    value = xmlattr[i + 1];
+    GCODE_APPEND (block, index_block->code);
 
-    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
-    {
-      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
-        block->flags = n;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_POSITION) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
-        for (int j = 0; j < 2; j++)
-          template->position[j] = (gfloat_t)xyz[j];
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_ROTATION) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
-        template->rotation = (gfloat_t)w;
-    }
+    index_block = index_block->next;
   }
 }
 
@@ -415,6 +378,147 @@ gcode_template_draw (gcode_block_t *block, gcode_block_t *selected)
 }
 
 void
+gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_block_t *index_block;
+  gcode_vec2d_t tmin, tmax;
+
+  index_block = block->listhead;
+
+  min[0] = min[1] = 1;                                                          // Never cross the streams, you say...? Oh well, too late...
+  max[0] = max[1] = 0;                                                          // Callers should test for an inside-out aabb being returned;
+
+  while (index_block)
+  {
+    if (!index_block->aabb)                                                     // If the block has no bounds function, don't try to call it;
+      continue;
+
+    index_block->aabb (index_block, tmin, tmax);
+
+    if ((tmin[0] > tmax[0]) || (tmin[1] > tmax[1]))                             // If the block returned an inside-out box, discard the box;
+      continue;
+
+    if ((min[0] > max[0]) || (min[1] > max[1]))                                 // If bounds were inside-out (unset), accept the box directly;
+    {
+      min[0] = tmin[0];
+      min[1] = tmin[1];
+      max[0] = tmax[0];
+      max[1] = tmax[1];
+    }
+    else
+    {
+      if (tmin[0] < min[0])
+        min[0] = tmin[0];
+
+      if (tmax[0] > max[0])
+        max[0] = tmax[0];
+
+      if (tmin[1] < min[1])
+        min[1] = tmin[1];
+
+      if (tmax[1] > max[1])
+        max[1] = tmax[1];
+    }
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->move)
+      index_block->move (index_block, delta);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->spin)
+      index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_template_t *template;
+  gcode_block_t *index_block;
+
+  template = (gcode_template_t *)block->pdata;
+
+  template->position[0] *= scale;
+  template->position[1] *= scale;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->scale)                                                     /* Because a Tool could be part of this list */
+      index_block->scale (index_block, scale);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_parse (gcode_block_t *block, const char **xmlattr)
+{
+  gcode_template_t *template;
+
+  template = (gcode_template_t *)block->pdata;
+
+  for (int i = 0; xmlattr[i]; i += 2)
+  {
+    int m;
+    unsigned int n;
+    double xyz[3], w;
+    const char *name, *value;
+
+    name = xmlattr[i];
+    value = xmlattr[i + 1];
+
+    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    {
+      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
+        block->flags = n;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_POSITION) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          template->position[j] = (gfloat_t)xyz[j];
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_TEMPLATE_ROTATION) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
+        template->rotation = (gfloat_t)w;
+    }
+  }
+}
+
+void
 gcode_template_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
   gcode_template_t *template, *model_template;
@@ -444,28 +548,6 @@ gcode_template_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *mode
     index_block->clone (&new_block, gcode, index_block);
 
     gcode_append_as_listtail (*block, new_block);                               // Append 'new_block' to the end of 'block's list (as head if the list is NULL)
-
-    index_block = index_block->next;
-  }
-}
-
-void
-gcode_template_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_template_t *template;
-  gcode_block_t *index_block;
-
-  template = (gcode_template_t *)block->pdata;
-
-  template->position[0] *= scale;
-  template->position[1] *= scale;
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    if (index_block->scale)                                                     /* Because a Tool could be part of this list */
-      index_block->scale (index_block, scale);
 
     index_block = index_block->next;
   }

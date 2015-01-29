@@ -47,16 +47,19 @@ gcode_internal_init (gcode_block_t *block, gcode_t *gcode, gcode_block_t *parent
   block->code = NULL;
 
   block->free = NULL;
-  block->make = NULL;
   block->save = NULL;
   block->load = NULL;
-  block->ends = NULL;
+  block->make = NULL;
   block->draw = NULL;
   block->eval = NULL;
-  block->length = NULL;
-  block->clone = NULL;
-  block->scale = NULL;
+  block->ends = NULL;
   block->aabb = NULL;
+  block->length = NULL;
+  block->move = NULL;
+  block->spin = NULL;
+  block->scale = NULL;
+  block->parse = NULL;
+  block->clone = NULL;
 }
 
 static void

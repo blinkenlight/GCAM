@@ -42,13 +42,16 @@ gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pa
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_DRILL_HOLES, 0);
 
   (*block)->free = gcode_drill_holes_free;
-  (*block)->make = gcode_drill_holes_make;
   (*block)->save = gcode_drill_holes_save;
   (*block)->load = gcode_drill_holes_load;
+  (*block)->make = gcode_drill_holes_make;
   (*block)->draw = gcode_drill_holes_draw;
-  (*block)->clone = gcode_drill_holes_clone;
+  (*block)->aabb = gcode_drill_holes_aabb;
+  (*block)->move = gcode_drill_holes_move;
+  (*block)->spin = gcode_drill_holes_spin;
   (*block)->scale = gcode_drill_holes_scale;
   (*block)->parse = gcode_drill_holes_parse;
+  (*block)->clone = gcode_drill_holes_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_drill_holes_t));
 
@@ -558,6 +561,96 @@ gcode_drill_holes_draw (gcode_block_t *block, gcode_block_t *selected)
 #endif
 }
 
+/**
+ * Construct the axis-aligned bounding box of all the holes in the drill holes;
+ * NOTE: this can and does return an "imposible" or "inside-out" bounding box
+ * which has its minimum larger than its maximum as a sign of failure to pick
+ * up any valid holes, if either the list is empty or none of the members are 
+ * points (there should ONLY be points) - THIS SHOULD BE TESTED FOR ON RETURN!
+ */
+
+void
+gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_block_t *index_block;
+  gcode_tool_t *tool;
+  gcode_point_t *point;
+  gfloat_t radius;
+
+  tool = gcode_tool_find (block);                                               // Find the tool that applies to this block;
+
+  radius = tool ? tool->diameter / 2 : 0;                                       // This should never happen (to a dog - not even to a cowardly one) but hey...
+
+  min[0] = min[1] = 1;                                                          // Confuse the hell out of anyone who's not paying attention properly;
+  max[0] = max[1] = 0;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->type == GCODE_TYPE_POINT)                                  // This not being true should never happen either (to a d... oops, sorry);
+    {
+      point = (gcode_point_t *)index_block->pdata;
+
+      if ((min[0] > max[0]) || (min[1] > max[1]))                               // If bounds were inside-out (unset), accept the hole directly;
+      {
+        min[0] = point->p[0] - radius;
+        max[0] = point->p[0] + radius;
+        min[1] = point->p[1] - radius;
+        max[1] = point->p[1] + radius;
+      }
+      else                                                                      // If bounds are already valid (set), look for holes not inside;
+      {
+        if (point->p[0] - radius < min[0])
+          min[0] = point->p[0] - radius;
+
+        if (point->p[0] + radius > max[0])
+          max[0] = point->p[0] + radius;
+
+        if (point->p[1] - radius < min[1])
+          min[1] = point->p[1] - radius;
+
+        if (point->p[1] + radius > max[1])
+          max[1] = point->p[1] + radius;
+      }
+    }
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_drill_holes_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->move)
+      index_block->move (index_block, delta);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_drill_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->spin)
+      index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
 void
 gcode_drill_holes_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
@@ -619,7 +712,7 @@ gcode_drill_holes_scale (gcode_block_t *block, gfloat_t scale)
  */
 
 void
-gcode_drill_holes_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t translate_x, gfloat_t translate_y, gfloat_t rotate_about_x, gfloat_t rotate_about_y, gfloat_t rotation)
+gcode_drill_holes_pattern (gcode_block_t *block, uint32_t count, gcode_vec2d_t delta, gcode_vec2d_t datum, gfloat_t angle)
 {
   gcode_block_t *index_block, *final_block, *new_block, *last_block;
   gfloat_t inc_rotation, inc_translate_x, inc_translate_y;
@@ -634,11 +727,11 @@ gcode_drill_holes_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t t
 
     last_block = final_block;                                                   // Point 'last_block' as well to the last block in the list.
 
-    for (i = 1; i < iterations; i++)                                            // If 'iterations' equals 0 or 1, this will do nothing at all - as it should.
+    for (i = 1; i < count; i++)                                                 // If 'count' equals 0 or 1, this will do nothing at all - as it should.
     {
-      inc_rotation = ((float)i) * rotation;                                     // Calculate roto-translation factors for the current iteration
-      inc_translate_x = ((float)i) * translate_x;
-      inc_translate_y = ((float)i) * translate_y;
+      inc_rotation = ((float)i) * angle;                                        // Calculate roto-translation factors for the current iteration
+      inc_translate_x = ((float)i) * delta[0];
+      inc_translate_y = ((float)i) * delta[1];
 
       index_block = block->listhead;                                            // Each time, start with the first block in the list (which we know must exist)
 
@@ -653,11 +746,11 @@ gcode_drill_holes_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t t
         new_point = (gcode_point_t *)new_block->pdata;                          // and acquire a reference to its data as well.
 
         /* Rotate and Translate */
-        pt[0] = point->p[0] - rotate_about_x;
-        pt[1] = point->p[1] - rotate_about_y;
+        pt[0] = point->p[0] - datum[0];
+        pt[1] = point->p[1] - datum[1];
         GCODE_MATH_ROTATE (xform_pt, pt, inc_rotation);
-        new_point->p[0] = xform_pt[0] + rotate_about_x + inc_translate_x;
-        new_point->p[1] = xform_pt[1] + rotate_about_y + inc_translate_y;
+        new_point->p[0] = xform_pt[0] + datum[0] + inc_translate_x;
+        new_point->p[1] = xform_pt[1] + datum[1] + inc_translate_y;
 
         strcpy (new_block->comment, index_block->comment);                      // Copy the comment string of the current block to the new one;
 

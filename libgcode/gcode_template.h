@@ -42,12 +42,15 @@ typedef struct gcode_template_s
 
 void gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_template_free (gcode_block_t **block);
-void gcode_template_make (gcode_block_t *block);
 void gcode_template_save (gcode_block_t *block, FILE *fh);
 void gcode_template_load (gcode_block_t *block, FILE *fh);
+void gcode_template_make (gcode_block_t *block);
 void gcode_template_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_template_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_template_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_template_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_template_parse (gcode_block_t *block, const char **xmlattr);
+void gcode_template_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 
 #endif

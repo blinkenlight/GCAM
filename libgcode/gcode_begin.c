@@ -33,9 +33,9 @@ gcode_begin_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_BEGIN, GCODE_FLAGS_LOCK);
 
   (*block)->free = gcode_begin_free;
-  (*block)->make = gcode_begin_make;
   (*block)->save = gcode_begin_save;
   (*block)->load = gcode_begin_load;
+  (*block)->make = gcode_begin_make;
   (*block)->parse = gcode_begin_parse;
 
   (*block)->pdata = malloc (sizeof (gcode_begin_t));
@@ -62,73 +62,6 @@ gcode_begin_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_begin_make (gcode_block_t *block)
-{
-  gcode_begin_t *begin;
-  char string[256], nrcode[32], date_string[32];
-  time_t timer;
-
-  begin = (gcode_begin_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  if (block->gcode->driver == GCODE_DRIVER_HAAS)
-  {
-    GCODE_APPEND (block, "%\n");
-
-    sprintf (string, "O%.5d\n", block->gcode->project_number);
-    GCODE_APPEND (block, string);
-  }
-
-  sprintf (string, "Project: %s", block->gcode->name);
-  GCODE_COMMENT (block, string);
-
-  timer = time (NULL);
-  strcpy (date_string, asctime (localtime (&timer)));
-  date_string[strlen (date_string) - 1] = 0;
-  sprintf (string, "Created: %s with GCAM SE v%s", date_string, VERSION);
-  GCODE_COMMENT (block, string);
-
-  gsprintf (string, block->gcode->decimals, "Material Size: X=%z Y=%z Z=%z", block->gcode->material_size[0], block->gcode->material_size[1], block->gcode->material_size[2]);
-  GCODE_COMMENT (block, string);
-
-  gsprintf (string, block->gcode->decimals, "Origin Offset: X=%z Y=%z Z=%z", block->gcode->material_origin[0], block->gcode->material_origin[1], block->gcode->material_origin[2]);
-  GCODE_COMMENT (block, string);
-
-  sprintf (string, "Notes: %s", block->gcode->notes);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "BEGIN: %s", block->comment);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  if (begin->coordinate_system == GCODE_BEGIN_COORDINATE_SYSTEM_NONE)
-  {
-    GCODE_COMMENT (block, "Machine coordinates");
-  }
-  else
-  {
-    sprintf (nrcode, "G%d", 53 + begin->coordinate_system);
-    sprintf (string, "workspace %d", begin->coordinate_system);
-    GCODE_COMMAND (block, nrcode, string);
-  }
-
-  if (block->gcode->units == GCODE_UNITS_INCH)
-  {
-    GCODE_COMMAND (block, "G20", "units are inches");
-  }
-  else
-  {
-    GCODE_COMMAND (block, "G21", "units are millimeters");
-  }
-
-  GCODE_COMMAND (block, "G90", "absolute positioning");
 }
 
 void
@@ -205,6 +138,73 @@ gcode_begin_load (gcode_block_t *block, FILE *fh)
         break;
     }
   }
+}
+
+void
+gcode_begin_make (gcode_block_t *block)
+{
+  gcode_begin_t *begin;
+  char string[256], nrcode[32], date_string[32];
+  time_t timer;
+
+  begin = (gcode_begin_t *)block->pdata;
+
+  GCODE_CLEAR (block);
+
+  if (block->gcode->driver == GCODE_DRIVER_HAAS)
+  {
+    GCODE_APPEND (block, "%\n");
+
+    sprintf (string, "O%.5d\n", block->gcode->project_number);
+    GCODE_APPEND (block, string);
+  }
+
+  sprintf (string, "Project: %s", block->gcode->name);
+  GCODE_COMMENT (block, string);
+
+  timer = time (NULL);
+  strcpy (date_string, asctime (localtime (&timer)));
+  date_string[strlen (date_string) - 1] = 0;
+  sprintf (string, "Created: %s with GCAM SE v%s", date_string, VERSION);
+  GCODE_COMMENT (block, string);
+
+  gsprintf (string, block->gcode->decimals, "Material Size: X=%z Y=%z Z=%z", block->gcode->material_size[0], block->gcode->material_size[1], block->gcode->material_size[2]);
+  GCODE_COMMENT (block, string);
+
+  gsprintf (string, block->gcode->decimals, "Origin Offset: X=%z Y=%z Z=%z", block->gcode->material_origin[0], block->gcode->material_origin[1], block->gcode->material_origin[2]);
+  GCODE_COMMENT (block, string);
+
+  sprintf (string, "Notes: %s", block->gcode->notes);
+  GCODE_COMMENT (block, string);
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "BEGIN: %s", block->comment);
+  GCODE_COMMENT (block, string);
+
+  GCODE_APPEND (block, "\n");
+
+  if (begin->coordinate_system == GCODE_BEGIN_COORDINATE_SYSTEM_NONE)
+  {
+    GCODE_COMMENT (block, "Machine coordinates");
+  }
+  else
+  {
+    sprintf (nrcode, "G%d", 53 + begin->coordinate_system);
+    sprintf (string, "workspace %d", begin->coordinate_system);
+    GCODE_COMMAND (block, nrcode, string);
+  }
+
+  if (block->gcode->units == GCODE_UNITS_INCH)
+  {
+    GCODE_COMMAND (block, "G20", "units are inches");
+  }
+  else
+  {
+    GCODE_COMMAND (block, "G21", "units are millimeters");
+  }
+
+  GCODE_COMMAND (block, "G90", "absolute positioning");
 }
 
 void

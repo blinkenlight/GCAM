@@ -27,8 +27,8 @@
 
 void gcode_code_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_code_free (gcode_block_t **block);
-void gcode_code_make (gcode_block_t *block);
 void gcode_code_save (gcode_block_t *block, FILE *fh);
 void gcode_code_load (gcode_block_t *block, FILE *fh);
+void gcode_code_make (gcode_block_t *block);
 
 #endif

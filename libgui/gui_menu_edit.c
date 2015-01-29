@@ -108,6 +108,286 @@ gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 static void
+move_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
+{
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
+static void
+move_on_assistant_apply (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget **wlist;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+  gcode_vec2d_t delta;
+
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+
+  if (selected_block->move)
+  {
+    delta[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
+    delta[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+
+    selected_block->move (selected_block, delta);
+
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
+
+    update_project_modified_flag (gui, 1);
+
+    gui_tab_display (gui, selected_block, 1);
+  }
+}
+
+static void
+move_create_page1 (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *table;
+  GtkWidget *label;
+  GtkWidget *translatex_spin;
+  GtkWidget *translatey_spin;
+  GtkWidget **wlist;
+  GdkPixbuf *pixbuf;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  table = gtk_table_new (2, 2, TRUE);
+  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
+
+  label = gtk_label_new ("Translate(X)");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
+  translatex_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatex_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
+  gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 0, 1);
+
+  label = gtk_label_new ("Translate(Y)");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
+
+  translatey_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatey_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
+  gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 1, 2);
+
+  wlist[1] = translatex_spin;
+  wlist[2] = translatey_spin;
+
+  gtk_widget_show_all (table);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Translate");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_TRANSLATE, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+}
+
+void
+gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
+
+  gui = (gui_t *)data;
+
+  assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Translate");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
+
+  /* Setup Global Widgets */
+  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+
+  wlist[0] = (void *)gui;
+
+  move_create_page1 (assistant, wlist);
+
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (move_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (move_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (move_on_assistant_apply), wlist);
+
+  gtk_widget_show (assistant);
+}
+
+static void
+spin_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
+{
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
+static void
+spin_on_assistant_apply (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget **wlist;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+  gcode_vec2d_t datum;
+  gfloat_t angle;
+
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+
+  if (selected_block->spin)
+  {
+    datum[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
+    datum[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+    angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+
+    selected_block->spin (selected_block, datum, angle);
+
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
+
+    update_project_modified_flag (gui, 1);
+
+    gui_tab_display (gui, selected_block, 1);
+  }
+}
+
+static void
+spin_create_page1 (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *table;
+  GtkWidget *label;
+  GtkWidget *rotate_aboutx_spin;
+  GtkWidget *rotate_abouty_spin;
+  GtkWidget *rotation_angle_spin;
+  GtkWidget **wlist;
+  GdkPixbuf *pixbuf;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+
+  gcode_vec2d_t aabb_min, aabb_max, datum;
+
+  datum[0] = 0.0;
+  datum[1] = 0.0;
+
+  if (selected_block->aabb)
+  {
+    selected_block->aabb (selected_block, aabb_min, aabb_max);
+
+    if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
+    {
+      datum[0] = (aabb_min[0] + aabb_max[0]) / 2;
+      datum[1] = (aabb_min[1] + aabb_max[1]) / 2;
+    }
+  }
+
+  table = gtk_table_new (3, 2, TRUE);
+  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
+
+  label = gtk_label_new ("Rotate About(X)");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
+  rotate_aboutx_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), datum[0]);
+  gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 0, 1);
+
+  label = gtk_label_new ("Rotate About(Y)");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
+
+  rotate_abouty_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), datum[1]);
+  gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 1, 2);
+
+  label = gtk_label_new ("Rotation Angle");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
+
+  rotation_angle_spin = gtk_spin_button_new_with_range (-360.0, 360.0, 1.0);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_angle_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_angle_spin), 90.0);
+  gtk_table_attach_defaults (GTK_TABLE (table), rotation_angle_spin, 1, 2, 2, 3);
+
+  wlist[1] = rotate_aboutx_spin;
+  wlist[2] = rotate_abouty_spin;
+  wlist[3] = rotation_angle_spin;
+
+  gtk_widget_show_all (table);
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Rotate");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_ROTATE, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+}
+
+void
+gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
+
+  gui = (gui_t *)data;
+
+  assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Rotate");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
+
+  /* Setup Global Widgets */
+  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+
+  wlist[0] = (void *)gui;
+
+  spin_create_page1 (assistant, wlist);
+
+  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
+  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (spin_on_assistant_apply), wlist);
+
+  gtk_widget_show (assistant);
+}
+
+static void
 scale_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
   GtkWidget **wlist;
@@ -134,16 +414,19 @@ scale_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   get_selected_block (gui, &selected_block, &selected_iter);
 
-  factor = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
+  if (selected_block->scale)
+  {
+    factor = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
 
-  selected_block->scale (selected_block, factor);
+    selected_block->scale (selected_block, factor);
 
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, selected_block);
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
 
-  update_project_modified_flag (gui, 1);
+    update_project_modified_flag (gui, 1);
 
-  gui_tab_display (gui, selected_block, 1);
+    gui_tab_display (gui, selected_block, 1);
+  }
 }
 
 static void
@@ -155,14 +438,10 @@ scale_create_page1 (GtkWidget *assistant, gpointer data)
   GtkWidget *factor_spin;
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
-  GtkTreeIter selected_iter;
-  gcode_block_t *selected_block;
 
   wlist = (GtkWidget **)data;
 
   gui = (gui_t *)wlist[0];
-
-  get_selected_block (gui, &selected_block, &selected_iter);
 
   hbox = gtk_hbox_new (TRUE, TABLE_SPACING);
   gtk_container_set_border_width (GTK_CONTAINER (hbox), BORDER_WIDTH);
@@ -573,6 +852,9 @@ pattern_on_assistant_apply (GtkWidget *assistant, gpointer data)
   GtkWidget **wlist;
   GtkTreeIter selected_iter, new_iter;
   gcode_block_t *selected_block;
+  gcode_vec2d_t delta, datum;
+  gfloat_t angle;
+  uint32_t count;
 
   wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
 
@@ -580,30 +862,21 @@ pattern_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   get_selected_block (gui, &selected_block, &selected_iter);                    // Retrieve the currently selected block / iter;
 
-  /* *INDENT-OFF* */
+  count = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1]));
+  delta[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  delta[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  datum[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  datum[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
 
   if (selected_block->type == GCODE_TYPE_SKETCH)                                // If it's a 'sketch' block, call the sketch pattern generator;
   {
-    gcode_sketch_pattern (selected_block,
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
+    gcode_sketch_pattern (selected_block, count, delta, datum, angle);
   }
   else if (selected_block->type == GCODE_TYPE_DRILL_HOLES)                      // If it's a 'drill holes' block, call the drill holes pattern generator;
   {
-    gcode_drill_holes_pattern (selected_block,
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[1])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5])),
-      gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6])));                  // The parameters for the pattern are retrieved directly from the GUI widgets;
+    gcode_drill_holes_pattern (selected_block, count, delta, datum, angle);
   }
-
-  /* *INDENT-ON* */
 
   new_iter = gui_insert_after_iter (gui, &selected_iter, selected_block);       // Make a sub-tree from the updated block and insert it after the original iter;
 
@@ -630,7 +903,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   GtkWidget *translatey_spin;
   GtkWidget *rotate_aboutx_spin;
   GtkWidget *rotate_abouty_spin;
-  GtkWidget *rotation_spin;
+  GtkWidget *rotation_angle_spin;
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
@@ -683,20 +956,20 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 4, 5);
 
-  label = gtk_label_new ("Rotation");
+  label = gtk_label_new ("Rotation Angle");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
 
-  rotation_spin = gtk_spin_button_new_with_range (-180.0, 180.0, 0.1);
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_spin), 5);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_spin), 0.0);
-  gtk_table_attach_defaults (GTK_TABLE (table), rotation_spin, 1, 2, 5, 6);
+  rotation_angle_spin = gtk_spin_button_new_with_range (-180.0, 180.0, 1.0);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_angle_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_angle_spin), 0.0);
+  gtk_table_attach_defaults (GTK_TABLE (table), rotation_angle_spin, 1, 2, 5, 6);
 
   wlist[1] = iterations_spin;
   wlist[2] = translatex_spin;
   wlist[3] = translatey_spin;
   wlist[4] = rotate_aboutx_spin;
   wlist[5] = rotate_abouty_spin;
-  wlist[6] = rotation_spin;
+  wlist[6] = rotation_angle_spin;
 
   gtk_widget_show_all (table);
 

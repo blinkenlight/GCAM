@@ -35,12 +35,12 @@ gcode_stl_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_STL, 0);
 
   (*block)->free = gcode_stl_free;
-  (*block)->make = gcode_stl_make;
   (*block)->save = gcode_stl_save;
   (*block)->load = gcode_stl_load;
+  (*block)->make = gcode_stl_make;
   (*block)->draw = gcode_stl_draw;
-  (*block)->clone = gcode_stl_clone;
   (*block)->scale = gcode_stl_scale;
+  (*block)->clone = gcode_stl_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_stl_t));
 
@@ -92,6 +92,51 @@ gcode_stl_free (gcode_block_t **block)
 }
 
 void
+gcode_stl_save (gcode_block_t *block, FILE *fh)
+{
+  gcode_stl_t *stl;
+  uint32_t size;
+  uint8_t data;
+
+  stl = (gcode_stl_t *)block->pdata;
+}
+
+void
+gcode_stl_load (gcode_block_t *block, FILE *fh)
+{
+  gcode_stl_t *stl;
+  uint32_t bsize, dsize, start;
+  uint8_t data;
+
+  stl = (gcode_stl_t *)block->pdata;
+
+  fread (&bsize, sizeof (uint32_t), 1, fh);
+
+  start = ftell (fh);
+
+  while (ftell (fh) - start < bsize)
+  {
+    fread (&data, sizeof (uint8_t), 1, fh);
+    fread (&dsize, sizeof (uint32_t), 1, fh);
+
+    switch (data)
+    {
+      case GCODE_BIN_DATA_BLOCK_COMMENT:
+        fread (block->comment, sizeof (char), dsize, fh);
+        break;
+
+      case GCODE_BIN_DATA_BLOCK_FLAGS:
+        fread (&block->flags, sizeof (uint8_t), dsize, fh);
+        break;
+
+      default:
+        fseek (fh, dsize, SEEK_CUR);
+        break;
+    }
+  }
+}
+
+void
 gcode_stl_make (gcode_block_t *block)
 {
   gcode_stl_t *stl;
@@ -140,48 +185,171 @@ gcode_stl_make (gcode_block_t *block)
 }
 
 void
-gcode_stl_save (gcode_block_t *block, FILE *fh)
+gcode_stl_draw (gcode_block_t *block, gcode_block_t *selected)
 {
+#if GCODE_USE_OPENGL
   gcode_stl_t *stl;
-  uint32_t size;
-  uint8_t data;
+  gcode_block_t *index_block;
+  gfloat_t z;
+  float mat_diffuse[4];
+  int i;
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
 
   stl = (gcode_stl_t *)block->pdata;
+
+#if 0
+  glEnable (GL_LIGHTING);
+  glEnable (GL_LIGHT0);
+
+  mat_diffuse[0] = 0.6;
+  mat_diffuse[1] = 0.6;
+  mat_diffuse[2] = 0.6;
+  mat_diffuse[3] = 1.0;
+  glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+  glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, mat_diffuse);
+
+  glBegin (GL_TRIANGLES);
+
+  for (i = 0; i < stl->tri_num; i++)
+  {
+    glNormal3f (stl->tri_list[i * 12 + 0], stl->tri_list[i * 12 + 1], stl->tri_list[i * 12 + 2]);
+    glVertex3f (stl->tri_list[i * 12 + 3], stl->tri_list[i * 12 + 4], stl->tri_list[i * 12 + 5]);
+    glVertex3f (stl->tri_list[i * 12 + 6], stl->tri_list[i * 12 + 7], stl->tri_list[i * 12 + 8]);
+    glVertex3f (stl->tri_list[i * 12 + 9], stl->tri_list[i * 12 + 10], stl->tri_list[i * 12 + 11]);
+  }
+
+  glEnd ();
+#else
+  glDisable (GL_LIGHTING);
+  glDisable (GL_LIGHT0);
+  glDisable (GL_DEPTH_TEST);
+
+  glColor3f (GCODE_OPENGL_STL_SURFACE_COLOR[0],
+             GCODE_OPENGL_STL_SURFACE_COLOR[1],
+             GCODE_OPENGL_STL_SURFACE_COLOR[2]);
+  glBegin (GL_LINES);
+
+  for (i = 0; i < stl->slices; i++)
+  {
+    z = block->gcode->material_size[2] * (1.0 - ((gfloat_t)i / (gfloat_t)(stl->slices - 1)));
+
+    index_block = stl->slice_list[i];
+
+    while (index_block)
+    {
+      gcode_vec2d_t e0, e1;
+
+      index_block->ends (index_block, e0, e1, GCODE_GET);
+
+      glVertex3f (e0[0], e0[1], z);
+      glVertex3f (e1[0], e1[1], z);
+
+      index_block = index_block->next;
+    }
+  }
+
+  glEnd ();
+#endif
+
+#endif
 }
 
 void
-gcode_stl_load (gcode_block_t *block, FILE *fh)
+gcode_stl_scale (gcode_block_t *block, gfloat_t scale)
 {
   gcode_stl_t *stl;
-  uint32_t bsize, dsize, start;
-  uint8_t data;
+  int i;
 
   stl = (gcode_stl_t *)block->pdata;
 
-  fread (&bsize, sizeof (uint32_t), 1, fh);
-
-  start = ftell (fh);
-
-  while (ftell (fh) - start < bsize)
+  for (i = 0; i < stl->tri_num; i++)
   {
-    fread (&data, sizeof (uint8_t), 1, fh);
-    fread (&dsize, sizeof (uint32_t), 1, fh);
+    stl->tri_list[i * 12 + 3] *= scale;
+    stl->tri_list[i * 12 + 4] *= scale;
+    stl->tri_list[i * 12 + 5] *= scale;
 
-    switch (data)
-    {
-      case GCODE_BIN_DATA_BLOCK_COMMENT:
-        fread (block->comment, sizeof (char), dsize, fh);
-        break;
+    stl->tri_list[i * 12 + 6] *= scale;
+    stl->tri_list[i * 12 + 7] *= scale;
+    stl->tri_list[i * 12 + 8] *= scale;
 
-      case GCODE_BIN_DATA_BLOCK_FLAGS:
-        fread (&block->flags, sizeof (uint8_t), dsize, fh);
-        break;
-
-      default:
-        fseek (fh, dsize, SEEK_CUR);
-        break;
-    }
+    stl->tri_list[i * 12 + 9] *= scale;
+    stl->tri_list[i * 12 + 10] *= scale;
+    stl->tri_list[i * 12 + 11] *= scale;
   }
+}
+
+void
+gcode_stl_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
+{
+  gcode_stl_t *stl, *model_stl;
+
+  model_stl = (gcode_stl_t *)model->pdata;
+}
+
+void
+gcode_stl_build (gcode_block_t *block)
+{
+
+}
+
+int
+gcode_stl_import (gcode_block_t *block, char *filename)
+{
+  gcode_stl_t *stl;
+  FILE *fh;
+  gcode_vec3d_t nor, vec0, vec1;
+  char comment[80];
+  int i;
+
+  stl = (gcode_stl_t *)block->pdata;
+
+  fh = fopen (filename, "rb");
+
+  if (!fh)
+    return (1);
+
+  /* First Check to see if file is Binary or ASCII */
+
+  /* XXX - Assume Binary for the moment */
+  fread (comment, 1, 80, fh);
+  i = 79;
+  comment[i] = 0;
+
+  while (comment[i] == 32 || comment[i] == 0)
+    comment[i--] = 0;
+
+  fread (&stl->tri_num, sizeof (int), 1, fh);
+
+  stl->tri_list = (float *)malloc (sizeof (float) * 12 * stl->tri_num);
+
+  for (i = 0; i < stl->tri_num; i++)
+  {
+    fseek (fh, 12, SEEK_CUR);                                                   /* Skip Normal */
+    fread (&stl->tri_list[12 * i + 3], sizeof (float), 9, fh);                  /* 3 vertices */
+    fseek (fh, 2, SEEK_CUR);                                                    /* Skip Pad/Color */
+
+    /* Calculate Normal */
+    vec0[0] = stl->tri_list[12 * i + 6] - stl->tri_list[12 * i + 3];
+    vec0[1] = stl->tri_list[12 * i + 7] - stl->tri_list[12 * i + 4];
+    vec0[2] = stl->tri_list[12 * i + 8] - stl->tri_list[12 * i + 5];
+
+    vec1[0] = stl->tri_list[12 * i + 9] - stl->tri_list[12 * i + 3];
+    vec1[1] = stl->tri_list[12 * i + 10] - stl->tri_list[12 * i + 4];
+    vec1[2] = stl->tri_list[12 * i + 11] - stl->tri_list[12 * i + 5];
+
+    GCODE_MATH_VEC3D_CROSS (nor, vec0, vec1);
+    GCODE_MATH_VEC3D_UNITIZE (nor);
+    stl->tri_list[12 * i + 0] = nor[0];
+    stl->tri_list[12 * i + 1] = nor[1];
+    stl->tri_list[12 * i + 2] = nor[2];
+  }
+
+  gcode_stl_generate_slice_contours (block);
+  fclose (fh);
+
+  return (0);
 }
 
 void
@@ -296,167 +464,5 @@ gcode_stl_generate_slice_contours (gcode_block_t *block)
 
     /* Reorder the lines such that they are contiguous */
     gcode_util_merge_list_fragments (&stl->slice_list[i]);
-  }
-}
-
-int
-gcode_stl_import (gcode_block_t *block, char *filename)
-{
-  gcode_stl_t *stl;
-  FILE *fh;
-  gcode_vec3d_t nor, vec0, vec1;
-  char comment[80];
-  int i;
-
-  stl = (gcode_stl_t *)block->pdata;
-
-  fh = fopen (filename, "rb");
-
-  if (!fh)
-    return (1);
-
-  /* First Check to see if file is Binary or ASCII */
-
-  /* XXX - Assume Binary for the moment */
-  fread (comment, 1, 80, fh);
-  i = 79;
-  comment[i] = 0;
-
-  while (comment[i] == 32 || comment[i] == 0)
-    comment[i--] = 0;
-
-  fread (&stl->tri_num, sizeof (int), 1, fh);
-
-  stl->tri_list = (float *)malloc (sizeof (float) * 12 * stl->tri_num);
-
-  for (i = 0; i < stl->tri_num; i++)
-  {
-    fseek (fh, 12, SEEK_CUR);                                                   /* Skip Normal */
-    fread (&stl->tri_list[12 * i + 3], sizeof (float), 9, fh);                  /* 3 vertices */
-    fseek (fh, 2, SEEK_CUR);                                                    /* Skip Pad/Color */
-
-    /* Calculate Normal */
-    vec0[0] = stl->tri_list[12 * i + 6] - stl->tri_list[12 * i + 3];
-    vec0[1] = stl->tri_list[12 * i + 7] - stl->tri_list[12 * i + 4];
-    vec0[2] = stl->tri_list[12 * i + 8] - stl->tri_list[12 * i + 5];
-
-    vec1[0] = stl->tri_list[12 * i + 9] - stl->tri_list[12 * i + 3];
-    vec1[1] = stl->tri_list[12 * i + 10] - stl->tri_list[12 * i + 4];
-    vec1[2] = stl->tri_list[12 * i + 11] - stl->tri_list[12 * i + 5];
-
-    GCODE_MATH_VEC3D_CROSS (nor, vec0, vec1);
-    GCODE_MATH_VEC3D_UNITIZE (nor);
-    stl->tri_list[12 * i + 0] = nor[0];
-    stl->tri_list[12 * i + 1] = nor[1];
-    stl->tri_list[12 * i + 2] = nor[2];
-  }
-
-  gcode_stl_generate_slice_contours (block);
-  fclose (fh);
-
-  return (0);
-}
-
-void
-gcode_stl_draw (gcode_block_t *block, gcode_block_t *selected)
-{
-#if GCODE_USE_OPENGL
-  gcode_stl_t *stl;
-  gcode_block_t *index_block;
-  gfloat_t z;
-  float mat_diffuse[4];
-  int i;
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  stl = (gcode_stl_t *)block->pdata;
-
-#if 0
-  glEnable (GL_LIGHTING);
-  glEnable (GL_LIGHT0);
-
-  mat_diffuse[0] = 0.6;
-  mat_diffuse[1] = 0.6;
-  mat_diffuse[2] = 0.6;
-  mat_diffuse[3] = 1.0;
-  glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
-  glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, mat_diffuse);
-
-  glBegin (GL_TRIANGLES);
-
-  for (i = 0; i < stl->tri_num; i++)
-  {
-    glNormal3f (stl->tri_list[i * 12 + 0], stl->tri_list[i * 12 + 1], stl->tri_list[i * 12 + 2]);
-    glVertex3f (stl->tri_list[i * 12 + 3], stl->tri_list[i * 12 + 4], stl->tri_list[i * 12 + 5]);
-    glVertex3f (stl->tri_list[i * 12 + 6], stl->tri_list[i * 12 + 7], stl->tri_list[i * 12 + 8]);
-    glVertex3f (stl->tri_list[i * 12 + 9], stl->tri_list[i * 12 + 10], stl->tri_list[i * 12 + 11]);
-  }
-
-  glEnd ();
-#else
-  glDisable (GL_LIGHTING);
-  glDisable (GL_LIGHT0);
-  glDisable (GL_DEPTH_TEST);
-
-  glColor3f (GCODE_OPENGL_STL_SURFACE_COLOR[0],
-             GCODE_OPENGL_STL_SURFACE_COLOR[1],
-             GCODE_OPENGL_STL_SURFACE_COLOR[2]);
-  glBegin (GL_LINES);
-
-  for (i = 0; i < stl->slices; i++)
-  {
-    z = block->gcode->material_size[2] * (1.0 - ((gfloat_t)i / (gfloat_t)(stl->slices - 1)));
-
-    index_block = stl->slice_list[i];
-
-    while (index_block)
-    {
-      gcode_vec2d_t e0, e1;
-
-      index_block->ends (index_block, e0, e1, GCODE_GET);
-
-      glVertex3f (e0[0], e0[1], z);
-      glVertex3f (e1[0], e1[1], z);
-
-      index_block = index_block->next;
-    }
-  }
-
-  glEnd ();
-#endif
-
-#endif
-}
-
-void
-gcode_stl_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
-{
-  gcode_stl_t *stl, *model_stl;
-
-  model_stl = (gcode_stl_t *)model->pdata;
-}
-
-void
-gcode_stl_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_stl_t *stl;
-  int i;
-
-  stl = (gcode_stl_t *)block->pdata;
-
-  for (i = 0; i < stl->tri_num; i++)
-  {
-    stl->tri_list[i * 12 + 3] *= scale;
-    stl->tri_list[i * 12 + 4] *= scale;
-    stl->tri_list[i * 12 + 5] *= scale;
-
-    stl->tri_list[i * 12 + 6] *= scale;
-    stl->tri_list[i * 12 + 7] *= scale;
-    stl->tri_list[i * 12 + 8] *= scale;
-
-    stl->tri_list[i * 12 + 9] *= scale;
-    stl->tri_list[i * 12 + 10] *= scale;
-    stl->tri_list[i * 12 + 11] *= scale;
   }
 }

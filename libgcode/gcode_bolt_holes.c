@@ -38,13 +38,16 @@ gcode_bolt_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *par
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_BOLT_HOLES, 0);
 
   (*block)->free = gcode_bolt_holes_free;
-  (*block)->make = gcode_bolt_holes_make;
   (*block)->save = gcode_bolt_holes_save;
   (*block)->load = gcode_bolt_holes_load;
+  (*block)->make = gcode_bolt_holes_make;
   (*block)->draw = gcode_bolt_holes_draw;
-  (*block)->clone = gcode_bolt_holes_clone;
+  (*block)->aabb = gcode_bolt_holes_aabb;
+  (*block)->move = gcode_bolt_holes_move;
+  (*block)->spin = gcode_bolt_holes_spin;
   (*block)->scale = gcode_bolt_holes_scale;
   (*block)->parse = gcode_bolt_holes_parse;
+  (*block)->clone = gcode_bolt_holes_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_bolt_holes_t));
 
@@ -599,6 +602,97 @@ gcode_bolt_holes_draw (gcode_block_t *block, gcode_block_t *selected)
   bolt_holes->offset.tool = 0.0;                                                // should be re-initialized appropriately anyway), but hey - let's play nice...
   bolt_holes->offset.eval = 0.0;
 #endif
+}
+
+/**
+ * Construct the axis-aligned bounding box of all the holes in the bolt holes;
+ * NOTE: this can and does return an "imposible" or "inside-out" bounding box
+ * which has its minimum larger than its maximum as a sign of failure to pick
+ * up any valid holes, if either the list is empty or none of the members are 
+ * arcs (there should ONLY be arcs) - THIS SHOULD BE TESTED FOR ON RETURN!
+ */
+
+void
+gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_block_t *index_block;
+  gcode_bolt_holes_t *bolt_holes;
+  gcode_vec2d_t center;
+  gfloat_t radius;
+
+  bolt_holes = (gcode_bolt_holes_t *)block->pdata;
+
+  radius = bolt_holes->hole_diameter / 2;
+
+  min[0] = min[1] = 1;
+  max[0] = max[1] = 0;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->type == GCODE_TYPE_ARC)
+    {
+      gcode_arc_center (index_block, center, GCODE_GET);
+
+      if ((min[0] > max[0]) || (min[1] > max[1]))                               // If bounds were inside-out (unset), accept the hole directly;
+      {
+        min[0] = center[0] - radius;
+        max[0] = center[0] + radius;
+        min[1] = center[1] - radius;
+        max[1] = center[1] + radius;
+      }
+      else                                                                      // If bounds are already valid (set), look for holes not inside;
+      {
+        if (center[0] - radius < min[0])
+          min[0] = center[0] - radius;
+
+        if (center[0] + radius > max[0])
+          max[0] = center[0] + radius;
+
+        if (center[1] - radius < min[1])
+          min[1] = center[1] - radius;
+
+        if (center[1] + radius > max[1])
+          max[1] = center[1] + radius;
+      }
+    }
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_bolt_holes_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_bolt_holes_t *bolt_holes;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  bolt_holes = (gcode_bolt_holes_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_COPY (orgnl_pt, bolt_holes->position);
+  GCODE_MATH_TRANSLATE (xform_pt, orgnl_pt, delta);
+  GCODE_MATH_VEC2D_COPY (bolt_holes->position, xform_pt);
+
+  gcode_bolt_holes_rebuild (block);
+}
+
+void
+gcode_bolt_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_bolt_holes_t *bolt_holes;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  bolt_holes = (gcode_bolt_holes_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_SUB (orgnl_pt, bolt_holes->position, datum);
+  GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
+  GCODE_MATH_VEC2D_ADD (bolt_holes->position, xform_pt, datum);
+
+  bolt_holes->offset_angle += angle;
+  GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+
+  gcode_bolt_holes_rebuild (block);
 }
 
 void

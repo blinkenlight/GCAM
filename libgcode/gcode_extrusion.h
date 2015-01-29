@@ -46,14 +46,14 @@ typedef struct gcode_extrusion_s
 
 void gcode_extrusion_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_extrusion_free (gcode_block_t **block);
-void gcode_extrusion_make (gcode_block_t *block);
 void gcode_extrusion_save (gcode_block_t *block, FILE *fh);
 void gcode_extrusion_load (gcode_block_t *block, FILE *fh);
-int gcode_extrusion_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
+void gcode_extrusion_make (gcode_block_t *block);
 void gcode_extrusion_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_extrusion_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+int gcode_extrusion_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
 void gcode_extrusion_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_extrusion_parse (gcode_block_t *block, const char **xmlattr);
+void gcode_extrusion_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 int gcode_extrusion_evaluate_offset (gcode_block_t *block, gfloat_t z, gfloat_t *offset);
 int gcode_extrusion_taper_exists (gcode_block_t *block);
 

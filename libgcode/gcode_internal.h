@@ -214,17 +214,19 @@ struct gcode_block_s;
  * Type definitions for block-specific functions
  */
 typedef void gcode_free_t (struct gcode_block_s **block);
-typedef void gcode_make_t (struct gcode_block_s *block);
 typedef void gcode_save_t (struct gcode_block_s *block, FILE *fh);
 typedef void gcode_load_t (struct gcode_block_s *block, FILE *fh);
-typedef int gcode_ends_t (struct gcode_block_s *block, gfloat_t p0[2], gfloat_t p1[2], uint8_t mode);
+typedef void gcode_make_t (struct gcode_block_s *block);
 typedef void gcode_draw_t (struct gcode_block_s *block, struct gcode_block_s *selected);
 typedef int gcode_eval_t (struct gcode_block_s *block, gfloat_t y, gfloat_t *x_array, uint32_t *xind);
+typedef int gcode_ends_t (struct gcode_block_s *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
+typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max);
 typedef gfloat_t gcode_length_t (struct gcode_block_s *block);
-typedef void gcode_clone_t (struct gcode_block_s **block, struct gcode_s *gcode, struct gcode_block_s *model);
+typedef void gcode_move_t (struct gcode_block_s *block, gcode_vec2d_t delta);
+typedef void gcode_spin_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);
 typedef void gcode_scale_t (struct gcode_block_s *block, gfloat_t scale);
 typedef void gcode_parse_t (struct gcode_block_s *block, const char **xmlattr);
-typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max);
+typedef void gcode_clone_t (struct gcode_block_s **block, struct gcode_s *gcode, struct gcode_block_s *model);
 
 typedef void gcode_progress_callback_t (void *gui, gfloat_t progress);
 typedef void gcode_message_callback_t (void *gui, char *message);
@@ -270,17 +272,19 @@ typedef struct gcode_block_s
   char *code;
 
   gcode_free_t *free;
-  gcode_make_t *make;
   gcode_save_t *save;
   gcode_load_t *load;
-  gcode_ends_t *ends;
+  gcode_make_t *make;
   gcode_draw_t *draw;
   gcode_eval_t *eval;
+  gcode_ends_t *ends;
+  gcode_aabb_t *aabb;
   gcode_length_t *length;
-  gcode_clone_t *clone;
+  gcode_move_t *move;
+  gcode_spin_t *spin;
   gcode_scale_t *scale;
   gcode_parse_t *parse;
-  gcode_aabb_t *aabb;
+  gcode_clone_t *clone;
 } gcode_block_t;
 
 typedef struct gcode_s

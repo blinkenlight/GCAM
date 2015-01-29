@@ -44,13 +44,15 @@ static GtkActionEntry gui_menu_entries[] = {
   { "Export",                      GTK_STOCK_CONVERT,                 "_Export G-Code",               "<control>E",        "Export Project to G-Code",         G_CALLBACK (gui_menu_file_export_gcode_menuitem_callback) },
   { "Import GCAM",                 GTK_STOCK_OPEN,                    "_Import GCAM",                 "<control>I",        "Import Blocks from GCAM File",     G_CALLBACK (gui_menu_file_import_gcam_menuitem_callback) },
   { "Import Gerber (RS274X)",      GTK_STOCK_OPEN,                    "Import _Gerber (RS274X)",      "<control>G",        "Import Gerber (RS274X) to Sketch", G_CALLBACK (gui_menu_file_import_gerber_menuitem_callback) },
-  { "Import Excellon Drill Holes", GTK_STOCK_OPEN,                    "Import Excellon _Drill Holes", "<control>X",        "Import Excellon Drill Holes",      G_CALLBACK (gui_menu_file_import_excellon_menuitem_callback) },
-  { "Import SVG Paths",            GTK_STOCK_OPEN,                    "Import SVG Paths",             NULL,                "Import SVG Paths",                 G_CALLBACK (gui_menu_file_import_svg_menuitem_callback) },
+  { "Import Excellon Drill Holes", GTK_STOCK_OPEN,                    "Import E_xcellon Drill Holes", "<control>X",        "Import Excellon Drill Holes",      G_CALLBACK (gui_menu_file_import_excellon_menuitem_callback) },
+  { "Import SVG Paths",            GTK_STOCK_OPEN,                    "Import SVG _Paths",            "<control>P",        "Import SVG Paths",                 G_CALLBACK (gui_menu_file_import_svg_menuitem_callback) },
   { "Quit",                        GTK_STOCK_QUIT,                    "_Quit",                        "<control>Q",        "Quit GCAM",                        G_CALLBACK (gui_menu_file_quit_menuitem_callback) },
   { "EditMenu",                    NULL,                              "_Edit" },
   { "Remove",                      GTK_STOCK_DELETE,                  "_Remove",                      "<control>R",        "Remove",                           G_CALLBACK (gui_menu_edit_remove_menuitem_callback) },
   { "Duplicate",                   GTK_STOCK_COPY,                    "_Duplicate",                   "<control>D",        "Duplicate",                        G_CALLBACK (gui_menu_edit_duplicate_menuitem_callback) },
-  { "Scale",                       GCAM_STOCK_EDIT_SCALE,             "_Scale",                       NULL,                "Scale",                            G_CALLBACK (gui_menu_edit_scale_menuitem_callback) },
+  { "Translate",                   GCAM_STOCK_EDIT_TRANSLATE,         "_Translate",                   "<alt><control>T",   "Translate",                        G_CALLBACK (gui_menu_edit_move_menuitem_callback) },
+  { "Rotate",                      GCAM_STOCK_EDIT_ROTATE,            "_Rotate",                      "<alt><control>R",   "Rotate",                           G_CALLBACK (gui_menu_edit_spin_menuitem_callback) },
+  { "Scale",                       GCAM_STOCK_EDIT_SCALE,             "_Scale",                       "<alt><control>S",   "Scale",                            G_CALLBACK (gui_menu_edit_scale_menuitem_callback) },
   { "Attract Previous",            GCAM_STOCK_EDIT_ATTRACT_PREV,      "Attract _Previous",            "<alt><control>P",   "Attract Previous",                 G_CALLBACK (gui_menu_edit_attract_previous_menuitem_callback) },
   { "Attract Next",                GCAM_STOCK_EDIT_ATTRACT_NEXT,      "Attract _Next",                "<alt><control>N",   "Attract Next",                     G_CALLBACK (gui_menu_edit_attract_next_menuitem_callback) },
   { "Fillet Previous",             GCAM_STOCK_EDIT_FILLET_PREV,       "Fillet Previous",              NULL,                "Fillet Previous",                  G_CALLBACK (gui_menu_edit_fillet_previous_menuitem_callback) },
@@ -109,6 +111,8 @@ static const char *gui_menu_description =
 "      <menuitem action='Remove'/>"
 "      <menuitem action='Duplicate'/>"
 "      <separator/>"
+"      <menuitem action='Translate'/>"
+"      <menuitem action='Rotate'/>"
 "      <menuitem action='Scale'/>"
 "      <separator/>"
 "      <menuitem action='Attract Previous'/>"

@@ -1441,17 +1441,20 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   sketch_block->aabb (sketch_block, aabb_min, aabb_max);
 
   /* Extend material size and/or move origin if anything spills over */
-  if (gui->gcode.material_origin[0] + aabb_min[0] < 0)
-    gui->gcode.material_origin[0] = -aabb_min[0];
+  if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
+  {
+    if (gui->gcode.material_origin[0] + aabb_min[0] < 0)
+      gui->gcode.material_origin[0] = -aabb_min[0];
 
-  if (gui->gcode.material_origin[1] + aabb_min[1] < 0)
-    gui->gcode.material_origin[1] = -aabb_min[1];
+    if (gui->gcode.material_origin[1] + aabb_min[1] < 0)
+      gui->gcode.material_origin[1] = -aabb_min[1];
 
-  if (gui->gcode.material_size[0] < (aabb_max[0] - aabb_min[0]))
-    gui->gcode.material_size[0] = aabb_max[0] - aabb_min[0];
+    if (gui->gcode.material_size[0] < (aabb_max[0] - aabb_min[0]))
+      gui->gcode.material_size[0] = aabb_max[0] - aabb_min[0];
 
-  if (gui->gcode.material_size[1] < (aabb_max[1] - aabb_min[1]))
-    gui->gcode.material_size[1] = aabb_max[1] - aabb_min[1];
+    if (gui->gcode.material_size[1] < (aabb_max[1] - aabb_min[1]))
+      gui->gcode.material_size[1] = aabb_max[1] - aabb_min[1];
+  }
 
   gui_opengl_build_gridxy_display_list (&gui->opengl);
   gui_opengl_build_gridxz_display_list (&gui->opengl);

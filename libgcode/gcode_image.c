@@ -38,13 +38,13 @@ gcode_image_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_IMAGE, 0);
 
   (*block)->free = gcode_image_free;
-  (*block)->make = gcode_image_make;
   (*block)->save = gcode_image_save;
   (*block)->load = gcode_image_load;
+  (*block)->make = gcode_image_make;
   (*block)->draw = gcode_image_draw;
-  (*block)->clone = gcode_image_clone;
   (*block)->scale = gcode_image_scale;
   (*block)->parse = gcode_image_parse;
+  (*block)->clone = gcode_image_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_image_t));
 
@@ -81,85 +81,6 @@ gcode_image_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_image_make (gcode_block_t *block)
-{
-  gcode_image_t *image;
-  gcode_tool_t *tool;
-  gcode_vec2d_t pos;
-  gfloat_t xpos, ypos;
-  char string[256];
-  int x, y;
-
-  image = (gcode_image_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  tool = gcode_tool_find (block);
-
-  if (tool == NULL)
-    return;
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "IMAGE: %s", block->comment);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  xpos = ((gfloat_t)0) * image->size[0] / (gfloat_t)image->resolution[0];
-  ypos = ((gfloat_t)0) * image->size[1] / (gfloat_t)image->resolution[1];
-
-  GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
-  GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
-  GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
-
-  GCODE_RETRACT (block, block->gcode->ztraverse);
-
-  GCODE_2D_MOVE (block, pos[0], pos[1], "");
-
-  GCODE_PLUMMET (block, 0.0);
-
-  for (y = 0; y < image->resolution[1]; y++)
-  {
-    ypos = (((gfloat_t)y) + 0.5) * image->size[1] / (gfloat_t)image->resolution[1];
-
-    /* Even - Left to Right */
-    for (x = 0; x < image->resolution[0]; x++)
-    {
-      xpos = (((gfloat_t)x) + 0.5) * image->size[0] / (gfloat_t)image->resolution[0];
-
-      GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
-      GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
-      GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
-
-      GCODE_3D_LINE (block, pos[0], pos[1], image->size[2] * image->dmap[y * image->resolution[0] + x], "");
-    }
-
-    y++;
-
-    ypos = (((gfloat_t)y) + 0.5) * image->size[1] / (gfloat_t)image->resolution[1];
-
-    if (y < image->resolution[1])
-    {
-      /* Odd - Left to Right */
-      for (x = image->resolution[0] - 1; x >= 0; x--)
-      {
-        xpos = (((gfloat_t)x) + 0.5) * image->size[0] / (gfloat_t)image->resolution[0];
-
-        GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
-        GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
-        GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
-
-        GCODE_3D_LINE (block, pos[0], pos[1], image->size[2] * image->dmap[y * image->resolution[0] + x], "");
-      }
-    }
-  }
 }
 
 void
@@ -279,6 +200,181 @@ gcode_image_load (gcode_block_t *block, FILE *fh)
 }
 
 void
+gcode_image_make (gcode_block_t *block)
+{
+  gcode_image_t *image;
+  gcode_tool_t *tool;
+  gcode_vec2d_t pos;
+  gfloat_t xpos, ypos;
+  char string[256];
+  int x, y;
+
+  image = (gcode_image_t *)block->pdata;
+
+  GCODE_CLEAR (block);
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  tool = gcode_tool_find (block);
+
+  if (tool == NULL)
+    return;
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "IMAGE: %s", block->comment);
+  GCODE_COMMENT (block, string);
+
+  GCODE_APPEND (block, "\n");
+
+  xpos = ((gfloat_t)0) * image->size[0] / (gfloat_t)image->resolution[0];
+  ypos = ((gfloat_t)0) * image->size[1] / (gfloat_t)image->resolution[1];
+
+  GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
+  GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
+  GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
+
+  GCODE_RETRACT (block, block->gcode->ztraverse);
+
+  GCODE_2D_MOVE (block, pos[0], pos[1], "");
+
+  GCODE_PLUMMET (block, 0.0);
+
+  for (y = 0; y < image->resolution[1]; y++)
+  {
+    ypos = (((gfloat_t)y) + 0.5) * image->size[1] / (gfloat_t)image->resolution[1];
+
+    /* Even - Left to Right */
+    for (x = 0; x < image->resolution[0]; x++)
+    {
+      xpos = (((gfloat_t)x) + 0.5) * image->size[0] / (gfloat_t)image->resolution[0];
+
+      GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
+      GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
+      GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
+
+      GCODE_3D_LINE (block, pos[0], pos[1], image->size[2] * image->dmap[y * image->resolution[0] + x], "");
+    }
+
+    y++;
+
+    ypos = (((gfloat_t)y) + 0.5) * image->size[1] / (gfloat_t)image->resolution[1];
+
+    if (y < image->resolution[1])
+    {
+      /* Odd - Left to Right */
+      for (x = image->resolution[0] - 1; x >= 0; x--)
+      {
+        xpos = (((gfloat_t)x) + 0.5) * image->size[0] / (gfloat_t)image->resolution[0];
+
+        GCODE_MATH_VEC2D_SET (pos, xpos, ypos);
+        GCODE_MATH_ROTATE (pos, pos, block->offset->rotation);
+        GCODE_MATH_TRANSLATE (pos, pos, block->offset->origin);
+
+        GCODE_3D_LINE (block, pos[0], pos[1], image->size[2] * image->dmap[y * image->resolution[0] + x], "");
+      }
+    }
+  }
+}
+
+void
+gcode_image_draw (gcode_block_t *block, gcode_block_t *selected)
+{
+#if GCODE_USE_OPENGL
+  gcode_image_t *image;
+  gcode_vec2d_t p0, p1, p2, p3;
+  int xmin, xmax, ymin, ymax, x, y, sind;
+  gfloat_t xsize, ysize, zsize;
+  gfloat_t xposmin, xposmax, yposmin, yposmax;
+  gfloat_t xpos[2], ypos[2], zval[2][2], coef;
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  image = (gcode_image_t *)block->pdata;
+
+  xmin = ymin = 0;
+
+  xmax = image->resolution[0];
+  ymax = image->resolution[1];
+
+  xsize = image->size[0];
+  ysize = image->size[1];
+  zsize = image->size[2];
+
+  xposmin = yposmin = 0;
+
+  xposmax = xsize;
+  yposmax = ysize;
+
+  sind = 0;
+
+  if (selected)
+    if (block == selected || block->parent == selected)
+      sind = 1;
+
+  glBegin (GL_QUADS);
+
+  for (y = ymin; y <= ymax; y++)
+  {
+    ypos[0] = (y == ymin) ? yposmin : (((gfloat_t)y) - 0.5) * ysize / (gfloat_t)ymax;
+    ypos[1] = (y == ymax) ? yposmax : (((gfloat_t)y) + 0.5) * ysize / (gfloat_t)ymax;
+
+    for (x = xmin; x <= xmax; x++)
+    {
+      xpos[0] = (x == xmin) ? xposmin : (((gfloat_t)x) - 0.5) * xsize / (gfloat_t)xmax;
+      xpos[1] = (x == xmax) ? xposmax : (((gfloat_t)x) + 0.5) * xsize / (gfloat_t)xmax;
+
+      zval[0][0] = ((x == xmin) || (y == ymin)) ? 0 : image->dmap[(y - 1) * xmax + (x - 1)];
+      zval[1][0] = ((x == xmax) || (y == ymin)) ? 0 : image->dmap[(y - 1) * xmax + (x - 0)];
+      zval[0][1] = ((x == xmin) || (y == ymax)) ? 0 : image->dmap[(y - 0) * xmax + (x - 1)];
+      zval[1][1] = ((x == xmax) || (y == ymax)) ? 0 : image->dmap[(y - 0) * xmax + (x - 0)];
+
+      GCODE_MATH_VEC2D_SET (p0, xpos[0], ypos[0]);
+      GCODE_MATH_VEC2D_SET (p1, xpos[1], ypos[0]);
+      GCODE_MATH_VEC2D_SET (p2, xpos[1], ypos[1]);
+      GCODE_MATH_VEC2D_SET (p3, xpos[0], ypos[1]);
+
+      GCODE_MATH_ROTATE (p0, p0, block->offset->rotation);
+      GCODE_MATH_ROTATE (p1, p1, block->offset->rotation);
+      GCODE_MATH_ROTATE (p2, p2, block->offset->rotation);
+      GCODE_MATH_ROTATE (p3, p3, block->offset->rotation);
+      GCODE_MATH_TRANSLATE (p0, p0, block->offset->origin);
+      GCODE_MATH_TRANSLATE (p1, p1, block->offset->origin);
+      GCODE_MATH_TRANSLATE (p2, p2, block->offset->origin);
+      GCODE_MATH_TRANSLATE (p3, p3, block->offset->origin);
+
+      coef = 1.0 - 0.25 * (zval[0][0] + zval[1][0] + zval[0][1] + zval[1][1]);
+
+      glColor3f (coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][0],
+                 coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][1],
+                 coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][2]);
+
+      glVertex3f (p0[0], p0[1], zsize * zval[0][0]);
+      glVertex3f (p1[0], p1[1], zsize * zval[1][0]);
+      glVertex3f (p2[0], p2[1], zsize * zval[1][1]);
+      glVertex3f (p3[0], p3[1], zsize * zval[0][1]);
+    }
+  }
+
+  glEnd ();
+#endif
+}
+
+void
+gcode_image_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_image_t *image;
+
+  image = (gcode_image_t *)block->pdata;
+
+  image->size[0] *= scale;
+  image->size[1] *= scale;
+  image->size[2] *= scale;
+}
+
+void
 gcode_image_parse (gcode_block_t *block, const char **xmlattr)
 {
   gcode_image_t *image;
@@ -324,6 +420,38 @@ gcode_image_parse (gcode_block_t *block, const char **xmlattr)
 
     image->dmap = (gfloat_t *)calloc (image->resolution[0] * image->resolution[1], sizeof (gfloat_t));
   }
+}
+
+void
+gcode_image_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
+{
+  gcode_image_t *image, *model_image;
+  int i;
+
+  model_image = (gcode_image_t *)model->pdata;
+
+  gcode_image_init (block, gcode, model->parent);
+
+  (*block)->flags = model->flags;
+
+  strcpy ((*block)->comment, model->comment);
+
+  (*block)->offset = model->offset;
+
+  image = (gcode_image_t *)(*block)->pdata;
+
+  /* Copy resolution and size */
+  image->resolution[0] = model_image->resolution[0];
+  image->resolution[1] = model_image->resolution[1];
+  image->size[0] = model_image->size[0];
+  image->size[1] = model_image->size[1];
+  image->size[2] = model_image->size[2];
+
+  /* Copy Depth Map */
+  image->dmap = (gfloat_t *)malloc (image->resolution[0] * image->resolution[1] * sizeof (gfloat_t));
+
+  for (i = 0; i < image->resolution[0] * image->resolution[1]; i++)
+    image->dmap[i] = model_image->dmap[i];
 }
 
 void
@@ -439,132 +567,4 @@ gcode_image_open (gcode_block_t *block, char *filename)
   free (row_pointers);
 
   fclose (fp);
-}
-
-void
-gcode_image_draw (gcode_block_t *block, gcode_block_t *selected)
-{
-#if GCODE_USE_OPENGL
-  gcode_image_t *image;
-  gcode_vec2d_t p0, p1, p2, p3;
-  int xmin, xmax, ymin, ymax, x, y, sind;
-  gfloat_t xsize, ysize, zsize;
-  gfloat_t xposmin, xposmax, yposmin, yposmax;
-  gfloat_t xpos[2], ypos[2], zval[2][2], coef;
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  image = (gcode_image_t *)block->pdata;
-
-  xmin = ymin = 0;
-
-  xmax = image->resolution[0];
-  ymax = image->resolution[1];
-
-  xsize = image->size[0];
-  ysize = image->size[1];
-  zsize = image->size[2];
-
-  xposmin = yposmin = 0;
-
-  xposmax = xsize;
-  yposmax = ysize;
-
-  sind = 0;
-
-  if (selected)
-    if (block == selected || block->parent == selected)
-      sind = 1;
-
-  glBegin (GL_QUADS);
-
-  for (y = ymin; y <= ymax; y++)
-  {
-    ypos[0] = (y == ymin) ? yposmin : (((gfloat_t)y) - 0.5) * ysize / (gfloat_t)ymax;
-    ypos[1] = (y == ymax) ? yposmax : (((gfloat_t)y) + 0.5) * ysize / (gfloat_t)ymax;
-
-    for (x = xmin; x <= xmax; x++)
-    {
-      xpos[0] = (x == xmin) ? xposmin : (((gfloat_t)x) - 0.5) * xsize / (gfloat_t)xmax;
-      xpos[1] = (x == xmax) ? xposmax : (((gfloat_t)x) + 0.5) * xsize / (gfloat_t)xmax;
-
-      zval[0][0] = ((x == xmin) || (y == ymin)) ? 0 : image->dmap[(y - 1) * xmax + (x - 1)];
-      zval[1][0] = ((x == xmax) || (y == ymin)) ? 0 : image->dmap[(y - 1) * xmax + (x - 0)];
-      zval[0][1] = ((x == xmin) || (y == ymax)) ? 0 : image->dmap[(y - 0) * xmax + (x - 1)];
-      zval[1][1] = ((x == xmax) || (y == ymax)) ? 0 : image->dmap[(y - 0) * xmax + (x - 0)];
-
-      GCODE_MATH_VEC2D_SET (p0, xpos[0], ypos[0]);
-      GCODE_MATH_VEC2D_SET (p1, xpos[1], ypos[0]);
-      GCODE_MATH_VEC2D_SET (p2, xpos[1], ypos[1]);
-      GCODE_MATH_VEC2D_SET (p3, xpos[0], ypos[1]);
-
-      GCODE_MATH_ROTATE (p0, p0, block->offset->rotation);
-      GCODE_MATH_ROTATE (p1, p1, block->offset->rotation);
-      GCODE_MATH_ROTATE (p2, p2, block->offset->rotation);
-      GCODE_MATH_ROTATE (p3, p3, block->offset->rotation);
-      GCODE_MATH_TRANSLATE (p0, p0, block->offset->origin);
-      GCODE_MATH_TRANSLATE (p1, p1, block->offset->origin);
-      GCODE_MATH_TRANSLATE (p2, p2, block->offset->origin);
-      GCODE_MATH_TRANSLATE (p3, p3, block->offset->origin);
-
-      coef = 1.0 - 0.25 * (zval[0][0] + zval[1][0] + zval[0][1] + zval[1][1]);
-
-      glColor3f (coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][0],
-                 coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][1],
-                 coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][2]);
-
-      glVertex3f (p0[0], p0[1], zsize * zval[0][0]);
-      glVertex3f (p1[0], p1[1], zsize * zval[1][0]);
-      glVertex3f (p2[0], p2[1], zsize * zval[1][1]);
-      glVertex3f (p3[0], p3[1], zsize * zval[0][1]);
-    }
-  }
-
-  glEnd ();
-#endif
-}
-
-void
-gcode_image_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
-{
-  gcode_image_t *image, *model_image;
-  int i;
-
-  model_image = (gcode_image_t *)model->pdata;
-
-  gcode_image_init (block, gcode, model->parent);
-
-  (*block)->flags = model->flags;
-
-  strcpy ((*block)->comment, model->comment);
-
-  (*block)->offset = model->offset;
-
-  image = (gcode_image_t *)(*block)->pdata;
-
-  /* Copy resolution and size */
-  image->resolution[0] = model_image->resolution[0];
-  image->resolution[1] = model_image->resolution[1];
-  image->size[0] = model_image->size[0];
-  image->size[1] = model_image->size[1];
-  image->size[2] = model_image->size[2];
-
-  /* Copy Depth Map */
-  image->dmap = (gfloat_t *)malloc (image->resolution[0] * image->resolution[1] * sizeof (gfloat_t));
-
-  for (i = 0; i < image->resolution[0] * image->resolution[1]; i++)
-    image->dmap[i] = model_image->dmap[i];
-}
-
-void
-gcode_image_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_image_t *image;
-
-  image = (gcode_image_t *)block->pdata;
-
-  image->size[0] *= scale;
-  image->size[1] *= scale;
-  image->size[2] *= scale;
 }

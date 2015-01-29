@@ -32,9 +32,9 @@ gcode_end_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_END, GCODE_FLAGS_LOCK);
 
   (*block)->free = gcode_end_free;
-  (*block)->make = gcode_end_make;
   (*block)->save = gcode_end_save;
   (*block)->load = gcode_end_load;
+  (*block)->make = gcode_end_make;
   (*block)->scale = gcode_end_scale;
   (*block)->parse = gcode_end_parse;
 
@@ -66,42 +66,6 @@ gcode_end_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_end_make (gcode_block_t *block)
-{
-  char string[256];
-  gcode_end_t *end;
-
-  end = (gcode_end_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "END: %s", block->comment);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_HOME_SWITCHES)
-  {
-    GCODE_GO_HOME (block, block->gcode->ztraverse);
-  }
-  else
-  {
-    GCODE_PULL_UP (block, end->retract_position[2]);
-
-    GCODE_2D_MOVE (block, end->retract_position[0], end->retract_position[1], "move to parking position");
-  }
-
-  GCODE_COMMAND (block, "M30", "program end and reset");
-
-  if (block->gcode->driver == GCODE_DRIVER_HAAS)
-  {
-    GCODE_APPEND (block, "%\n");
-  }
 }
 
 void
@@ -186,6 +150,54 @@ gcode_end_load (gcode_block_t *block, FILE *fh)
 }
 
 void
+gcode_end_make (gcode_block_t *block)
+{
+  char string[256];
+  gcode_end_t *end;
+
+  end = (gcode_end_t *)block->pdata;
+
+  GCODE_CLEAR (block);
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "END: %s", block->comment);
+  GCODE_COMMENT (block, string);
+
+  GCODE_APPEND (block, "\n");
+
+  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_HOME_SWITCHES)
+  {
+    GCODE_GO_HOME (block, block->gcode->ztraverse);
+  }
+  else
+  {
+    GCODE_PULL_UP (block, end->retract_position[2]);
+
+    GCODE_2D_MOVE (block, end->retract_position[0], end->retract_position[1], "move to parking position");
+  }
+
+  GCODE_COMMAND (block, "M30", "program end and reset");
+
+  if (block->gcode->driver == GCODE_DRIVER_HAAS)
+  {
+    GCODE_APPEND (block, "%\n");
+  }
+}
+
+void
+gcode_end_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_end_t *end;
+
+  end = (gcode_end_t *)block->pdata;
+
+  end->retract_position[0] *= scale;
+  end->retract_position[1] *= scale;
+  end->retract_position[2] *= scale;
+}
+
+void
 gcode_end_parse (gcode_block_t *block, const char **xmlattr)
 {
   gcode_end_t *end;
@@ -223,16 +235,4 @@ gcode_end_parse (gcode_block_t *block, const char **xmlattr)
         end->home_all_axes = m;
     }
   }
-}
-
-void
-gcode_end_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_end_t *end;
-
-  end = (gcode_end_t *)block->pdata;
-
-  end->retract_position[0] *= scale;
-  end->retract_position[1] *= scale;
-  end->retract_position[2] *= scale;
 }

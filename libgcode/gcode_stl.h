@@ -36,12 +36,14 @@ typedef struct gcode_stl_s
 
 void gcode_stl_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_stl_free (gcode_block_t **block);
-void gcode_stl_make (gcode_block_t *block);
 void gcode_stl_save (gcode_block_t *block, FILE *fh);
 void gcode_stl_load (gcode_block_t *block, FILE *fh);
+void gcode_stl_make (gcode_block_t *block);
 void gcode_stl_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_stl_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_stl_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_stl_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_stl_scale (gcode_block_t *block, gfloat_t scale);
+void gcode_stl_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 void gcode_stl_build (gcode_block_t *block);
 int gcode_stl_import (gcode_block_t *block, char *filename);
 void gcode_stl_generate_slice_contours (gcode_block_t *block);

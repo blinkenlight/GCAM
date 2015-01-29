@@ -40,9 +40,11 @@ void gcode_point_free (gcode_block_t **block);
 void gcode_point_save (gcode_block_t *block, FILE *fh);
 void gcode_point_load (gcode_block_t *block, FILE *fh);
 void gcode_point_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_point_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_point_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_point_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_point_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_point_parse (gcode_block_t *block, const char **xmlattr);
+void gcode_point_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 void gcode_point_with_offset (gcode_block_t *block, gcode_vec2d_t p);
 
 #endif

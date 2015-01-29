@@ -34,17 +34,19 @@ gcode_line_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_LINE, 0);
 
   (*block)->free = gcode_line_free;
-  (*block)->make = gcode_line_make;
   (*block)->save = gcode_line_save;
   (*block)->load = gcode_line_load;
-  (*block)->ends = gcode_line_ends;
+  (*block)->make = gcode_line_make;
   (*block)->draw = gcode_line_draw;
   (*block)->eval = gcode_line_eval;
+  (*block)->ends = gcode_line_ends;
+  (*block)->aabb = gcode_line_aabb;
   (*block)->length = gcode_line_length;
-  (*block)->clone = gcode_line_clone;
+  (*block)->move = gcode_line_move;
+  (*block)->spin = gcode_line_spin;
   (*block)->scale = gcode_line_scale;
   (*block)->parse = gcode_line_parse;
-  (*block)->aabb = gcode_line_aabb;
+  (*block)->clone = gcode_line_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_line_t));
 
@@ -73,33 +75,6 @@ gcode_line_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_line_make (gcode_block_t *block)
-{
-  char string[256];
-  gcode_vec2d_t p0, p1, normal;
-
-  GCODE_CLEAR (block);
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  sprintf (string, "LINE: %s", block->comment);
-
-  gcode_line_with_offset (block, p0, p1, normal);
-
-  GCODE_2D_LINE (block, p0[0], p0[1], "");
-
-  if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
-  {
-    GCODE_2D_LINE (block, p1[0], p1[1], string);
-  }
-  else
-  {
-    GCODE_3D_LINE (block, p1[0], p1[1], block->offset->z[1], string);
-  }
 }
 
 void
@@ -181,111 +156,30 @@ gcode_line_load (gcode_block_t *block, FILE *fh)
 }
 
 void
-gcode_line_parse (gcode_block_t *block, const char **xmlattr)
+gcode_line_make (gcode_block_t *block)
 {
-  gcode_line_t *line;
+  char string[256];
+  gcode_vec2d_t p0, p1, normal;
 
-  line = (gcode_line_t *)block->pdata;
+  GCODE_CLEAR (block);
 
-  for (int i = 0; xmlattr[i]; i += 2)
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  sprintf (string, "LINE: %s", block->comment);
+
+  gcode_line_with_offset (block, p0, p1, normal);
+
+  GCODE_2D_LINE (block, p0[0], p0[1], "");
+
+  if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
   {
-    int m;
-    unsigned int n;
-    double xyz[3], w;
-    const char *name, *value;
-
-    name = xmlattr[i];
-    value = xmlattr[i + 1];
-
-    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
-    {
-      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
-        block->flags = n;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_LINE_START_POINT) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
-        for (int j = 0; j < 2; j++)
-          line->p0[j] = (gfloat_t)xyz[j];
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_LINE_END_POINT) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
-        for (int j = 0; j < 2; j++)
-          line->p1[j] = (gfloat_t)xyz[j];
-    }
+    GCODE_2D_LINE (block, p1[0], p1[1], string);
   }
-}
-
-int
-gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
-{
-  gcode_line_t *line;
-  gcode_vec2d_t normal;
-
-  line = (gcode_line_t *)block->pdata;
-
-  switch (mode)
+  else
   {
-    case GCODE_GET:
-
-      p0[0] = line->p0[0];
-      p0[1] = line->p0[1];
-
-      p1[0] = line->p1[0];
-      p1[1] = line->p1[1];
-
-      break;
-
-    case GCODE_SET:
-
-      line->p0[0] = p0[0];
-      line->p0[1] = p0[1];
-
-      line->p1[0] = p1[0];
-      line->p1[1] = p1[1];
-
-      break;
-
-    case GCODE_GET_WITH_OFFSET:
-
-      gcode_line_with_offset (block, p0, p1, normal);
-
-      break;
-
-    case GCODE_GET_NORMAL:
-
-      gcode_line_with_offset (block, p0, p1, normal);
-
-      p0[0] = normal[0];
-      p0[1] = normal[1];
-      p1[0] = normal[0];
-      p1[1] = normal[1];
-
-      break;
-
-    case GCODE_GET_TANGENT:
-
-      p0[0] = line->p0[0] - line->p1[0];
-      p0[1] = line->p0[1] - line->p1[1];
-      GCODE_MATH_VEC2D_UNITIZE (p0);
-
-      p1[0] = line->p1[0] - line->p0[0];
-      p1[1] = line->p1[1] - line->p0[1];
-      GCODE_MATH_VEC2D_UNITIZE (p1);
-
-      break;
-
-    default:
-
-      return (1);
+    GCODE_3D_LINE (block, p1[0], p1[1], block->offset->z[1], string);
   }
-
-  return (0);
 }
 
 void
@@ -433,53 +327,71 @@ gcode_line_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *
   return (0);
 }
 
-gfloat_t
-gcode_line_length (gcode_block_t *block)
+int
+gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
 {
   gcode_line_t *line;
-  gfloat_t length;
+  gcode_vec2d_t normal;
 
   line = (gcode_line_t *)block->pdata;
 
-  GCODE_MATH_VEC2D_DIST (length, line->p0, line->p1);
+  switch (mode)
+  {
+    case GCODE_GET:
 
-  return (length);
-}
+      p0[0] = line->p0[0];
+      p0[1] = line->p0[1];
 
-void
-gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
-{
-  gcode_line_t *line, *model_line;
+      p1[0] = line->p1[0];
+      p1[1] = line->p1[1];
 
-  model_line = (gcode_line_t *)model->pdata;
+      break;
 
-  gcode_line_init (block, gcode, model->parent);
+    case GCODE_SET:
 
-  (*block)->flags = model->flags;
+      line->p0[0] = p0[0];
+      line->p0[1] = p0[1];
 
-  strcpy ((*block)->comment, model->comment);
+      line->p1[0] = p1[0];
+      line->p1[1] = p1[1];
 
-  (*block)->offset = model->offset;
+      break;
 
-  line = (gcode_line_t *)(*block)->pdata;
+    case GCODE_GET_WITH_OFFSET:
 
-  line->p0[0] = model_line->p0[0];
-  line->p0[1] = model_line->p0[1];
-  line->p1[0] = model_line->p1[0];
-  line->p1[1] = model_line->p1[1];
-}
+      gcode_line_with_offset (block, p0, p1, normal);
 
-void
-gcode_line_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_line_t *line;
+      break;
 
-  line = (gcode_line_t *)block->pdata;
+    case GCODE_GET_NORMAL:
 
-  line->p0[0] *= scale;
-  line->p0[1] *= scale;
-  line->p1[0] *= scale;
-  line->p1[1] *= scale;
+      gcode_line_with_offset (block, p0, p1, normal);
+
+      p0[0] = normal[0];
+      p0[1] = normal[1];
+      p1[0] = normal[0];
+      p1[1] = normal[1];
+
+      break;
+
+    case GCODE_GET_TANGENT:
+
+      p0[0] = line->p0[0] - line->p1[0];
+      p0[1] = line->p0[1] - line->p1[1];
+      GCODE_MATH_VEC2D_UNITIZE (p0);
+
+      p1[0] = line->p1[0] - line->p0[0];
+      p1[1] = line->p1[1] - line->p0[1];
+      GCODE_MATH_VEC2D_UNITIZE (p1);
+
+      break;
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
 }
 
 void
@@ -508,6 +420,130 @@ gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 
   if (p1[1] > max[1])
     max[1] = p1[1];
+}
+
+gfloat_t
+gcode_line_length (gcode_block_t *block)
+{
+  gcode_line_t *line;
+  gfloat_t length;
+
+  line = (gcode_line_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_DIST (length, line->p0, line->p1);
+
+  return (length);
+}
+
+void
+gcode_line_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_line_t *line;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  line = (gcode_line_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_COPY (orgnl_pt, line->p0);
+  GCODE_MATH_TRANSLATE (xform_pt, orgnl_pt, delta);
+  GCODE_MATH_VEC2D_COPY (line->p0, xform_pt);
+
+  GCODE_MATH_VEC2D_COPY (orgnl_pt, line->p1);
+  GCODE_MATH_TRANSLATE (xform_pt, orgnl_pt, delta);
+  GCODE_MATH_VEC2D_COPY (line->p1, xform_pt);
+}
+
+void
+gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_line_t *line;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  line = (gcode_line_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_SUB (orgnl_pt, line->p0, datum);
+  GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
+  GCODE_MATH_VEC2D_ADD (line->p0, xform_pt, datum);
+
+  GCODE_MATH_VEC2D_SUB (orgnl_pt, line->p1, datum);
+  GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
+  GCODE_MATH_VEC2D_ADD (line->p1, xform_pt, datum);
+}
+
+void
+gcode_line_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_line_t *line;
+
+  line = (gcode_line_t *)block->pdata;
+
+  line->p0[0] *= scale;
+  line->p0[1] *= scale;
+  line->p1[0] *= scale;
+  line->p1[1] *= scale;
+}
+
+void
+gcode_line_parse (gcode_block_t *block, const char **xmlattr)
+{
+  gcode_line_t *line;
+
+  line = (gcode_line_t *)block->pdata;
+
+  for (int i = 0; xmlattr[i]; i += 2)
+  {
+    int m;
+    unsigned int n;
+    double xyz[3], w;
+    const char *name, *value;
+
+    name = xmlattr[i];
+    value = xmlattr[i + 1];
+
+    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    {
+      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
+        block->flags = n;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_LINE_START_POINT) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          line->p0[j] = (gfloat_t)xyz[j];
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_LINE_END_POINT) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          line->p1[j] = (gfloat_t)xyz[j];
+    }
+  }
+}
+
+void
+gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
+{
+  gcode_line_t *line, *model_line;
+
+  model_line = (gcode_line_t *)model->pdata;
+
+  gcode_line_init (block, gcode, model->parent);
+
+  (*block)->flags = model->flags;
+
+  strcpy ((*block)->comment, model->comment);
+
+  (*block)->offset = model->offset;
+
+  line = (gcode_line_t *)(*block)->pdata;
+
+  line->p0[0] = model_line->p0[0];
+  line->p0[1] = model_line->p0[1];
+  line->p1[0] = model_line->p1[0];
+  line->p1[1] = model_line->p1[1];
 }
 
 /**

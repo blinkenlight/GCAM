@@ -40,9 +40,9 @@ typedef struct gcode_end_s
 
 void gcode_end_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_end_free (gcode_block_t **block);
-void gcode_end_make (gcode_block_t *block);
 void gcode_end_save (gcode_block_t *block, FILE *fh);
 void gcode_end_load (gcode_block_t *block, FILE *fh);
+void gcode_end_make (gcode_block_t *block);
 void gcode_end_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_end_parse (gcode_block_t *block, const char **xmlattr);
 

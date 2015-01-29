@@ -36,14 +36,14 @@ gcode_extrusion_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pare
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_EXTRUSION, GCODE_FLAGS_LOCK);
 
   (*block)->free = gcode_extrusion_free;
-  (*block)->make = gcode_extrusion_make;
   (*block)->save = gcode_extrusion_save;
   (*block)->load = gcode_extrusion_load;
-  (*block)->ends = gcode_extrusion_ends;
+  (*block)->make = gcode_extrusion_make;
   (*block)->draw = gcode_extrusion_draw;
-  (*block)->clone = gcode_extrusion_clone;
+  (*block)->ends = gcode_extrusion_ends;
   (*block)->scale = gcode_extrusion_scale;
   (*block)->parse = gcode_extrusion_parse;
+  (*block)->clone = gcode_extrusion_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_extrusion_t));
 
@@ -105,12 +105,6 @@ gcode_extrusion_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_extrusion_make (gcode_block_t *block)
-{
-  GCODE_CLEAR (block);
 }
 
 void
@@ -285,6 +279,82 @@ gcode_extrusion_load (gcode_block_t *block, FILE *fh)
 }
 
 void
+gcode_extrusion_make (gcode_block_t *block)
+{
+  GCODE_CLEAR (block);
+}
+
+void
+gcode_extrusion_draw (gcode_block_t *block, gcode_block_t *selected)
+{
+#if GCODE_USE_OPENGL
+  gcode_block_t *index_block;
+
+  glDisable (GL_DEPTH_TEST);
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    index_block->draw (index_block, selected);
+    index_block = index_block->next;
+  }
+#endif
+}
+
+int
+gcode_extrusion_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
+{
+  gcode_block_t *index_block;
+  gfloat_t t[2];
+
+  p0[0] = 0.0;
+  p0[1] = 0.0;
+  p1[0] = 0.0;
+  p1[1] = 0.0;
+
+  if (!block->listhead)
+    return (1);
+
+  index_block = block->listhead;
+
+  /* Get Beginning of first block */
+  index_block->ends (index_block, p0, t, GCODE_GET);
+
+  while (index_block)
+  {
+    /* Get End of last block */
+    if (!index_block->next)
+      index_block->ends (index_block, t, p1, GCODE_GET);
+
+    index_block = index_block->next;
+  }
+
+  return (0);
+}
+
+void
+gcode_extrusion_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_extrusion_t *extrusion;
+  gcode_block_t *index_block;
+
+  extrusion = (gcode_extrusion_t *)block->pdata;
+
+  extrusion->resolution *= scale;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->scale)
+      index_block->scale (index_block, scale);
+
+    index_block = index_block->next;
+  }
+}
+
+void
 gcode_extrusion_parse (gcode_block_t *block, const char **xmlattr)
 {
   gcode_extrusion_t *extrusion;
@@ -323,83 +393,6 @@ gcode_extrusion_parse (gcode_block_t *block, const char **xmlattr)
   }
 }
 
-int
-gcode_extrusion_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
-{
-  gcode_block_t *index_block;
-  gfloat_t t[2];
-
-  p0[0] = 0.0;
-  p0[1] = 0.0;
-  p1[0] = 0.0;
-  p1[1] = 0.0;
-
-  if (!block->listhead)
-    return (1);
-
-  index_block = block->listhead;
-
-  /* Get Beginning of first block */
-  index_block->ends (index_block, p0, t, GCODE_GET);
-
-  while (index_block)
-  {
-    /* Get End of last block */
-    if (!index_block->next)
-      index_block->ends (index_block, t, p1, GCODE_GET);
-
-    index_block = index_block->next;
-  }
-
-  return (0);
-}
-
-int
-gcode_extrusion_evaluate_offset (gcode_block_t *block, gfloat_t z, gfloat_t *offset)
-{
-  gcode_block_t *index_block;
-  gfloat_t p0[2], p1[2], x_array[2];
-  uint32_t x_index;
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    index_block->ends (index_block, p0, p1, GCODE_GET);
-
-    if ((z >= p0[1] && z <= p1[1]) || (z >= p1[1] && z <= p0[1]))
-    {
-      x_index = 0;
-      index_block->eval (index_block, z, x_array, &x_index);
-      *offset = x_array[0];
-
-      return (0);
-    }
-
-    index_block = index_block->next;
-  }
-
-  return (1);
-}
-
-void
-gcode_extrusion_draw (gcode_block_t *block, gcode_block_t *selected)
-{
-#if GCODE_USE_OPENGL
-  gcode_block_t *index_block;
-
-  glDisable (GL_DEPTH_TEST);
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    index_block->draw (index_block, selected);
-    index_block = index_block->next;
-  }
-#endif
-}
-
 void
 gcode_extrusion_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
@@ -436,30 +429,38 @@ gcode_extrusion_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *mod
   }
 }
 
-void
-gcode_extrusion_scale (gcode_block_t *block, gfloat_t scale)
+int
+gcode_extrusion_evaluate_offset (gcode_block_t *block, gfloat_t z, gfloat_t *offset)
 {
-  gcode_extrusion_t *extrusion;
   gcode_block_t *index_block;
-
-  extrusion = (gcode_extrusion_t *)block->pdata;
-
-  extrusion->resolution *= scale;
+  gfloat_t p0[2], p1[2], x_array[2];
+  uint32_t x_index;
 
   index_block = block->listhead;
 
   while (index_block)
   {
-    if (index_block->scale)
-      index_block->scale (index_block, scale);
+    index_block->ends (index_block, p0, p1, GCODE_GET);
+
+    if ((z >= p0[1] && z <= p1[1]) || (z >= p1[1] && z <= p0[1]))
+    {
+      x_index = 0;
+      index_block->eval (index_block, z, x_array, &x_index);
+      *offset = x_array[0];
+
+      return (0);
+    }
 
     index_block = index_block->next;
   }
+
+  return (1);
 }
 
 /**
  * Determines if a taper exists, which may imply that pocketing can occur.
  */
+
 int
 gcode_extrusion_taper_exists (gcode_block_t *block)
 {

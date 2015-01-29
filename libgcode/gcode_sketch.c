@@ -28,87 +28,6 @@
 #include "gcode_line.h"
 #include "gcode.h"
 
-void
-gcode_sketch_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
-{
-  gcode_sketch_t *sketch;
-  gcode_block_t *extrusion_block;
-
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
-
-  gcode_internal_init (*block, gcode, parent, GCODE_TYPE_SKETCH, 0);
-
-  (*block)->free = gcode_sketch_free;
-  (*block)->make = gcode_sketch_make;
-  (*block)->save = gcode_sketch_save;
-  (*block)->load = gcode_sketch_load;
-  (*block)->draw = gcode_sketch_draw;
-  (*block)->clone = gcode_sketch_clone;
-  (*block)->scale = gcode_sketch_scale;
-  (*block)->parse = gcode_sketch_parse;
-  (*block)->aabb = gcode_sketch_aabb;
-
-  (*block)->pdata = malloc (sizeof (gcode_sketch_t));
-
-  (*block)->offset = &gcode->zero_offset;
-
-  strcpy ((*block)->comment, "Sketch");
-  strcpy ((*block)->status, "OK");
-  GCODE_INIT ((*block));
-  GCODE_CLEAR ((*block));
-
-  /* Defaults */
-
-  sketch = (gcode_sketch_t *)(*block)->pdata;
-
-  sketch->taper_offset[0] = 0.0;
-  sketch->taper_offset[1] = 0.0;
-  sketch->pocket = 0;
-  sketch->zero_pass = 0;
-  sketch->helical = 0;
-
-  sketch->offset.side = 0.0;
-  sketch->offset.tool = 0.0;
-  sketch->offset.eval = 0.0;
-  sketch->offset.rotation = 0.0;
-  sketch->offset.origin[0] = 0.0;
-  sketch->offset.origin[1] = 0.0;
-  sketch->offset.z[0] = 0.0;
-  sketch->offset.z[1] = 0.0;
-
-  (*block)->offref = &sketch->offset;
-
-  /* Create default extrusion */
-
-  gcode_extrusion_init (&extrusion_block, gcode, *block);
-
-  gcode_attach_as_extruder (*block, extrusion_block);
-}
-
-void
-gcode_sketch_free (gcode_block_t **block)
-{
-  gcode_block_t *index_block, *tmp;
-
-  /* Free the extrusion list */
-  (*block)->extruder->free (&(*block)->extruder);
-
-  /* Walk the list and free */
-  index_block = (*block)->listhead;
-
-  while (index_block)
-  {
-    tmp = index_block;
-    index_block = index_block->next;
-    tmp->free (&tmp);
-  }
-
-  free ((*block)->code);
-  free ((*block)->pdata);
-  free (*block);
-  *block = NULL;
-}
-
 /**
  * Return -1 if the "inside" of the closed curve 'start_block' -> 'end_block' is
  * to the right of the curve, or +1 if the "inside" of the curve is to the left;
@@ -548,6 +467,298 @@ gcode_sketch_add_up_path_length (gcode_block_t *listhead, gfloat_t *length)
 }
 
 void
+gcode_sketch_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
+{
+  gcode_sketch_t *sketch;
+  gcode_block_t *extrusion_block;
+
+  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+
+  gcode_internal_init (*block, gcode, parent, GCODE_TYPE_SKETCH, 0);
+
+  (*block)->free = gcode_sketch_free;
+  (*block)->save = gcode_sketch_save;
+  (*block)->load = gcode_sketch_load;
+  (*block)->make = gcode_sketch_make;
+  (*block)->draw = gcode_sketch_draw;
+  (*block)->aabb = gcode_sketch_aabb;
+  (*block)->move = gcode_sketch_move;
+  (*block)->spin = gcode_sketch_spin;
+  (*block)->scale = gcode_sketch_scale;
+  (*block)->parse = gcode_sketch_parse;
+  (*block)->clone = gcode_sketch_clone;
+
+  (*block)->pdata = malloc (sizeof (gcode_sketch_t));
+
+  (*block)->offset = &gcode->zero_offset;
+
+  strcpy ((*block)->comment, "Sketch");
+  strcpy ((*block)->status, "OK");
+  GCODE_INIT ((*block));
+  GCODE_CLEAR ((*block));
+
+  /* Defaults */
+
+  sketch = (gcode_sketch_t *)(*block)->pdata;
+
+  sketch->taper_offset[0] = 0.0;
+  sketch->taper_offset[1] = 0.0;
+  sketch->pocket = 0;
+  sketch->zero_pass = 0;
+  sketch->helical = 0;
+
+  sketch->offset.side = 0.0;
+  sketch->offset.tool = 0.0;
+  sketch->offset.eval = 0.0;
+  sketch->offset.rotation = 0.0;
+  sketch->offset.origin[0] = 0.0;
+  sketch->offset.origin[1] = 0.0;
+  sketch->offset.z[0] = 0.0;
+  sketch->offset.z[1] = 0.0;
+
+  (*block)->offref = &sketch->offset;
+
+  /* Create default extrusion */
+
+  gcode_extrusion_init (&extrusion_block, gcode, *block);
+
+  gcode_attach_as_extruder (*block, extrusion_block);
+}
+
+void
+gcode_sketch_free (gcode_block_t **block)
+{
+  gcode_block_t *index_block, *tmp;
+
+  /* Free the extrusion list */
+  (*block)->extruder->free (&(*block)->extruder);
+
+  /* Walk the list and free */
+  index_block = (*block)->listhead;
+
+  while (index_block)
+  {
+    tmp = index_block;
+    index_block = index_block->next;
+    tmp->free (&tmp);
+  }
+
+  free ((*block)->code);
+  free ((*block)->pdata);
+  free (*block);
+  *block = NULL;
+}
+
+void
+gcode_sketch_save (gcode_block_t *block, FILE *fh)
+{
+  gcode_block_t *index_block;
+  gcode_sketch_t *sketch;
+  uint32_t size, num, marker;
+  uint8_t data;
+
+  sketch = (gcode_sketch_t *)block->pdata;
+
+  if (block->gcode->format == GCODE_FORMAT_XML)                                 // Save to new xml format
+  {
+    int indent = GCODE_XML_BASE_INDENT;
+
+    index_block = block->parent;
+
+    while (index_block)
+    {
+      indent++;
+
+      index_block = index_block->parent;
+    }
+
+    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
+    GCODE_WRITE_XML_HEAD_OF_TAG (fh, GCODE_XML_TAG_SKETCH);
+    GCODE_WRITE_XML_ATTR_STRING (fh, GCODE_XML_ATTR_BLOCK_COMMENT, block->comment);
+    GCODE_WRITE_XML_ATTR_AS_HEX (fh, GCODE_XML_ATTR_BLOCK_FLAGS, block->flags);
+    GCODE_WRITE_XML_ATTR_2D_FLT (fh, GCODE_XML_ATTR_SKETCH_TAPER_OFFSET, sketch->taper_offset);
+    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_POCKET, sketch->pocket);
+    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_ZERO_PASS, sketch->zero_pass);
+    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_HELICAL, sketch->helical);
+    GCODE_WRITE_XML_OP_TAG_TAIL (fh);
+    GCODE_WRITE_XML_END_OF_LINE (fh);
+
+    /**
+     * In the XML branch the parent does NOT save even the common attributes
+     * of its child blocks (as the binary branch does): saving some attributes
+     * here and some (custom) attributes in the child would get rather messy
+     */
+
+    block->extruder->save (block->extruder, fh);
+
+    index_block = block->listhead;
+
+    while (index_block)
+    {
+      index_block->save (index_block, fh);
+
+      index_block = index_block->next;
+    }
+
+    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
+    GCODE_WRITE_XML_END_TAG_FOR (fh, GCODE_XML_TAG_SKETCH);
+    GCODE_WRITE_XML_END_OF_LINE (fh);
+  }
+  else                                                                          // Save to legacy binary format
+  {
+    /* SAVE EXTRUSION DATA */
+    data = GCODE_BIN_DATA_SKETCH_EXTRUSION;
+    size = 0;
+    fwrite (&data, sizeof (uint8_t), 1, fh);
+
+    /* Write block type */
+    marker = ftell (fh);
+    size = 0;
+    fwrite (&size, sizeof (uint32_t), 1, fh);
+
+    /* Write comment */
+    GCODE_WRITE_BINARY_STR_DATA (fh, GCODE_BIN_DATA_BLOCK_COMMENT, block->extruder->comment);
+
+    block->extruder->save (block->extruder, fh);
+
+    size = ftell (fh) - marker - sizeof (uint32_t);
+    fseek (fh, marker, SEEK_SET);
+    fwrite (&size, sizeof (uint32_t), 1, fh);
+    fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
+
+    num = 0;
+    index_block = block->listhead;
+
+    while (index_block)
+    {
+      num++;
+
+      index_block = index_block->next;
+    }
+
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_NUMBER, sizeof (uint32_t), &num);
+
+    num = 0;
+    index_block = block->listhead;
+
+    while (index_block)
+    {
+      /* Write block type */
+      fwrite (&index_block->type, sizeof (uint8_t), 1, fh);
+      marker = ftell (fh);
+      size = 0;
+      fwrite (&size, sizeof (uint32_t), 1, fh);
+
+      /* Write comment */
+      GCODE_WRITE_BINARY_STR_DATA (fh, GCODE_BIN_DATA_BLOCK_COMMENT, index_block->comment);
+
+      /* Write flags */
+      GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_BLOCK_FLAGS, sizeof (uint8_t), &index_block->flags);
+
+      index_block->save (index_block, fh);
+
+      size = ftell (fh) - marker - sizeof (uint32_t);
+      fseek (fh, marker, SEEK_SET);
+      fwrite (&size, sizeof (uint32_t), 1, fh);
+      fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
+
+      index_block = index_block->next;
+    }
+
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_TAPER_OFFSET, 2 * sizeof (gfloat_t), sketch->taper_offset);
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_POCKET, sizeof (uint8_t), &sketch->pocket);
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_ZERO_PASS, sizeof (uint8_t), &sketch->zero_pass);
+    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_HELICAL, sizeof (uint8_t), &sketch->helical);
+  }
+}
+
+void
+gcode_sketch_load (gcode_block_t *block, FILE *fh)
+{
+  gcode_sketch_t *sketch;
+  gcode_block_t *new_block;
+  uint32_t bsize, dsize, start, num, i;
+  uint8_t data, type;
+
+  sketch = (gcode_sketch_t *)block->pdata;
+
+  fread (&bsize, sizeof (uint32_t), 1, fh);
+
+  start = ftell (fh);
+
+  while (ftell (fh) - start < bsize)
+  {
+    fread (&data, sizeof (uint8_t), 1, fh);
+    fread (&dsize, sizeof (uint32_t), 1, fh);
+
+    switch (data)
+    {
+      case GCODE_BIN_DATA_BLOCK_COMMENT:
+        fread (block->comment, sizeof (char), dsize, fh);
+        break;
+
+      case GCODE_BIN_DATA_BLOCK_FLAGS:
+        fread (&block->flags, sizeof (uint8_t), dsize, fh);
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_EXTRUSION:
+        /* Rewind 4 bytes because the extrusion wants to read in its block size too. */
+        fseek (fh, -4, SEEK_CUR);
+        gcode_extrusion_load (block->extruder, fh);
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_NUMBER:
+        fread (&num, sizeof (uint32_t), 1, fh);
+
+        for (i = 0; i < num; i++)
+        {
+          /* Read Data */
+          fread (&type, sizeof (uint8_t), 1, fh);
+
+          switch (type)
+          {
+            case GCODE_TYPE_ARC:
+              gcode_arc_init (&new_block, block->gcode, block);
+              break;
+
+            case GCODE_TYPE_LINE:
+              gcode_line_init (&new_block, block->gcode, block);
+              break;
+
+            default:
+              break;
+          }
+
+          gcode_append_as_listtail (block, new_block);                          // Append 'new_block' to the end of 'block's list (as head if the list is NULL)
+
+          new_block->load (new_block, fh);
+        }
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_TAPER_OFFSET:
+        fread (&sketch->taper_offset, dsize, 1, fh);
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_POCKET:
+        fread (&sketch->pocket, dsize, 1, fh);
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_ZERO_PASS:
+        fread (&sketch->zero_pass, dsize, 1, fh);
+        break;
+
+      case GCODE_BIN_DATA_SKETCH_HELICAL:
+        fread (&sketch->helical, dsize, 1, fh);
+        break;
+
+      default:
+        fseek (fh, dsize, SEEK_CUR);
+        break;
+    }
+  }
+}
+
+void
 gcode_sketch_make (gcode_block_t *block)
 {
   gcode_sketch_t *sketch;
@@ -859,265 +1070,6 @@ gcode_sketch_make (gcode_block_t *block)
   sketch->offset.eval = 0.0;
 }
 
-void
-gcode_sketch_save (gcode_block_t *block, FILE *fh)
-{
-  gcode_block_t *index_block;
-  gcode_sketch_t *sketch;
-  uint32_t size, num, marker;
-  uint8_t data;
-
-  sketch = (gcode_sketch_t *)block->pdata;
-
-  if (block->gcode->format == GCODE_FORMAT_XML)                                 // Save to new xml format
-  {
-    int indent = GCODE_XML_BASE_INDENT;
-
-    index_block = block->parent;
-
-    while (index_block)
-    {
-      indent++;
-
-      index_block = index_block->parent;
-    }
-
-    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
-    GCODE_WRITE_XML_HEAD_OF_TAG (fh, GCODE_XML_TAG_SKETCH);
-    GCODE_WRITE_XML_ATTR_STRING (fh, GCODE_XML_ATTR_BLOCK_COMMENT, block->comment);
-    GCODE_WRITE_XML_ATTR_AS_HEX (fh, GCODE_XML_ATTR_BLOCK_FLAGS, block->flags);
-    GCODE_WRITE_XML_ATTR_2D_FLT (fh, GCODE_XML_ATTR_SKETCH_TAPER_OFFSET, sketch->taper_offset);
-    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_POCKET, sketch->pocket);
-    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_ZERO_PASS, sketch->zero_pass);
-    GCODE_WRITE_XML_ATTR_1D_INT (fh, GCODE_XML_ATTR_SKETCH_HELICAL, sketch->helical);
-    GCODE_WRITE_XML_OP_TAG_TAIL (fh);
-    GCODE_WRITE_XML_END_OF_LINE (fh);
-
-    /**
-     * In the XML branch the parent does NOT save even the common attributes
-     * of its child blocks (as the binary branch does): saving some attributes
-     * here and some (custom) attributes in the child would get rather messy
-     */
-
-    block->extruder->save (block->extruder, fh);
-
-    index_block = block->listhead;
-
-    while (index_block)
-    {
-      index_block->save (index_block, fh);
-
-      index_block = index_block->next;
-    }
-
-    GCODE_WRITE_XML_INDENT_TABS (fh, indent);
-    GCODE_WRITE_XML_END_TAG_FOR (fh, GCODE_XML_TAG_SKETCH);
-    GCODE_WRITE_XML_END_OF_LINE (fh);
-  }
-  else                                                                          // Save to legacy binary format
-  {
-    /* SAVE EXTRUSION DATA */
-    data = GCODE_BIN_DATA_SKETCH_EXTRUSION;
-    size = 0;
-    fwrite (&data, sizeof (uint8_t), 1, fh);
-
-    /* Write block type */
-    marker = ftell (fh);
-    size = 0;
-    fwrite (&size, sizeof (uint32_t), 1, fh);
-
-    /* Write comment */
-    GCODE_WRITE_BINARY_STR_DATA (fh, GCODE_BIN_DATA_BLOCK_COMMENT, block->extruder->comment);
-
-    block->extruder->save (block->extruder, fh);
-
-    size = ftell (fh) - marker - sizeof (uint32_t);
-    fseek (fh, marker, SEEK_SET);
-    fwrite (&size, sizeof (uint32_t), 1, fh);
-    fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
-
-    num = 0;
-    index_block = block->listhead;
-
-    while (index_block)
-    {
-      num++;
-
-      index_block = index_block->next;
-    }
-
-    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_NUMBER, sizeof (uint32_t), &num);
-
-    num = 0;
-    index_block = block->listhead;
-
-    while (index_block)
-    {
-      /* Write block type */
-      fwrite (&index_block->type, sizeof (uint8_t), 1, fh);
-      marker = ftell (fh);
-      size = 0;
-      fwrite (&size, sizeof (uint32_t), 1, fh);
-
-      /* Write comment */
-      GCODE_WRITE_BINARY_STR_DATA (fh, GCODE_BIN_DATA_BLOCK_COMMENT, index_block->comment);
-
-      /* Write flags */
-      GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_BLOCK_FLAGS, sizeof (uint8_t), &index_block->flags);
-
-      index_block->save (index_block, fh);
-
-      size = ftell (fh) - marker - sizeof (uint32_t);
-      fseek (fh, marker, SEEK_SET);
-      fwrite (&size, sizeof (uint32_t), 1, fh);
-      fseek (fh, marker + size + sizeof (uint32_t), SEEK_SET);
-
-      index_block = index_block->next;
-    }
-
-    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_TAPER_OFFSET, 2 * sizeof (gfloat_t), sketch->taper_offset);
-    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_POCKET, sizeof (uint8_t), &sketch->pocket);
-    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_ZERO_PASS, sizeof (uint8_t), &sketch->zero_pass);
-    GCODE_WRITE_BINARY_NUM_DATA (fh, GCODE_BIN_DATA_SKETCH_HELICAL, sizeof (uint8_t), &sketch->helical);
-  }
-}
-
-void
-gcode_sketch_load (gcode_block_t *block, FILE *fh)
-{
-  gcode_sketch_t *sketch;
-  gcode_block_t *new_block;
-  uint32_t bsize, dsize, start, num, i;
-  uint8_t data, type;
-
-  sketch = (gcode_sketch_t *)block->pdata;
-
-  fread (&bsize, sizeof (uint32_t), 1, fh);
-
-  start = ftell (fh);
-
-  while (ftell (fh) - start < bsize)
-  {
-    fread (&data, sizeof (uint8_t), 1, fh);
-    fread (&dsize, sizeof (uint32_t), 1, fh);
-
-    switch (data)
-    {
-      case GCODE_BIN_DATA_BLOCK_COMMENT:
-        fread (block->comment, sizeof (char), dsize, fh);
-        break;
-
-      case GCODE_BIN_DATA_BLOCK_FLAGS:
-        fread (&block->flags, sizeof (uint8_t), dsize, fh);
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_EXTRUSION:
-        /* Rewind 4 bytes because the extrusion wants to read in its block size too. */
-        fseek (fh, -4, SEEK_CUR);
-        gcode_extrusion_load (block->extruder, fh);
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_NUMBER:
-        fread (&num, sizeof (uint32_t), 1, fh);
-
-        for (i = 0; i < num; i++)
-        {
-          /* Read Data */
-          fread (&type, sizeof (uint8_t), 1, fh);
-
-          switch (type)
-          {
-            case GCODE_TYPE_ARC:
-              gcode_arc_init (&new_block, block->gcode, block);
-              break;
-
-            case GCODE_TYPE_LINE:
-              gcode_line_init (&new_block, block->gcode, block);
-              break;
-
-            default:
-              break;
-          }
-
-          gcode_append_as_listtail (block, new_block);                          // Append 'new_block' to the end of 'block's list (as head if the list is NULL)
-
-          new_block->load (new_block, fh);
-        }
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_TAPER_OFFSET:
-        fread (&sketch->taper_offset, dsize, 1, fh);
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_POCKET:
-        fread (&sketch->pocket, dsize, 1, fh);
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_ZERO_PASS:
-        fread (&sketch->zero_pass, dsize, 1, fh);
-        break;
-
-      case GCODE_BIN_DATA_SKETCH_HELICAL:
-        fread (&sketch->helical, dsize, 1, fh);
-        break;
-
-      default:
-        fseek (fh, dsize, SEEK_CUR);
-        break;
-    }
-  }
-}
-
-void
-gcode_sketch_parse (gcode_block_t *block, const char **xmlattr)
-{
-  gcode_sketch_t *sketch;
-
-  sketch = (gcode_sketch_t *)block->pdata;
-
-  for (int i = 0; xmlattr[i]; i += 2)
-  {
-    int m;
-    unsigned int n;
-    double xyz[3], w;
-    const char *name, *value;
-
-    name = xmlattr[i];
-    value = xmlattr[i + 1];
-
-    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
-    {
-      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
-        block->flags = n;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_TAPER_OFFSET) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
-        for (int j = 0; j < 2; j++)
-          sketch->taper_offset[j] = (gfloat_t)xyz[j];
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_POCKET) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
-        sketch->pocket = m;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_ZERO_PASS) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
-        sketch->zero_pass = m;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_HELICAL) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
-        sketch->helical = m;
-    }
-  }
-}
-
 /**
  * Draw the contents of the sketch either as several contour lines (one for each
  * milling pass as determined by the extrusion resolution) or as a single curve
@@ -1328,6 +1280,167 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
 #endif
 }
 
+/**
+ * Construct the axis-aligned bounding box of all the members of the sketch;
+ * NOTE: this can and does return an "imposible" or "inside-out" bounding box
+ * which has its minimum larger than its maximum as a sign of failure to pick
+ * up any member with a valid bounding box, if either the list is empty or the
+ * members all lack an "aabb" function - THIS SHOULD BE TESTED FOR ON RETURN!
+ */
+
+void
+gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_block_t *index_block;
+  gcode_vec2d_t tmin, tmax;
+
+  index_block = block->listhead;
+
+  min[0] = min[1] = 1;                                                          // Never cross the streams, you say...? Oh well, too late...
+  max[0] = max[1] = 0;                                                          // Callers should test for an inside-out aabb being returned;
+
+  while (index_block)
+  {
+    if (!index_block->aabb)                                                     // If the block has no bounds function, don't try to call it;
+      continue;
+
+    index_block->aabb (index_block, tmin, tmax);
+
+    if ((tmin[0] > tmax[0]) || (tmin[1] > tmax[1]))                             // If the block returned an inside-out box, discard the box;
+      continue;
+
+    if ((min[0] > max[0]) || (min[1] > max[1]))                                 // If bounds were inside-out (unset), accept the box directly;
+    {
+      min[0] = tmin[0];
+      min[1] = tmin[1];
+      max[0] = tmax[0];
+      max[1] = tmax[1];
+    }
+    else                                                                        // Nothing ever is too simple to screw up, eh...?
+    {
+      if (tmin[0] < min[0])
+        min[0] = tmin[0];
+
+      if (tmax[0] > max[0])
+        max[0] = tmax[0];
+
+      if (tmin[1] < min[1])
+        min[1] = tmin[1];
+
+      if (tmax[1] > max[1])
+        max[1] = tmax[1];
+    }
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_sketch_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->move)
+      index_block->move (index_block, delta);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_sketch_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->spin)
+      index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_sketch_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_block_t *index_block;
+  gcode_sketch_t *sketch;
+
+  sketch = (gcode_sketch_t *)block->pdata;
+
+  sketch->taper_offset[0] *= scale;
+  sketch->taper_offset[1] *= scale;
+
+  block->extruder->scale (block->extruder, scale);
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->scale)
+      index_block->scale (index_block, scale);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_sketch_parse (gcode_block_t *block, const char **xmlattr)
+{
+  gcode_sketch_t *sketch;
+
+  sketch = (gcode_sketch_t *)block->pdata;
+
+  for (int i = 0; xmlattr[i]; i += 2)
+  {
+    int m;
+    unsigned int n;
+    double xyz[3], w;
+    const char *name, *value;
+
+    name = xmlattr[i];
+    value = xmlattr[i + 1];
+
+    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    {
+      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
+        block->flags = n;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_TAPER_OFFSET) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          sketch->taper_offset[j] = (gfloat_t)xyz[j];
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_POCKET) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
+        sketch->pocket = m;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_ZERO_PASS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
+        sketch->zero_pass = m;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_SKETCH_HELICAL) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
+        sketch->helical = m;
+    }
+  }
+}
+
 void
 gcode_sketch_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
@@ -1368,66 +1481,6 @@ gcode_sketch_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
   }
 }
 
-void
-gcode_sketch_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_block_t *index_block;
-  gcode_sketch_t *sketch;
-
-  sketch = (gcode_sketch_t *)block->pdata;
-
-  sketch->taper_offset[0] *= scale;
-  sketch->taper_offset[1] *= scale;
-
-  block->extruder->scale (block->extruder, scale);
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    if (index_block->scale)
-      index_block->scale (index_block, scale);
-
-    index_block = index_block->next;
-  }
-}
-
-void
-gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
-{
-  gcode_block_t *index_block;
-  gcode_vec2d_t tmin, tmax;
-
-  index_block = block->listhead;
-
-  while (index_block)
-  {
-    index_block->aabb (index_block, tmin, tmax);                                /* asserted that the blocks are only arcs and lines */
-
-    if (index_block == block->listhead)
-    {
-      min[0] = tmin[0];
-      min[1] = tmin[1];
-      max[0] = tmax[0];
-      max[1] = tmax[1];
-    }
-
-    if (tmin[0] < min[0])
-      min[0] = tmin[0];
-
-    if (tmin[0] > max[0])
-      max[0] = tmin[0];
-
-    if (tmax[1] < min[1])
-      min[1] = tmax[1];
-
-    if (tmax[1] > max[1])
-      max[1] = tmax[1];
-
-    index_block = index_block->next;
-  }
-}
-
 /**
  * Multiply the elements of a sketch a number of times, each time applying an
  * incremental rotation and translation offset, creating a regularly repeating
@@ -1435,7 +1488,7 @@ gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
  */
 
 void
-gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t translate_x, gfloat_t translate_y, gfloat_t rotate_about_x, gfloat_t rotate_about_y, gfloat_t rotation)
+gcode_sketch_pattern (gcode_block_t *block, uint32_t count, gcode_vec2d_t delta, gcode_vec2d_t datum, gfloat_t angle)
 {
   gcode_block_t *index_block, *final_block, *new_block, *last_block;
   gfloat_t inc_rotation, inc_translate_x, inc_translate_y;
@@ -1450,11 +1503,11 @@ gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t transl
 
     last_block = final_block;                                                   // Point 'last_block' as well to the last block in the list.
 
-    for (i = 1; i < iterations; i++)                                            // If 'iterations' equals 0 or 1, this will do nothing at all - as it should.
+    for (i = 1; i < count; i++)                                                 // If 'count' equals 0 or 1, this will do nothing at all - as it should.
     {
-      inc_rotation = ((float)i) * rotation;                                     // Calculate roto-translation factors for the current iteration
-      inc_translate_x = ((float)i) * translate_x;
-      inc_translate_y = ((float)i) * translate_y;
+      inc_rotation = ((float)i) * angle;                                        // Calculate roto-translation factors for the current iteration
+      inc_translate_x = ((float)i) * delta[0];
+      inc_translate_y = ((float)i) * delta[1];
 
       index_block = block->listhead;                                            // Each time, start with the first block in the list (which we know must exist)
 
@@ -1473,11 +1526,11 @@ gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t transl
             new_arc = (gcode_arc_t *)new_block->pdata;                          // and acquire a reference to its data as well.
 
             /* Rotate and Translate */
-            pt[0] = arc->p[0] - rotate_about_x;
-            pt[1] = arc->p[1] - rotate_about_y;
+            pt[0] = arc->p[0] - datum[0];
+            pt[1] = arc->p[1] - datum[1];
             GCODE_MATH_ROTATE (xform_pt, pt, inc_rotation);
-            new_arc->p[0] = xform_pt[0] + rotate_about_x + inc_translate_x;
-            new_arc->p[1] = xform_pt[1] + rotate_about_y + inc_translate_y;
+            new_arc->p[0] = xform_pt[0] + datum[0] + inc_translate_x;
+            new_arc->p[1] = xform_pt[1] + datum[1] + inc_translate_y;
             new_arc->sweep_angle = arc->sweep_angle;
             new_arc->radius = arc->radius;
             new_arc->start_angle = arc->start_angle + inc_rotation;
@@ -1497,17 +1550,17 @@ gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t transl
             new_line = (gcode_line_t *)new_block->pdata;                        // and acquire a reference to its data as well.
 
             /* Rotate and Translate */
-            pt[0] = line->p0[0] - rotate_about_x;
-            pt[1] = line->p0[1] - rotate_about_y;
+            pt[0] = line->p0[0] - datum[0];
+            pt[1] = line->p0[1] - datum[1];
             GCODE_MATH_ROTATE (xform_pt, pt, inc_rotation);
-            new_line->p0[0] = xform_pt[0] + rotate_about_x + inc_translate_x;
-            new_line->p0[1] = xform_pt[1] + rotate_about_y + inc_translate_y;
+            new_line->p0[0] = xform_pt[0] + datum[0] + inc_translate_x;
+            new_line->p0[1] = xform_pt[1] + datum[1] + inc_translate_y;
 
-            pt[0] = line->p1[0] - rotate_about_x;
-            pt[1] = line->p1[1] - rotate_about_y;
+            pt[0] = line->p1[0] - datum[0];
+            pt[1] = line->p1[1] - datum[1];
             GCODE_MATH_ROTATE (xform_pt, pt, inc_rotation);
-            new_line->p1[0] = xform_pt[0] + rotate_about_x + inc_translate_x;
-            new_line->p1[1] = xform_pt[1] + rotate_about_y + inc_translate_y;
+            new_line->p1[0] = xform_pt[0] + datum[0] + inc_translate_x;
+            new_line->p1[1] = xform_pt[1] + datum[1] + inc_translate_y;
 
             break;
           }

@@ -30,9 +30,9 @@ gcode_code_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_CODE, GCODE_FLAGS_LOCK);
 
   (*block)->free = gcode_code_free;
-  (*block)->make = gcode_code_make;
   (*block)->save = gcode_code_save;
   (*block)->load = gcode_code_load;
+  (*block)->make = gcode_code_make;
 
   (*block)->offref = &gcode->zero_offset;
   (*block)->offset = &gcode->zero_offset;
@@ -51,14 +51,6 @@ gcode_code_free (gcode_block_t **block)
 }
 
 void
-gcode_code_make (gcode_block_t *block)
-{
-  GCODE_CLEAR (block);
-
-  GCODE_COMMENT (block, "Insert Custom G-Code Here");
-}
-
-void
 gcode_code_save (gcode_block_t *block, FILE *fh)
 {
 }
@@ -66,4 +58,12 @@ gcode_code_save (gcode_block_t *block, FILE *fh)
 void
 gcode_code_load (gcode_block_t *block, FILE *fh)
 {
+}
+
+void
+gcode_code_make (gcode_block_t *block)
+{
+  GCODE_CLEAR (block);
+
+  GCODE_COMMENT (block, "Insert Custom G-Code Here");
 }

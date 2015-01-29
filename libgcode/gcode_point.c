@@ -36,9 +36,11 @@ gcode_point_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->save = gcode_point_save;
   (*block)->load = gcode_point_load;
   (*block)->draw = gcode_point_draw;
-  (*block)->clone = gcode_point_clone;
+  (*block)->move = gcode_point_move;
+  (*block)->spin = gcode_point_spin;
   (*block)->scale = gcode_point_scale;
   (*block)->parse = gcode_point_parse;
+  (*block)->clone = gcode_point_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_point_t));
 
@@ -144,6 +146,64 @@ gcode_point_load (gcode_block_t *block, FILE *fh)
 }
 
 void
+gcode_point_draw (gcode_block_t *block, gcode_block_t *selected)
+{
+#if GCODE_USE_OPENGL
+  gcode_vec2d_t p;
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  gcode_point_with_offset (block, p);
+
+  glPointSize (GCODE_OPENGL_SMALL_POINT_SIZE);
+  glColor3f (GCODE_OPENGL_SMALL_POINT_COLOR[0],
+             GCODE_OPENGL_SMALL_POINT_COLOR[1],
+             GCODE_OPENGL_SMALL_POINT_COLOR[2]);
+  glBegin (GL_POINTS);
+  glVertex3f (p[0], p[1], 0.0);
+  glEnd ();
+#endif
+}
+
+void
+gcode_point_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_point_t *point;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  point = (gcode_point_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_COPY (orgnl_pt, point->p);
+  GCODE_MATH_TRANSLATE (xform_pt, orgnl_pt, delta);
+  GCODE_MATH_VEC2D_COPY (point->p, xform_pt);
+}
+
+void
+gcode_point_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_point_t *point;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  point = (gcode_point_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_SUB (orgnl_pt, point->p, datum);
+  GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
+  GCODE_MATH_VEC2D_ADD (point->p, xform_pt, datum);
+}
+
+void
+gcode_point_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_point_t *point;
+
+  point = (gcode_point_t *)block->pdata;
+
+  point->p[0] *= scale;
+  point->p[1] *= scale;
+}
+
+void
 gcode_point_parse (gcode_block_t *block, const char **xmlattr)
 {
   gcode_point_t *point;
@@ -179,27 +239,6 @@ gcode_point_parse (gcode_block_t *block, const char **xmlattr)
 }
 
 void
-gcode_point_draw (gcode_block_t *block, gcode_block_t *selected)
-{
-#if GCODE_USE_OPENGL
-  gcode_vec2d_t p;
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  gcode_point_with_offset (block, p);
-
-  glPointSize (GCODE_OPENGL_SMALL_POINT_SIZE);
-  glColor3f (GCODE_OPENGL_SMALL_POINT_COLOR[0],
-             GCODE_OPENGL_SMALL_POINT_COLOR[1],
-             GCODE_OPENGL_SMALL_POINT_COLOR[2]);
-  glBegin (GL_POINTS);
-  glVertex3f (p[0], p[1], 0.0);
-  glEnd ();
-#endif
-}
-
-void
 gcode_point_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 {
   gcode_point_t *point, *model_point;
@@ -218,17 +257,6 @@ gcode_point_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 
   point->p[0] = model_point->p[0];
   point->p[1] = model_point->p[1];
-}
-
-void
-gcode_point_scale (gcode_block_t *block, gfloat_t scale)
-{
-  gcode_point_t *point;
-
-  point = (gcode_point_t *)block->pdata;
-
-  point->p[0] *= scale;
-  point->p[1] *= scale;
 }
 
 /**

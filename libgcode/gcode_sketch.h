@@ -49,15 +49,17 @@ typedef struct gcode_sketch_s
 
 void gcode_sketch_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_sketch_free (gcode_block_t **block);
-void gcode_sketch_make (gcode_block_t *block);
 void gcode_sketch_save (gcode_block_t *block, FILE *fh);
 void gcode_sketch_load (gcode_block_t *block, FILE *fh);
+void gcode_sketch_make (gcode_block_t *block);
 void gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_sketch_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_sketch_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_sketch_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_sketch_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_sketch_parse (gcode_block_t *block, const char **xmlattr);
-void gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
-void gcode_sketch_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t translate_x, gfloat_t translate_y, gfloat_t rotate_about_x, gfloat_t rotate_about_y, gfloat_t rotation);
+void gcode_sketch_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_sketch_pattern (gcode_block_t *block, uint32_t count, gcode_vec2d_t delta, gcode_vec2d_t datum, gfloat_t angle);
 int gcode_sketch_is_closed (gcode_block_t *block);
 int gcode_sketch_is_joined (gcode_block_t *block);
 gcode_block_t *gcode_sketch_prev_connected (gcode_block_t *block);

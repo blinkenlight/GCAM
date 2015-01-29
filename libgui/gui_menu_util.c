@@ -841,6 +841,8 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Remove"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Scale"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 1);
@@ -984,6 +986,20 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
       (selected_block->type == GCODE_TYPE_EXTRUSION))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 0);
+  }
+
+  /* TRANSLATE AND ROTATE */
+  if ((selected_block->type != GCODE_TYPE_TEMPLATE) &&
+      (selected_block->type != GCODE_TYPE_SKETCH) &&
+      (selected_block->type != GCODE_TYPE_BOLT_HOLES) &&
+      (selected_block->type != GCODE_TYPE_DRILL_HOLES) &&
+      (selected_block->type != GCODE_TYPE_POINT) &&
+      (selected_block->type != GCODE_TYPE_LINE) &&
+      (selected_block->type != GCODE_TYPE_ARC) &&
+      (selected_block->type != GCODE_TYPE_STL))
+  {
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 0);
   }
 
   /* SCALE */

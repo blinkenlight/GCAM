@@ -66,12 +66,12 @@ typedef struct gcode_tool_s
 
 void gcode_tool_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_tool_free (gcode_block_t **block);
-void gcode_tool_make (gcode_block_t *block);
 void gcode_tool_save (gcode_block_t *block, FILE *fh);
 void gcode_tool_load (gcode_block_t *block, FILE *fh);
-void gcode_tool_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_tool_make (gcode_block_t *block);
 void gcode_tool_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_tool_parse (gcode_block_t *block, const char **xmlattr);
+void gcode_tool_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 void gcode_tool_calc (gcode_block_t *block);
 gcode_tool_t *gcode_tool_find (gcode_block_t *block);
 

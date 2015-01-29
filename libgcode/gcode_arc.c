@@ -37,17 +37,19 @@ gcode_arc_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_ARC, 0);
 
   (*block)->free = gcode_arc_free;
-  (*block)->make = gcode_arc_make;
   (*block)->save = gcode_arc_save;
   (*block)->load = gcode_arc_load;
-  (*block)->ends = gcode_arc_ends;
+  (*block)->make = gcode_arc_make;
   (*block)->draw = gcode_arc_draw;
   (*block)->eval = gcode_arc_eval;
+  (*block)->ends = gcode_arc_ends;
+  (*block)->aabb = gcode_arc_aabb;
   (*block)->length = gcode_arc_length;
-  (*block)->clone = gcode_arc_clone;
+  (*block)->move = gcode_arc_move;
+  (*block)->spin = gcode_arc_spin;
   (*block)->scale = gcode_arc_scale;
   (*block)->parse = gcode_arc_parse;
-  (*block)->aabb = gcode_arc_aabb;
+  (*block)->clone = gcode_arc_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_arc_t));
 
@@ -78,57 +80,6 @@ gcode_arc_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_arc_make (gcode_block_t *block)
-{
-  gcode_arc_t *arc;
-  gcode_vec2d_t p0, origin, center;
-  gfloat_t arc_radius_offset, start_angle;
-  char string[256];
-
-  arc = (gcode_arc_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  sprintf (string, "ARC: %s", block->comment);
-
-  gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &start_angle);
-
-  /* Do not proceed if arc_radius is <= GCODE_PRECISION */
-  if (arc_radius_offset <= GCODE_PRECISION)
-    return;
-
-  GCODE_2D_LINE (block, origin[0], origin[1], "");
-
-  if (arc->sweep_angle < 0.0)
-  {
-    /* Clockwise */
-    if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
-    {
-      GCODE_2D_ARC_CW (block, p0[0], p0[1], center[0] - origin[0], center[1] - origin[1], string);
-    }
-    else
-    {
-      GCODE_3D_ARC_CW (block, p0[0], p0[1], block->offset->z[1], center[0] - origin[0], center[1] - origin[1], string);
-    }
-  }
-  else
-  {
-    /* Counter-Clockwise */
-    if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
-    {
-      GCODE_2D_ARC_CCW (block, p0[0], p0[1], center[0] - origin[0], center[1] - origin[1], string);
-    }
-    else
-    {
-      GCODE_3D_ARC_CCW (block, p0[0], p0[1], block->offset->z[1], center[0] - origin[0], center[1] - origin[1], string);
-    }
-  }
 }
 
 void
@@ -232,199 +183,54 @@ gcode_arc_load (gcode_block_t *block, FILE *fh)
 }
 
 void
-gcode_arc_parse (gcode_block_t *block, const char **xmlattr)
+gcode_arc_make (gcode_block_t *block)
 {
   gcode_arc_t *arc;
+  gcode_vec2d_t p0, origin, center;
+  gfloat_t arc_radius_offset, start_angle;
+  char string[256];
 
   arc = (gcode_arc_t *)block->pdata;
 
-  for (int i = 0; xmlattr[i]; i += 2)
+  GCODE_CLEAR (block);
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  sprintf (string, "ARC: %s", block->comment);
+
+  gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &start_angle);
+
+  /* Do not proceed if arc_radius is <= GCODE_PRECISION */
+  if (arc_radius_offset <= GCODE_PRECISION)
+    return;
+
+  GCODE_2D_LINE (block, origin[0], origin[1], "");
+
+  if (arc->sweep_angle < 0.0)
   {
-    int m;
-    unsigned int n;
-    double xyz[3], w;
-    const char *name, *value;
-
-    name = xmlattr[i];
-    value = xmlattr[i + 1];
-
-    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    /* Clockwise */
+    if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
     {
-      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+      GCODE_2D_ARC_CW (block, p0[0], p0[1], center[0] - origin[0], center[1] - origin[1], string);
     }
-    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    else
     {
-      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
-        block->flags = n;
+      GCODE_3D_ARC_CW (block, p0[0], p0[1], block->offset->z[1], center[0] - origin[0], center[1] - origin[1], string);
     }
-    else if (strcmp (name, GCODE_XML_ATTR_ARC_START_POINT) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
-        for (int j = 0; j < 2; j++)
-          arc->p[j] = (gfloat_t)xyz[j];
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_ARC_RADIUS) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
-        arc->radius = (gfloat_t)w;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_ARC_START_ANGLE) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
-        arc->start_angle = (gfloat_t)w;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_ARC_SWEEP_ANGLE) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
-        arc->sweep_angle = (gfloat_t)w;
-    }
-    else if (strcmp (name, GCODE_XML_ATTR_ARC_INTERFACE) == 0)
-    {
-      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
-        arc->native_mode = m;
-    }
-
-    GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);                          // No, you can't start at 5000 degrees...
-    GCODE_MATH_SNAP_TO_720_DEGREES (arc->sweep_angle);                          // ...nor can you sweep 1000000 degrees;
   }
-}
-
-int
-gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
-{
-  gcode_arc_t *arc;
-
-  arc = (gcode_arc_t *)block->pdata;
-
-  switch (mode)
+  else
   {
-    case GCODE_GET:
+    /* Counter-Clockwise */
+    if (fabs (block->offset->z[0] - block->offset->z[1]) < GCODE_PRECISION)
     {
-      gcode_vec2d_t center;
-
-      p0[0] = arc->p[0];
-      p0[1] = arc->p[1];
-
-      center[0] = p0[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
-      center[1] = p0[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
-
-      p1[0] = center[0] + arc->radius * cos ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
-      p1[1] = center[1] + arc->radius * sin ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
-
-      break;
+      GCODE_2D_ARC_CCW (block, p0[0], p0[1], center[0] - origin[0], center[1] - origin[1], string);
     }
-
-    case GCODE_SET:
-
-      arc->p[0] = p0[0];
-      arc->p[1] = p0[1];
-
-      break;
-
-    case GCODE_GET_WITH_OFFSET:
+    else
     {
-      gcode_vec2d_t origin, center;
-      gfloat_t arc_radius_offset, start_angle;
-
-      gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &start_angle);
-
-      p1[0] = p0[0];
-      p1[1] = p0[1];
-
-      p0[0] = origin[0];
-      p0[1] = origin[1];
-
-      break;
+      GCODE_3D_ARC_CCW (block, p0[0], p0[1], block->offset->z[1], center[0] - origin[0], center[1] - origin[1], string);
     }
-
-    case GCODE_GET_NORMAL:
-    {
-      gfloat_t xform_angle, flip;
-
-      xform_angle = arc->start_angle + block->offset->rotation;
-      flip = block->offset->side * (arc->sweep_angle < 0.0 ? -1.0 : 1.0);
-
-      p0[0] = flip * cos (xform_angle * GCODE_DEG2RAD);
-      p0[1] = flip * sin (xform_angle * GCODE_DEG2RAD);
-
-      p1[0] = flip * cos ((xform_angle + arc->sweep_angle) * GCODE_DEG2RAD);
-      p1[1] = flip * sin ((xform_angle + arc->sweep_angle) * GCODE_DEG2RAD);
-
-      break;
-    }
-
-    case GCODE_GET_TANGENT:
-    {
-      gfloat_t angle;
-
-      angle = arc->start_angle - 90.0;
-
-      if (angle < 0.0)
-        angle += 360.0;
-
-      p0[0] = cos (GCODE_DEG2RAD * angle);
-      p0[1] = sin (GCODE_DEG2RAD * angle);
-
-      if (arc->sweep_angle > 0.0)
-        GCODE_MATH_VEC2D_SCALE (p0, -1.0);
-
-      angle = arc->start_angle + arc->sweep_angle - 90.0;
-
-      if (angle < 0.0)
-        angle += 360.0;
-
-      if (angle > 360.0)
-        angle -= 360.0;
-
-      p1[0] = cos (GCODE_DEG2RAD * angle);
-      p1[1] = sin (GCODE_DEG2RAD * angle);
-
-      if (arc->sweep_angle > 0.0)
-        GCODE_MATH_VEC2D_SCALE (p1, -1.0);
-
-      break;
-    }
-
-    default:
-
-      return (1);
   }
-
-  return (0);
-}
-
-int
-gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode)
-{
-  gcode_arc_t *arc;
-
-  arc = (gcode_arc_t *)block->pdata;
-
-  switch (mode)
-  {
-    case GCODE_GET:
-
-      center[0] = arc->p[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
-      center[1] = arc->p[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
-
-      break;
-
-    case GCODE_GET_WITH_OFFSET:
-
-      center[0] = arc->p[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
-      center[1] = arc->p[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
-
-      GCODE_MATH_ROTATE (center, center, block->offset->rotation);              // NOTE: "rotating" the center is not as absurd as it sounds:
-      GCODE_MATH_TRANSLATE (center, center, block->offset->origin);             // remember that we're NOT rotating the center AROUND ITSELF.
-
-      break;
-
-    default:
-
-      return (1);
-  }
-
-  return (0);
 }
 
 void
@@ -617,55 +423,142 @@ gcode_arc_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x
   return (fail);
 }
 
-gfloat_t
-gcode_arc_length (gcode_block_t *block)
-{
-  gcode_arc_t *arc;
-  gfloat_t length;
-
-  arc = (gcode_arc_t *)block->pdata;
-
-  length = fabs (arc->radius * GCODE_2PI * arc->sweep_angle / 360.0);
-
-  return (length);
-}
-
-void
-gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
-{
-  gcode_arc_t *arc, *model_arc;
-
-  model_arc = (gcode_arc_t *)model->pdata;
-
-  gcode_arc_init (block, gcode, model->parent);
-
-  (*block)->flags = model->flags;
-
-  strcpy ((*block)->comment, model->comment);
-
-  (*block)->offset = model->offset;
-
-  arc = (gcode_arc_t *)(*block)->pdata;
-
-  arc->p[0] = model_arc->p[0];
-  arc->p[1] = model_arc->p[1];
-
-  arc->radius = model_arc->radius;
-  arc->start_angle = model_arc->start_angle;
-  arc->sweep_angle = model_arc->sweep_angle;
-  arc->native_mode = model_arc->native_mode;
-}
-
-void
-gcode_arc_scale (gcode_block_t *block, gfloat_t scale)
+int
+gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode)
 {
   gcode_arc_t *arc;
 
   arc = (gcode_arc_t *)block->pdata;
 
-  arc->p[0] *= scale;
-  arc->p[1] *= scale;
-  arc->radius *= scale;
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      gcode_vec2d_t center;
+
+      p0[0] = arc->p[0];
+      p0[1] = arc->p[1];
+
+      center[0] = p0[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
+      center[1] = p0[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
+
+      p1[0] = center[0] + arc->radius * cos ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+      p1[1] = center[1] + arc->radius * sin ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+
+      break;
+    }
+
+    case GCODE_SET:
+
+      arc->p[0] = p0[0];
+      arc->p[1] = p0[1];
+
+      break;
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_vec2d_t origin, center;
+      gfloat_t arc_radius_offset, start_angle;
+
+      gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &start_angle);
+
+      p1[0] = p0[0];
+      p1[1] = p0[1];
+
+      p0[0] = origin[0];
+      p0[1] = origin[1];
+
+      break;
+    }
+
+    case GCODE_GET_NORMAL:
+    {
+      gfloat_t xform_angle, flip;
+
+      xform_angle = arc->start_angle + block->offset->rotation;
+      flip = block->offset->side * (arc->sweep_angle < 0.0 ? -1.0 : 1.0);
+
+      p0[0] = flip * cos (xform_angle * GCODE_DEG2RAD);
+      p0[1] = flip * sin (xform_angle * GCODE_DEG2RAD);
+
+      p1[0] = flip * cos ((xform_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+      p1[1] = flip * sin ((xform_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+
+      break;
+    }
+
+    case GCODE_GET_TANGENT:
+    {
+      gfloat_t angle;
+
+      angle = arc->start_angle - 90.0;
+
+      if (angle < 0.0)
+        angle += 360.0;
+
+      p0[0] = cos (GCODE_DEG2RAD * angle);
+      p0[1] = sin (GCODE_DEG2RAD * angle);
+
+      if (arc->sweep_angle > 0.0)
+        GCODE_MATH_VEC2D_SCALE (p0, -1.0);
+
+      angle = arc->start_angle + arc->sweep_angle - 90.0;
+
+      if (angle < 0.0)
+        angle += 360.0;
+
+      if (angle > 360.0)
+        angle -= 360.0;
+
+      p1[0] = cos (GCODE_DEG2RAD * angle);
+      p1[1] = sin (GCODE_DEG2RAD * angle);
+
+      if (arc->sweep_angle > 0.0)
+        GCODE_MATH_VEC2D_SCALE (p1, -1.0);
+
+      break;
+    }
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
+}
+
+int
+gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode)
+{
+  gcode_arc_t *arc;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+
+      center[0] = arc->p[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
+      center[1] = arc->p[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
+
+      break;
+
+    case GCODE_GET_WITH_OFFSET:
+
+      center[0] = arc->p[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
+      center[1] = arc->p[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
+
+      GCODE_MATH_ROTATE (center, center, block->offset->rotation);              // NOTE: "rotating" the center is not as absurd as it sounds:
+      GCODE_MATH_TRANSLATE (center, center, block->offset->origin);             // remember that we're NOT rotating the center AROUND ITSELF.
+
+      break;
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
 }
 
 void
@@ -709,6 +602,144 @@ gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 
   if (!gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 270.0))
     min[1] = center[1] - arc_radius_offset;
+}
+
+gfloat_t
+gcode_arc_length (gcode_block_t *block)
+{
+  gcode_arc_t *arc;
+  gfloat_t length;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  length = fabs (arc->radius * GCODE_2PI * arc->sweep_angle / 360.0);
+
+  return (length);
+}
+
+void
+gcode_arc_move (gcode_block_t *block, gcode_vec2d_t delta)
+{
+  gcode_arc_t *arc;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_COPY (orgnl_pt, arc->p);
+  GCODE_MATH_TRANSLATE (xform_pt, orgnl_pt, delta);
+  GCODE_MATH_VEC2D_COPY (arc->p, xform_pt);
+}
+
+void
+gcode_arc_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_arc_t *arc;
+  gcode_vec2d_t orgnl_pt, xform_pt;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  GCODE_MATH_VEC2D_SUB (orgnl_pt, arc->p, datum);
+  GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
+  GCODE_MATH_VEC2D_ADD (arc->p, xform_pt, datum);
+
+  arc->start_angle += angle;
+  GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);
+}
+
+void
+gcode_arc_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_arc_t *arc;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  arc->p[0] *= scale;
+  arc->p[1] *= scale;
+  arc->radius *= scale;
+}
+
+void
+gcode_arc_parse (gcode_block_t *block, const char **xmlattr)
+{
+  gcode_arc_t *arc;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  for (int i = 0; xmlattr[i]; i += 2)
+  {
+    int m;
+    unsigned int n;
+    double xyz[3], w;
+    const char *name, *value;
+
+    name = xmlattr[i];
+    value = xmlattr[i + 1];
+
+    if (strcmp (name, GCODE_XML_ATTR_BLOCK_COMMENT) == 0)
+    {
+      GCODE_PARSE_XML_ATTR_STRING (block->comment, value);
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_BLOCK_FLAGS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_AS_HEX (n, value))
+        block->flags = n;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_ARC_START_POINT) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_2D_FLT (xyz, value))
+        for (int j = 0; j < 2; j++)
+          arc->p[j] = (gfloat_t)xyz[j];
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_ARC_RADIUS) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
+        arc->radius = (gfloat_t)w;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_ARC_START_ANGLE) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
+        arc->start_angle = (gfloat_t)w;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_ARC_SWEEP_ANGLE) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_FLT (w, value))
+        arc->sweep_angle = (gfloat_t)w;
+    }
+    else if (strcmp (name, GCODE_XML_ATTR_ARC_INTERFACE) == 0)
+    {
+      if (GCODE_PARSE_XML_ATTR_1D_INT (m, value))
+        arc->native_mode = m;
+    }
+
+    GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);                          // No, you can't start at 5000 degrees...
+    GCODE_MATH_SNAP_TO_720_DEGREES (arc->sweep_angle);                          // ...nor can you sweep 1000000 degrees;
+  }
+}
+
+void
+gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
+{
+  gcode_arc_t *arc, *model_arc;
+
+  model_arc = (gcode_arc_t *)model->pdata;
+
+  gcode_arc_init (block, gcode, model->parent);
+
+  (*block)->flags = model->flags;
+
+  strcpy ((*block)->comment, model->comment);
+
+  (*block)->offset = model->offset;
+
+  arc = (gcode_arc_t *)(*block)->pdata;
+
+  arc->p[0] = model_arc->p[0];
+  arc->p[1] = model_arc->p[1];
+
+  arc->radius = model_arc->radius;
+  arc->start_angle = model_arc->start_angle;
+  arc->sweep_angle = model_arc->sweep_angle;
+  arc->native_mode = model_arc->native_mode;
 }
 
 /**

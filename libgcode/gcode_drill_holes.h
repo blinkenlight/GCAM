@@ -45,13 +45,16 @@ typedef struct gcode_drill_holes_s
 
 void gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_drill_holes_free (gcode_block_t **block);
-void gcode_drill_holes_make (gcode_block_t *block);
 void gcode_drill_holes_save (gcode_block_t *block, FILE *fh);
 void gcode_drill_holes_load (gcode_block_t *block, FILE *fh);
+void gcode_drill_holes_make (gcode_block_t *block);
 void gcode_drill_holes_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_drill_holes_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_drill_holes_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_drill_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_drill_holes_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_drill_holes_parse (gcode_block_t *block, const char **xmlattr);
-void gcode_drill_holes_pattern (gcode_block_t *block, uint32_t iterations, gfloat_t translate_x, gfloat_t translate_y, gfloat_t rotate_about_x, gfloat_t rotate_about_y, gfloat_t rotation);
+void gcode_drill_holes_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_drill_holes_pattern (gcode_block_t *block, uint32_t count, gcode_vec2d_t delta, gcode_vec2d_t datum, gfloat_t angle);
 
 #endif

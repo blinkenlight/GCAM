@@ -42,13 +42,13 @@ typedef struct gcode_image_s
 
 void gcode_image_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_image_free (gcode_block_t **block);
-void gcode_image_make (gcode_block_t *block);
 void gcode_image_save (gcode_block_t *block, FILE *fh);
 void gcode_image_load (gcode_block_t *block, FILE *fh);
-void gcode_image_open (gcode_block_t *block, char *filename);
+void gcode_image_make (gcode_block_t *block);
 void gcode_image_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_image_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 void gcode_image_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_image_parse (gcode_block_t *block, const char **xmlattr);
+void gcode_image_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_image_open (gcode_block_t *block, char *filename);
 
 #endif

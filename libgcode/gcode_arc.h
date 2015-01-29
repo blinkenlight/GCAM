@@ -44,7 +44,7 @@ static const char *GCODE_XML_ATTR_ARC_INTERFACE = "interface";
 
 typedef struct gcode_arc_s
 {
-  gfloat_t p[2];
+  gcode_vec2d_t p;
   gfloat_t radius;
   gfloat_t start_angle;
   gfloat_t sweep_angle;
@@ -53,9 +53,9 @@ typedef struct gcode_arc_s
 
 typedef struct gcode_arcdata_s
 {
-  gfloat_t p0[2];
-  gfloat_t p1[2];
-  gfloat_t cp[2];
+  gcode_vec2d_t p0;
+  gcode_vec2d_t p1;
+  gcode_vec2d_t cp;
   gfloat_t radius;
   gfloat_t start_angle;
   gfloat_t sweep_angle;
@@ -65,18 +65,20 @@ typedef struct gcode_arcdata_s
 
 void gcode_arc_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent);
 void gcode_arc_free (gcode_block_t **block);
-void gcode_arc_make (gcode_block_t *block);
 void gcode_arc_save (gcode_block_t *block, FILE *fh);
 void gcode_arc_load (gcode_block_t *block, FILE *fh);
-int gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
-int gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode);
+void gcode_arc_make (gcode_block_t *block);
 void gcode_arc_draw (gcode_block_t *block, gcode_block_t *selected);
 int gcode_arc_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x_index);
+int gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
+int gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode);
+void gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 gfloat_t gcode_arc_length (gcode_block_t *block);
-void gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
+void gcode_arc_move (gcode_block_t *block, gcode_vec2d_t delta);
+void gcode_arc_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_arc_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_arc_parse (gcode_block_t *block, const char **xmlattr);
-void gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
 void gcode_arc_with_offset (gcode_block_t *block, gcode_vec2d_t origin, gcode_vec2d_t center, gcode_vec2d_t p0, gfloat_t *arc_radius_offset, gfloat_t *start_angle);
 void gcode_arc_flip_direction (gcode_block_t *block);
 int gcode_arc_radius_to_sweep (gcode_arcdata_t *arc);

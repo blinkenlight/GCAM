@@ -32,12 +32,12 @@ gcode_tool_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_TOOL, 0);
 
   (*block)->free = gcode_tool_free;
-  (*block)->make = gcode_tool_make;
   (*block)->save = gcode_tool_save;
   (*block)->load = gcode_tool_load;
-  (*block)->clone = gcode_tool_clone;
+  (*block)->make = gcode_tool_make;
   (*block)->scale = gcode_tool_scale;
   (*block)->parse = gcode_tool_parse;
+  (*block)->clone = gcode_tool_clone;
 
   (*block)->pdata = malloc (sizeof (gcode_tool_t));
 
@@ -77,111 +77,6 @@ gcode_tool_free (gcode_block_t **block)
   free ((*block)->pdata);
   free (*block);
   *block = NULL;
-}
-
-void
-gcode_tool_calc (gcode_block_t *block)
-{
-  gcode_tool_t *tool;
-
-  tool = (gcode_tool_t *)block->pdata;
-
-  switch (block->gcode->material_type)
-  {
-    case GCODE_MATERIAL_ALUMINUM:
-      tool->feed = 3.0;
-      tool->plunge_ratio = 0.2;
-      break;
-
-    case GCODE_MATERIAL_FOAM:
-      tool->feed = 15.0;
-      tool->plunge_ratio = 1.0;
-      break;
-
-    case GCODE_MATERIAL_PLASTIC:
-      tool->feed = 7.0;
-      tool->plunge_ratio = 1.0;
-      break;
-
-    case GCODE_MATERIAL_STEEL:
-      tool->feed = 0.1;
-      tool->plunge_ratio = 0.1;
-      break;
-
-    case GCODE_MATERIAL_WOOD:
-      tool->feed = 8.0;
-      tool->plunge_ratio = 0.5;
-      break;
-  }
-
-  if (block->gcode->units == GCODE_UNITS_MILLIMETER)
-    tool->feed *= GCODE_INCH2MM;
-}
-
-void
-gcode_tool_make (gcode_block_t *block)
-{
-  gcode_tool_t *tool;
-  char string[256];
-
-  tool = (gcode_tool_t *)block->pdata;
-
-  GCODE_CLEAR (block);
-
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
-    return;
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "TOOL CHANGE: %s", block->comment);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  sprintf (string, "Selected Tool: %s", tool->label);
-  GCODE_COMMENT (block, string);
-
-  sprintf (string, "Tool Diameter: %f", tool->diameter);
-  GCODE_COMMENT (block, string);
-
-  if (tool->prompt)
-  {
-    GCODE_PULL_UP (block, tool->change_position[2]);
-
-    GCODE_2D_MOVE (block, tool->change_position[0], tool->change_position[1], "move to tool change position");
-  }
-
-  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_SPINDLE_CONTROL)
-  {
-    GCODE_COMMAND (block, "M05", "spindle off");
-  }
-
-  if (tool->prompt || (block->gcode->machine_options & GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE))
-  {
-    sprintf (string, "M06 T%.2d", tool->number);
-    GCODE_COMMAND (block, string, tool->label);
-  }
-
-  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_SPINDLE_CONTROL)
-  {
-    GCODE_S_VALUE (block, tool->spindle_rpm, "set spindle speed");
-
-    GCODE_COMMAND (block, "M03", "spindle on");
-  }
-
-  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_COOLANT)
-  {
-    if (tool->coolant)
-    {
-      GCODE_COMMAND (block, "M08", "coolant on");
-    }
-    else
-    {
-      GCODE_COMMAND (block, "M09", "coolant off");
-    }
-  }
-
-  GCODE_F_VALUE (block, tool->feed, "set feed rate");
 }
 
 void
@@ -313,6 +208,87 @@ gcode_tool_load (gcode_block_t *block, FILE *fh)
 }
 
 void
+gcode_tool_make (gcode_block_t *block)
+{
+  gcode_tool_t *tool;
+  char string[256];
+
+  tool = (gcode_tool_t *)block->pdata;
+
+  GCODE_CLEAR (block);
+
+  if (block->flags & GCODE_FLAGS_SUPPRESS)
+    return;
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "TOOL CHANGE: %s", block->comment);
+  GCODE_COMMENT (block, string);
+
+  GCODE_APPEND (block, "\n");
+
+  sprintf (string, "Selected Tool: %s", tool->label);
+  GCODE_COMMENT (block, string);
+
+  sprintf (string, "Tool Diameter: %f", tool->diameter);
+  GCODE_COMMENT (block, string);
+
+  if (tool->prompt)
+  {
+    GCODE_PULL_UP (block, tool->change_position[2]);
+
+    GCODE_2D_MOVE (block, tool->change_position[0], tool->change_position[1], "move to tool change position");
+  }
+
+  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_SPINDLE_CONTROL)
+  {
+    GCODE_COMMAND (block, "M05", "spindle off");
+  }
+
+  if (tool->prompt || (block->gcode->machine_options & GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE))
+  {
+    sprintf (string, "M06 T%.2d", tool->number);
+    GCODE_COMMAND (block, string, tool->label);
+  }
+
+  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_SPINDLE_CONTROL)
+  {
+    GCODE_S_VALUE (block, tool->spindle_rpm, "set spindle speed");
+
+    GCODE_COMMAND (block, "M03", "spindle on");
+  }
+
+  if (block->gcode->machine_options & GCODE_MACHINE_OPTION_COOLANT)
+  {
+    if (tool->coolant)
+    {
+      GCODE_COMMAND (block, "M08", "coolant on");
+    }
+    else
+    {
+      GCODE_COMMAND (block, "M09", "coolant off");
+    }
+  }
+
+  GCODE_F_VALUE (block, tool->feed, "set feed rate");
+}
+
+void
+gcode_tool_scale (gcode_block_t *block, gfloat_t scale)
+{
+  gcode_tool_t *tool;
+
+  tool = (gcode_tool_t *)block->pdata;
+
+  tool->diameter *= scale;
+  tool->length *= scale;
+  tool->feed *= scale;
+  tool->change_position[0] *= scale;
+  tool->change_position[1] *= scale;
+  tool->change_position[2] *= scale;
+}
+
+void
 gcode_tool_parse (gcode_block_t *block, const char **xmlattr)
 {
   gcode_tool_t *tool;
@@ -426,23 +402,48 @@ gcode_tool_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 }
 
 void
-gcode_tool_scale (gcode_block_t *block, gfloat_t scale)
+gcode_tool_calc (gcode_block_t *block)
 {
   gcode_tool_t *tool;
 
   tool = (gcode_tool_t *)block->pdata;
 
-  tool->diameter *= scale;
-  tool->length *= scale;
-  tool->feed *= scale;
-  tool->change_position[0] *= scale;
-  tool->change_position[1] *= scale;
-  tool->change_position[2] *= scale;
+  switch (block->gcode->material_type)
+  {
+    case GCODE_MATERIAL_ALUMINUM:
+      tool->feed = 3.0;
+      tool->plunge_ratio = 0.2;
+      break;
+
+    case GCODE_MATERIAL_FOAM:
+      tool->feed = 15.0;
+      tool->plunge_ratio = 1.0;
+      break;
+
+    case GCODE_MATERIAL_PLASTIC:
+      tool->feed = 7.0;
+      tool->plunge_ratio = 1.0;
+      break;
+
+    case GCODE_MATERIAL_STEEL:
+      tool->feed = 0.1;
+      tool->plunge_ratio = 0.1;
+      break;
+
+    case GCODE_MATERIAL_WOOD:
+      tool->feed = 8.0;
+      tool->plunge_ratio = 0.5;
+      break;
+  }
+
+  if (block->gcode->units == GCODE_UNITS_MILLIMETER)
+    tool->feed *= GCODE_INCH2MM;
 }
 
 /**
  * Locate the nearest most previous tool by walking the list backwards and using recursion.
  */
+
 gcode_tool_t *
 gcode_tool_find (gcode_block_t *block)
 {
