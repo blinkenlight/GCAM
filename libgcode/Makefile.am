@@ -19,7 +19,9 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
-lib_LTLIBRARIES = libgcode.la
+
+noinst_LTLIBRARIES = libgcode.la
+
 libgcode_la_SOURCES = \
 	gcode.c \
 	gcode_arc.c \
