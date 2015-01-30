@@ -86,7 +86,7 @@ polygon_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   /* XXX - this should technically not be there */
   gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, selected_block);
+  gui_opengl_context_redraw (&gui->opengl, sketch_block);
 
   update_project_modified_flag (gui, 1);
 }
