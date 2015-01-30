@@ -289,6 +289,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   GdkPixbuf *pixbuf;
   GtkTreeIter selected_iter;
   gcode_block_t *selected_block;
+  gcode_vec2d_t aabb_min, aabb_max;
+  gcode_vec2d_t rotate_about;
 
   wlist = (GtkWidget **)data;
 
@@ -296,10 +298,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
   get_selected_block (gui, &selected_block, &selected_iter);
 
-  gcode_vec2d_t aabb_min, aabb_max, datum;
-
-  datum[0] = 0.0;
-  datum[1] = 0.0;
+  rotate_about[0] = 0.0;
+  rotate_about[1] = 0.0;
 
   if (selected_block->aabb)
   {
@@ -307,8 +307,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
     if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
     {
-      datum[0] = (aabb_min[0] + aabb_max[0]) / 2;
-      datum[1] = (aabb_min[1] + aabb_max[1]) / 2;
+      rotate_about[0] = (aabb_min[0] + aabb_max[0]) / 2;
+      rotate_about[1] = (aabb_min[1] + aabb_max[1]) / 2;
     }
   }
 
@@ -322,7 +322,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
   rotate_aboutx_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), datum[0]);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), rotate_about[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 0, 1);
 
   label = gtk_label_new ("Rotate About(Y)");
@@ -330,7 +330,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
   rotate_abouty_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), datum[1]);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), rotate_about[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 1, 2);
 
   label = gtk_label_new ("Rotation Angle");
