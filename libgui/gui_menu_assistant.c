@@ -43,9 +43,8 @@ polygon_on_assistant_apply (GtkWidget *assistant, gpointer data)
 {
   gui_t *gui;
   GtkWidget **wlist;
-  GtkTreeIter selected_iter, sketch_iter;
+  GtkTreeIter selected_iter;
   gcode_block_t *selected_block, *sketch_block, *line_block;
-  gcode_sketch_t *sketch;
   gcode_line_t *line;
   gfloat_t sides, radius, angle;
   int i, si;
@@ -61,8 +60,6 @@ polygon_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   /* Create Sketch */
   gcode_sketch_init (&sketch_block, &gui->gcode, selected_block);
-  sketch_iter = insert_primitive (gui, sketch_block, selected_block, &selected_iter, GUI_INSERT_AFTER);
-  sketch = (gcode_sketch_t *)sketch_block->pdata;
 
   /* Create Lines */
   si = (int)sides;
@@ -82,8 +79,10 @@ polygon_on_assistant_apply (GtkWidget *assistant, gpointer data)
     angle = 360.0 * ((float)(i + 1)) / ((float)sides);
     GCODE_MATH_ROTATE (line->p1, line->p1, angle);
 
-    insert_primitive (gui, line_block, sketch_block, &sketch_iter, GUI_APPEND_UNDER);
+    gcode_append_as_listtail (sketch_block, line_block);
   }
+
+  insert_primitive (gui, sketch_block, selected_block, &selected_iter, GUI_INSERT_AFTER);
 
   /* XXX - this should technically not be there */
   gui->opengl.rebuild_view_display_list = 1;
