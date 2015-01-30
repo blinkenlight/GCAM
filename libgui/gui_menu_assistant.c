@@ -119,6 +119,8 @@ polygon_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sides_spin), 6);
   gtk_table_attach_defaults (GTK_TABLE (table), sides_spin, 1, 2, 0, 1);
 
+  g_signal_connect_swapped (sides_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Radius");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
@@ -126,6 +128,8 @@ polygon_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), GCODE_UNITS ((&gui->gcode), 0.5));
   gtk_table_attach_defaults (GTK_TABLE (table), radius_spin, 1, 2, 1, 2);
+
+  g_signal_connect_swapped (radius_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[1] = sides_spin;
   wlist[2] = radius_spin;
@@ -165,9 +169,9 @@ gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
 
   polygon_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (polygon_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (polygon_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (polygon_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }

@@ -1014,7 +1014,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   row++;
 
   radius_apply_changes_button = gtk_button_new_with_label ("Apply Changes");
-  g_signal_connect (G_OBJECT (radius_apply_changes_button), "clicked", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (radius_apply_changes_button, "clicked", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_apply_changes_button, 0, 2, row, row + 1);
 
   wlist[wind++] = radius_direction_combo;
@@ -1088,7 +1088,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   row++;
 
   center_apply_changes_button = gtk_button_new_with_label ("Apply Changes");
-  g_signal_connect (G_OBJECT (center_apply_changes_button), "clicked", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (center_apply_changes_button, "clicked", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_apply_changes_button, 0, 2, row, row + 1);
 
   wlist[wind++] = center_direction_combo;

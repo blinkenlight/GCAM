@@ -178,6 +178,8 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 0, 1);
 
+  g_signal_connect_swapped (translatex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Translate(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
@@ -185,6 +187,8 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatey_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 1, 2);
+
+  g_signal_connect_swapped (translatey_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[1] = translatex_spin;
   wlist[2] = translatey_spin;
@@ -224,9 +228,9 @@ gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data)
 
   move_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (move_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (move_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (move_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (move_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (move_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (move_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -325,6 +329,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), rotate_about[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 0, 1);
 
+  g_signal_connect_swapped (rotate_aboutx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Rotate About(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
@@ -333,6 +339,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), rotate_about[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 1, 2);
 
+  g_signal_connect_swapped (rotate_abouty_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Rotation Angle");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
 
@@ -340,6 +348,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_angle_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_angle_spin), 90.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotation_angle_spin, 1, 2, 2, 3);
+
+  g_signal_connect_swapped (rotation_angle_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[1] = rotate_aboutx_spin;
   wlist[2] = rotate_abouty_spin;
@@ -380,9 +390,9 @@ gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data)
 
   spin_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (spin_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (spin_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (spin_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -454,6 +464,8 @@ scale_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (factor_spin), 1.0);
   gtk_box_pack_start (GTK_BOX (hbox), factor_spin, TRUE, TRUE, 0);
 
+  g_signal_connect_swapped (factor_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   wlist[1] = factor_spin;
 
   gtk_widget_show_all (hbox);
@@ -491,9 +503,9 @@ gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
 
   scale_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (scale_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (scale_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (scale_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -696,6 +708,8 @@ fillet_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), SCALED_INCHES (0.5 * tool->diameter));
   gtk_box_pack_start (GTK_BOX (hbox), radius_spin, TRUE, TRUE, 0);
 
+  g_signal_connect_swapped (radius_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   wlist[1] = radius_spin;
 
   gtk_widget_show_all (hbox);
@@ -743,9 +757,9 @@ gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer dat
 
   fillet_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_previous_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (fillet_previous_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -774,9 +788,9 @@ gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
 
   fillet_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (fillet_next_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (fillet_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (fillet_next_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -924,6 +938,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (iterations_spin), 2);
   gtk_table_attach_defaults (GTK_TABLE (table), iterations_spin, 1, 2, 0, 1);
 
+  g_signal_connect_swapped (iterations_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Translate(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
@@ -931,6 +947,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatex_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 1, 2);
+
+  g_signal_connect_swapped (translatex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Translate(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
@@ -940,6 +958,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 2, 3);
 
+  g_signal_connect_swapped (translatey_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Rotate About(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
 
@@ -947,6 +967,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 3, 4);
+
+  g_signal_connect_swapped (rotate_aboutx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Rotate About(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
@@ -956,6 +978,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 4, 5);
 
+  g_signal_connect_swapped (rotate_abouty_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Rotation Angle");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
 
@@ -963,6 +987,8 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_angle_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_angle_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotation_angle_spin, 1, 2, 5, 6);
+
+  g_signal_connect_swapped (rotation_angle_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[1] = iterations_spin;
   wlist[2] = translatex_spin;
@@ -1005,9 +1031,9 @@ gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer da
 
   pattern_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (pattern_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (pattern_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (pattern_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -1222,8 +1248,9 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   name_entry = gtk_entry_new ();
   gtk_entry_set_max_length (GTK_ENTRY (name_entry), 32);
-  gtk_table_attach (GTK_TABLE (table), name_entry, 1, 4, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
   gtk_entry_set_text (GTK_ENTRY (name_entry), gui->gcode.name);
+  gtk_entry_set_activates_default (GTK_ENTRY (name_entry), TRUE);
+  gtk_table_attach (GTK_TABLE (table), name_entry, 1, 4, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   label = gtk_label_new ("Base Unit");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
@@ -1232,8 +1259,9 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_combo_box_append_text (GTK_COMBO_BOX (base_unit_combo), "inch");
   gtk_combo_box_append_text (GTK_COMBO_BOX (base_unit_combo), "millimeter");
   gtk_combo_box_set_active (GTK_COMBO_BOX (base_unit_combo), gui->gcode.units);
-  g_signal_connect (base_unit_combo, "changed", G_CALLBACK (base_unit_changed_callback), wlist);
   gtk_table_attach (GTK_TABLE (table), base_unit_combo, 1, 4, 1, 2, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect (base_unit_combo, "changed", G_CALLBACK (base_unit_changed_callback), wlist);
 
   label = gtk_label_new ("Material Type");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
@@ -1255,15 +1283,21 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), gui->gcode.material_size[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizex_spin, 1, 2, 3, 4);
 
+  g_signal_connect_swapped (material_sizex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_sizey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizey_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizey_spin), gui->gcode.material_size[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizey_spin, 2, 3, 3, 4);
 
+  g_signal_connect_swapped (material_sizey_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_sizez_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (MAX_DIM_Z), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizez_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), gui->gcode.material_size[2]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizez_spin, 3, 4, 3, 4);
+
+  g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Material Origin (XYZ)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
@@ -1273,15 +1307,21 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originx_spin), gui->gcode.material_origin[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_originx_spin, 1, 2, 4, 5);
 
+  g_signal_connect_swapped (material_originx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_originy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_originy_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originy_spin), gui->gcode.material_origin[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_originy_spin, 2, 3, 4, 5);
 
+  g_signal_connect_swapped (material_originy_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_originz_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Z), SCALED_INCHES (MAX_DIM_Z), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_originz_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originz_spin), gui->gcode.material_origin[2]);
   gtk_table_attach_defaults (GTK_TABLE (table), material_originz_spin, 3, 4, 4, 5);
+
+  g_signal_connect_swapped (material_originz_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Traverse(Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
@@ -1290,6 +1330,8 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (ztraverse_spin), 2);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), gui->gcode.ztraverse);
   gtk_table_attach (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   {
     gui_machine_list_t machine_list;
@@ -1385,9 +1427,9 @@ gui_menu_edit_project_settings_menuitem_callback (GtkWidget *widget, gpointer da
 
   update_project_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (update_project_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (update_project_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (update_project_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (update_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (update_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (update_project_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }

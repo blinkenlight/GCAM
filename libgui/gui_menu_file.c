@@ -268,8 +268,9 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   name_entry = gtk_entry_new ();
   gtk_entry_set_max_length (GTK_ENTRY (name_entry), 32);
-  gtk_table_attach (GTK_TABLE (table), name_entry, 1, 4, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
   gtk_entry_set_text (GTK_ENTRY (name_entry), "Part");
+  gtk_entry_set_activates_default (GTK_ENTRY (name_entry), TRUE);
+  gtk_table_attach (GTK_TABLE (table), name_entry, 1, 4, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   label = gtk_label_new ("Base Unit");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
@@ -283,8 +284,9 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   else
     gtk_combo_box_set_active (GTK_COMBO_BOX (base_unit_combo), 1);
 
-  g_signal_connect (base_unit_combo, "changed", G_CALLBACK (base_unit_changed_callback), wlist);
   gtk_table_attach (GTK_TABLE (table), base_unit_combo, 1, 4, 1, 2, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect (base_unit_combo, "changed", G_CALLBACK (base_unit_changed_callback), wlist);
 
   label = gtk_label_new ("Material Type");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
@@ -306,15 +308,21 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), DEFVAL_INCHES (3.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizex_spin, 1, 2, 3, 4);
 
+  g_signal_connect_swapped (material_sizex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_sizey_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_Y), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizey_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizey_spin), DEFVAL_INCHES (2.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizey_spin, 2, 3, 3, 4);
 
+  g_signal_connect_swapped (material_sizey_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_sizez_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizez_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), DEFVAL_INCHES (0.25));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizez_spin, 3, 4, 3, 4);
+
+  g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Material Origin (XYZ)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
@@ -324,15 +332,21 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originx_spin), DEFVAL_INCHES (0.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_originx_spin, 1, 2, 4, 5);
 
+  g_signal_connect_swapped (material_originx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_originy_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_DIM_Y), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_originy_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originy_spin), DEFVAL_INCHES (0.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_originy_spin, 2, 3, 4, 5);
 
+  g_signal_connect_swapped (material_originy_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   material_originz_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (-MAX_DIM_Z), DEFVAL_INCHES (MAX_DIM_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_originz_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_originz_spin), DEFVAL_INCHES (0.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_originz_spin, 3, 4, 4, 5);
+
+  g_signal_connect_swapped (material_originz_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Traverse(Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
@@ -341,6 +355,8 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (ztraverse_spin), 2);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.05));
   gtk_table_attach (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   {
     gui_endmill_list_t endmill_list;
@@ -441,9 +457,9 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
 
   new_project_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (new_project_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (new_project_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (new_project_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -902,8 +918,9 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "TurboCNC");
   gtk_combo_box_append_text (GTK_COMBO_BOX (export_format_combo), "Haas");
   gtk_combo_box_set_active (GTK_COMBO_BOX (export_format_combo), 0);
-  g_signal_connect (export_format_combo, "changed", G_CALLBACK (export_format_changed_callback), wlist);
   gtk_table_attach (GTK_TABLE (table), export_format_combo, 1, 2, 0, 1, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect (export_format_combo, "changed", G_CALLBACK (export_format_changed_callback), wlist);
 
   label = gtk_label_new ("Project Number");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
@@ -912,6 +929,8 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (project_number_spin), 0);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (project_number_spin), 100.0);
   gtk_table_attach (GTK_TABLE (table), project_number_spin, 1, 2, 1, 2, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  g_signal_connect_swapped (project_number_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[1] = export_format_combo;
   wlist[2] = project_number_spin;
@@ -960,9 +979,9 @@ gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
 
   export_gcode_create_page1 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (export_gcode_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (export_gcode_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (export_gcode_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
@@ -1167,11 +1186,11 @@ import_gcam_callback (gui_t *gui, gcode_t *gcode)
 
   cancel_button = gtk_button_new_with_label ("Cancel");
   gtk_table_attach_defaults (GTK_TABLE (table), cancel_button, 0, 1, 1, 2);
-  g_signal_connect (G_OBJECT (cancel_button), "clicked", G_CALLBACK (cancel_import_gcam_callback), wlist);
+  g_signal_connect (cancel_button, "clicked", G_CALLBACK (cancel_import_gcam_callback), wlist);
 
   import_button = gtk_button_new_with_label ("Import");
   gtk_table_attach_defaults (GTK_TABLE (table), import_button, 1, 2, 1, 2);
-  g_signal_connect (G_OBJECT (import_button), "clicked", G_CALLBACK (import_gcam_block_callback), wlist);
+  g_signal_connect (import_button, "clicked", G_CALLBACK (import_gcam_block_callback), wlist);
 
   gtk_widget_show_all (window);
 }
@@ -1593,12 +1612,15 @@ gerber_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_container_add (GTK_CONTAINER (align1), label);                            // 'align1' <- label 'label'
 
   file_entry = gtk_entry_new ();
+  gtk_entry_set_activates_default (GTK_ENTRY (file_entry), TRUE);
   gtk_box_pack_start (GTK_BOX (hbox), file_entry, TRUE, TRUE, 0);               // 'hbox' cell 1 <- entry field 'file_entry'
-  g_signal_connect (G_OBJECT (file_entry), "changed", G_CALLBACK (gerber_on_entry_changed), assistant);
+
+  g_signal_connect (file_entry, "changed", G_CALLBACK (gerber_on_entry_changed), assistant);
 
   browse_button = gtk_button_new_from_stock (GTK_STOCK_OPEN);
   gtk_box_pack_start (GTK_BOX (hbox), browse_button, FALSE, FALSE, 0);          // 'hbox' cell 2 <- button 'browse_button'
-  g_signal_connect (G_OBJECT (browse_button), "clicked", G_CALLBACK (gerber_browse_file_callback), wlist);
+
+  g_signal_connect (browse_button, "clicked", G_CALLBACK (gerber_browse_file_callback), wlist);
 
   wlist[1] = file_entry;
 
@@ -1694,6 +1716,8 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), 10.0);
   gtk_box_pack_start (GTK_BOX (hbox2), feed_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'feed_spin'
 
+  g_signal_connect_swapped (feed_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Cutting Depth");
   gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
@@ -1701,6 +1725,8 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depth_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), SCALED_INCHES (-0.0045));
   gtk_box_pack_start (GTK_BOX (hbox3), depth_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'depth_spin'
+
+  g_signal_connect_swapped (depth_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[2] = tool_combo;
   wlist[3] = feed_spin;
@@ -1777,6 +1803,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (initial_spin), 0.0002);
   gtk_box_pack_start (GTK_BOX (hbox1), initial_spin, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'initial_spin'
 
+  g_signal_connect_swapped (initial_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Step");
   gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
 
@@ -1785,6 +1813,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (step_spin), 0.004);
   gtk_box_pack_start (GTK_BOX (hbox2), step_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'step_spin'
 
+  g_signal_connect_swapped (step_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
   label = gtk_label_new ("Max");
   gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
@@ -1792,6 +1822,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (max_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (max_spin), 0.02);
   gtk_box_pack_start (GTK_BOX (hbox3), max_spin, TRUE, TRUE, 0);                // 'hbox3' cell 2 <- spin 'max_spin'
+
+  g_signal_connect_swapped (max_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   wlist[5] = initial_spin;
   wlist[6] = step_spin;
@@ -1840,10 +1872,10 @@ gui_menu_file_import_gerber_menuitem_callback (GtkWidget *widget, gpointer data)
   gerber_create_page2 (assistant, wlist);
   gerber_create_page3 (assistant, wlist);
 
-  g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
-  g_signal_connect (G_OBJECT (assistant), "prepare", G_CALLBACK (gerber_on_assistant_prepare), wlist);
-  g_signal_connect (G_OBJECT (assistant), "apply", G_CALLBACK (gerber_on_assistant_apply), wlist);
+  g_signal_connect (assistant, "cancel", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (gerber_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "prepare", G_CALLBACK (gerber_on_assistant_prepare), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (gerber_on_assistant_apply), wlist);
 
   gtk_widget_show (assistant);
 }
