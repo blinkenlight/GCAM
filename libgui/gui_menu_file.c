@@ -1711,9 +1711,9 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Feed Rate");
   gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
 
-  feed_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (30.0), SCALED_INCHES (0.01));
+  feed_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (30.0), SCALED_INCHES (1.0));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (feed_spin), 2);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), 10.0);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), SCALED_INCHES (10.0));
   gtk_box_pack_start (GTK_BOX (hbox2), feed_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'feed_spin'
 
   g_signal_connect_swapped (feed_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1721,9 +1721,9 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Cutting Depth");
   gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
-  depth_spin = gtk_spin_button_new_with_range (-SCALED_INCHES (gui->gcode.material_size[2]), 0.0, SCALED_INCHES (0.0001));
+  depth_spin = gtk_spin_button_new_with_range (-gui->gcode.material_size[2], SCALED_INCHES (0.0), SCALED_INCHES (0.0001));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depth_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), SCALED_INCHES (-0.0045));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), SCALED_INCHES (-0.0024));
   gtk_box_pack_start (GTK_BOX (hbox3), depth_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'depth_spin'
 
   g_signal_connect_swapped (depth_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1798,9 +1798,9 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Initial");
   gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                   // 'hbox1' cell 1 <- label 'label'
 
-  initial_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  initial_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (0.1), SCALED_INCHES (0.001));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (initial_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (initial_spin), 0.0002);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (initial_spin), SCALED_INCHES (0.002));
   gtk_box_pack_start (GTK_BOX (hbox1), initial_spin, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'initial_spin'
 
   g_signal_connect_swapped (initial_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1808,9 +1808,9 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Step");
   gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
 
-  step_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  step_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (0.1), SCALED_INCHES (0.001));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (step_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (step_spin), 0.004);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (step_spin), SCALED_INCHES (0.004));
   gtk_box_pack_start (GTK_BOX (hbox2), step_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'step_spin'
 
   g_signal_connect_swapped (step_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1818,9 +1818,9 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Max");
   gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
-  max_spin = gtk_spin_button_new_with_range (0.0001, 1.0, 0.0001);
+  max_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (1.0), SCALED_INCHES (0.001));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (max_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (max_spin), 0.02);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (max_spin), SCALED_INCHES (0.02));
   gtk_box_pack_start (GTK_BOX (hbox3), max_spin, TRUE, TRUE, 0);                // 'hbox3' cell 2 <- spin 'max_spin'
 
   g_signal_connect_swapped (max_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);

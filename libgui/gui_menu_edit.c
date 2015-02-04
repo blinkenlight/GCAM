@@ -705,7 +705,7 @@ fillet_create_page1 (GtkWidget *assistant, gpointer data)
 
   radius_spin = gtk_spin_button_new_with_range (0.0001, SCALED_INCHES (10.0), 0.001);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), SCALED_INCHES (0.5 * tool->diameter));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), 0.5 * tool->diameter);
   gtk_box_pack_start (GTK_BOX (hbox), radius_spin, TRUE, TRUE, 0);
 
   g_signal_connect_swapped (radius_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);

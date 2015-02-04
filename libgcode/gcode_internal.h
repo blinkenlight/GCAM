@@ -355,12 +355,19 @@ void strswp (char *target, char oldchar, char newchar);
         fprintf (stderr, "Error in '%s()' near line %d:\n", __func__, __LINE__); \
         fprintf (stderr, ## __VA_ARGS__); }
 
-/* 
- * Scales default values such that they are relatively the similar meaning but clean rounded values.
+/**
+ * Scale imperial defaults to relatively similar but cleanly rounded metric values if needed.
+ * NOTE: the input value must ALWAYS be in INCHES (eg. numeric constants for default values);
+ * One should NEVER USE THIS on variables already scaled to metric units in metric projects.
  */
 #define EQUIV_UNITS(_unit, _num) \
         ((_unit == GCODE_UNITS_MILLIMETER) ? _num * 25.0 : _num)
 
+/**
+ * Same as above, but values are scaled (if needed) to the units currently used by "_gcode".
+ * NOTE: the input value must ALWAYS be in INCHES (eg. numeric constants for default values);
+ * One should NEVER USE THIS on variables already scaled to metric units in metric projects.
+ */
 #define GCODE_UNITS(_gcode, _num) \
         EQUIV_UNITS(_gcode->units, _num)
 
