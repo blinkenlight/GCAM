@@ -1087,12 +1087,12 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
 #if GCODE_USE_OPENGL
   gcode_sketch_t *sketch;
   gcode_extrusion_t *extrusion;
-  gcode_block_t *sorted_listhead, *offset_listhead;
+  gcode_block_t *sorted_listhead;
   gcode_block_t *start_block, *index_block, *index2_block;
   gcode_vec2d_t p0, p1, e0, e1, t;
   gfloat_t z, z0, z1;
   gfloat_t accum_length, path_length, path_drop, length_coef;
-  int inside, closed, tapered;
+  int edited, inside, closed, tapered;
 
   if (!block->listhead)                                                         // If the list is empty, this will definitely be a quick pass...
     return;
@@ -1120,64 +1120,74 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
 
   index_block = selected ? selected->parent : NULL;                             // If this sketch is the parent of the selected block, we're in 'edit' mode;
 
-  if (index_block == block)                                                     // THE EASY WAY - drawing the sketch with its inherited offset, nothing more;
+  edited = (index_block == block) ? TRUE : FALSE;                               // We need that information later, but by then 'index_block' will be in use.
+
+  index_block = block->listhead;                                                // Start with the first child in the list;
+
+  gcode_util_get_sublist_snapshot (&sorted_listhead, index_block, NULL);        // First off, we need a working snapshot of the entire list ('sorted_listhead')
+  gcode_util_remove_null_sections (&sorted_listhead);                           // We also need to remove any zero-sized features that could screw up the math;
+  gcode_util_merge_list_fragments (&sorted_listhead);                           // But why is it called 'sorted' when it's a straight copy? Oh, that's why...
+
+  index_block = sorted_listhead;                                                // Start crawling along the sorted list;
+
+  while (index_block)                                                           // Keep looping as long as the chain lasts, one sub-chain per loop;
   {
-    sketch->offset.origin[0] = block->offset->origin[0];                        // Start by inheriting the offset of the parent; and for now, that's all we do.
-    sketch->offset.origin[1] = block->offset->origin[1];                        // The rest of the offset caused by the extrusion profile should NOT be applied
-    sketch->offset.rotation = block->offset->rotation;                          // to the top-layer 'edit' view: IMHO it should reflect what the numbers imply.
+    start_block = index_block;                                                  // Save a reference to the first block in the current sub-chain;
 
-    sketch->offset.side = 0.0;                                                  // As this view is not affected by the extrusion profile, it needs no side;
-    sketch->offset.tool = 0.0;                                                  // The drawing operation is not influenced by tool size, so set it to zero;
-    sketch->offset.eval = 0.0;                                                  // The 'edit' view is not affected by the extrusion profile, set it to zero;
-
-    sketch->offset.z[0] = z0;                                                   // As z-offset arbitrarily use the extrusion top level (we could just use "0");
-    sketch->offset.z[1] = z0;
-
-    index_block = block->listhead;                                              // With no extrusion, use the list directly and start with the first child;
-
-    while (index_block)                                                         // Loop straight through the blocks in the list - order does not matter here;
+    while (index_block->next)                                                   // As long as there is a next block, crawl along the sub-chain;
     {
-      index_block->draw (index_block, selected);                                // Call the 'draw' method of each block ('draw' applies offset automatically);
+      index_block->ends (index_block, t, e0, GCODE_GET);                        // Obtain the endpoints of the current block and the next one;
+      index_block->next->ends (index_block->next, e1, t, GCODE_GET);
 
-      index_block = index_block->next;                                          // Keep crawling along the list;
+      if (GCODE_MATH_2D_MANHATTAN (e0, e1) > GCODE_TOLERANCE)                   // If the Manhattan distance from the ending point of the current block
+        break;                                                                  // to the starting point of the next is significant, break out of the loop;
+
+      index_block = index_block->next;                                          // If the endpoints did meet, keep following the sub-chain;
     }
-  }
-  else                                                                          // THE HARD WAY - sort, extrude, offset, intersect, transition: tiresome stuff.
-  {
-    index_block = block->listhead;                                              // Start with the first child in the list;
 
-    gcode_util_get_sublist_snapshot (&sorted_listhead, index_block, NULL);      // First off, we need a working snapshot of the entire list ('sorted_listhead')
-    gcode_util_remove_null_sections (&sorted_listhead);                         // We also need to remove any zero-sized features that could screw up the math;
-    gcode_util_merge_list_fragments (&sorted_listhead);                         // But why is it called 'sorted' when it's a straight copy? Oh, that's why...
+    start_block->ends (start_block, e0, t, GCODE_GET);                          // Obtain the starting point of the saved first block,
+    index_block->ends (index_block, t, e1, GCODE_GET);                          // and the ending point of the last contiguous one;
 
-    index_block = sorted_listhead;                                              // Start crawling along the sorted list;
+    closed = (GCODE_MATH_2D_MANHATTAN (e0, e1) < GCODE_TOLERANCE) ? 1 : 0;      // If they are practically identical, the sub-chain is 'closed';
 
-    while (index_block)                                                         // Keep looping as long as the chain lasts, one sub-chain per loop;
+    if (edited)                                                                 // THE EASY WAY - drawing the sketch with its inherited offset, nothing more;
     {
-      start_block = index_block;                                                // Save a reference to the first block in the current sub-chain;
+      gcode_block_t *sliced_listhead;                                           // Unaltered snapshot of the current contiguous slice of 'sorted_list';
 
-      while (index_block->next)                                                 // As long as there is a next block, crawl along the sub-chain;
+      sketch->offset.origin[0] = block->offset->origin[0];                      // Start by inheriting the offset of the parent; and for now, that's all we do.
+      sketch->offset.origin[1] = block->offset->origin[1];                      // The rest of the offset caused by the extrusion profile should NOT be applied
+      sketch->offset.rotation = block->offset->rotation;                        // to the top-layer 'edit' view: IMHO it should reflect what the numbers imply.
+
+      sketch->offset.side = 0.0;                                                // As this view is not affected by the extrusion profile, it needs no side;
+      sketch->offset.tool = 0.0;                                                // The drawing operation is not influenced by tool size, so set it to zero;
+      sketch->offset.eval = 0.0;                                                // The 'edit' view is not affected by the extrusion profile, set it to zero;
+
+      sketch->offset.z[0] = z0;                                                 // As z-offset arbitrarily use the extrusion top level (we could just use "0");
+      sketch->offset.z[1] = z0;
+
+      gcode_util_get_sublist_snapshot (&sliced_listhead, start_block, index_block);     // Another working snapshot is needed, so we can preserve 'sorted_list';
+
+      index2_block = sliced_listhead;                                           // With no extrusion, take the ordered list and start with the first child;
+
+      while (index2_block)                                                      // Loop around and draw the ordered list section (the current sub-chain);
       {
-        index_block->ends (index_block, t, e0, GCODE_GET);                      // Obtain the endpoints of the current block and the next one;
-        index_block->next->ends (index_block->next, e1, t, GCODE_GET);
+        index2_block->draw (index2_block, selected);                            // Call the 'draw' method of each block ('draw' applies offset automatically);
 
-        if (GCODE_MATH_2D_MANHATTAN (e0, e1) > GCODE_TOLERANCE)                 // If the Manhattan distance from the ending point of the current block
-          break;                                                                // to the starting point of the next is significant, break out of the loop;
-
-        index_block = index_block->next;                                        // If the endpoints did meet, keep following the sub-chain;
+        index2_block = index2_block->next;                                      // Keep crawling along the sub-chain;
       }
 
-      start_block->ends (start_block, e0, t, GCODE_GET);                        // Obtain the starting point of the saved first block,
-      index_block->ends (index_block, t, e1, GCODE_GET);                        // and the ending point of the last contiguous one;
-
-      closed = (GCODE_MATH_2D_MANHATTAN (e0, e1) < GCODE_TOLERANCE) ? 1 : 0;    // If they are practically identical, the sub-chain is 'closed';
+      gcode_list_free (&sliced_listhead);                                       // This sub-chain has been drawn - get rid of the list section snapshot;
+    }
+    else                                                                        // THE HARD WAY - extrude, offset, intersect, transition: tiresome stuff.
+    {
+      gcode_block_t *offset_listhead;                                           // Offset snapshot of the current contiguous slice of 'sorted_list';
 
       sketch->offset.tool = 0.0;                                                // Drawing is not influenced by tool size - set it to zero;
 
       /**
-       * Determine if the right side of the first line is inside or outside the sketch.
-       * Use this to tell whether the offset by the extrusion sketch should be right
-       * or left of the primitive.
+       * Determine if the right side of the first line is inside or outside the
+       * sketch. Use this to decide whether the offset caused by the extrusion
+       * should be right or left of the primitive.
        */
 
       if (closed)
@@ -1267,12 +1277,12 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
         else                                                                    // If the depth of the last pass is already indistinguishable from z1, quit;
           break;
       }
-
-      index_block = index_block->next;                                          // Move on to the next sub-chain: continue with the first 'unconnected' block;
     }
 
-    gcode_list_free (&sorted_listhead);                                         // The entire sketch has been drawn - get rid of the sorted list;
+    index_block = index_block->next;                                            // Move on to the next sub-chain: continue with the first 'unconnected' block;
   }
+
+  gcode_list_free (&sorted_listhead);                                           // The entire sketch has been drawn - get rid of the sorted list;
 
   sketch->offset.side = 0.0;                                                    // Not of any importance strictly speaking (anywhere these actually matter they
   sketch->offset.tool = 0.0;                                                    // should be re-initialized appropriately anyway), but hey - let's play nice...

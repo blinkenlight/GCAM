@@ -189,30 +189,39 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
   gcode_block_t *other_block;
   gcode_vec2d_t e0, e1, p0, p1, normal;
   gfloat_t coef;
-  uint32_t sind, edit;
+  uint32_t sind, edited, picked;
 
-  if (block->flags & GCODE_FLAGS_SUPPRESS)
+  if (block->flags & GCODE_FLAGS_SUPPRESS)                                      // Do not draw the block if it's suppressed;
     return;
 
-  gcode_line_with_offset (block, p0, p1, normal);
-
-  coef = 1.0;
+  picked = 0;
+  edited = 0;
   sind = 0;
-  edit = 0;
 
-  if (selected)
+  if (selected)                                                                 // If a selected block does exists, test some selection-related flags:
   {
-    if ((block->parent == selected) || (block == selected))
-      sind = 1;
+    if (block->name == selected->name)                                          // True if the block is the one currently selected in the GUI tree view;
+      picked = 1;                                                               // Tested by "name" rather than directly to allow for "snapshot" work copies;
 
-    if (block->parent == selected->parent)
-      edit = 1;
+    if (block->parent == selected->parent)                                      // True if a block within the same sketch is selected (sketch in "edit mode"),
+      edited = 1;                                                               // implying that end-nodes (selection or discontinuity) should be drawn;
+
+    if ((block->parent == selected) || picked)                                  // True if the block OR its parent is selected therefore requiring highlight;
+      sind = 1;
   }
 
-  if (block == selected)
-    coef = 0.5;
+  if (picked)                                                                   // This is not exactly elegant, but since the "snapshot" work copy used here
+  {                                                                             // could have been flipped during continuity detection therefore potentially
+    gcode_line_with_offset (selected, p0, p1, normal);                          // no longer reflects original segment direction, we need to take our data
+  }                                                                             // from somewhere else if direction is important. Luckily, the only such case
+  else                                                                          // (drawing the currently selected block with a start-to-end gradient stroke)
+  {                                                                             // can be handled fairly simply considering we also happen to have a reference
+    gcode_line_with_offset (block, p0, p1, normal);                             // to the selected block in its original, untampered form: we just use that
+  }                                                                             // as the data source if the current block happens to be the selected one...
 
-  glLoadName ((GLuint) block->name);                                            // Set "name" to block pointer value
+  coef = picked ? 0.5 : 1.0;
+
+  glLoadName ((GLuint) block->name);                                            // Attach the block's "name" to the line being drawn for reverse lookup;
   glLineWidth (1);
 
   glBegin (GL_LINES);
@@ -225,11 +234,11 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
              GCODE_OPENGL_SELECTABLE_COLORS[sind][1],
              GCODE_OPENGL_SELECTABLE_COLORS[sind][2]);
   glVertex3f (p1[0], p1[1], block->offset->z[1]);
-  glEnd ();
+  glEnd ();                                                                     // The line itself is drawn now but we might still need to draw end markers;
 
-  if (edit)
+  if (edited)                                                                   // So if end markers are needed...
   {
-    if (block == selected)
+    if (picked)                                                                 // ...they're either standard "selection" endpoint markers...
     {
       glPointSize (GCODE_OPENGL_SMALL_POINT_SIZE);
       glColor3f (GCODE_OPENGL_SMALL_POINT_COLOR[0],
@@ -240,15 +249,15 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
       glVertex3f (p1[0], p1[1], block->offset->z[1]);
       glEnd ();
     }
-    else
+    else                                                                        // ...or "discontinuity" endpoint markes, if there is a break;
     {
-      other_block = block;
+      other_block = block;                                                      // If we're here the block is NOT selected so data comes from the ordered list,
 
-      gcode_get_circular_prev (&other_block);
+      gcode_get_circular_prev (&other_block);                                   // therefore the start point can be compared to the previous block's end point.
 
-      other_block->ends (other_block, e0, e1, GCODE_GET_WITH_OFFSET);
+      other_block->ends (other_block, e0, e1, GCODE_GET_WITH_OFFSET);           // So we look up the previous block circularly, find its end point and compare;
 
-      if (GCODE_MATH_2D_DISTANCE (e1, p0) > GCODE_TOLERANCE)
+      if (GCODE_MATH_2D_DISTANCE (e1, p0) > GCODE_TOLERANCE)                    // If they DON'T match, this is a break, so we draw a marker.
       {
         glPointSize (GCODE_OPENGL_BREAK_POINT_SIZE);
         glColor3f (GCODE_OPENGL_BREAK_POINT_COLOR[0],
@@ -259,16 +268,16 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
         glEnd ();
       }
 
-      other_block = block;
+      other_block = block;                                                      // Then we do the exact same thing for the next block's start point.
 
       gcode_get_circular_next (&other_block);
 
       other_block->ends (other_block, e0, e1, GCODE_GET_WITH_OFFSET);
 
-      if (GCODE_MATH_2D_DISTANCE (p1, e0) > GCODE_TOLERANCE)
-      {
-        glPointSize (GCODE_OPENGL_BREAK_POINT_SIZE);
-        glColor3f (GCODE_OPENGL_BREAK_POINT_COLOR[0],
+      if (GCODE_MATH_2D_DISTANCE (p1, e0) > GCODE_TOLERANCE)                    // The thing to remember is that we're operating on a continuous sub-section
+      {                                                                         // of an ordered snapshot of the original list, so even if this sub-chain is
+        glPointSize (GCODE_OPENGL_BREAK_POINT_SIZE);                            // isolated from the rest of the sketch, it will close up without any breaks
+        glColor3f (GCODE_OPENGL_BREAK_POINT_COLOR[0],                           // as long as it ends exactly where it started...
                    GCODE_OPENGL_BREAK_POINT_COLOR[1],
                    GCODE_OPENGL_BREAK_POINT_COLOR[2]);
         glBegin (GL_POINTS);
