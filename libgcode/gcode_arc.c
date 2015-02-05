@@ -459,11 +459,31 @@ gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_
     }
 
     case GCODE_SET:
+    {
+      gcode_arcdata_t arcdata;
+
+      arcdata.p0[0] = p0[0];
+      arcdata.p0[1] = p0[1];
+
+      arcdata.p1[0] = p1[0];
+      arcdata.p1[1] = p1[1];
+
+      arcdata.radius = arc->radius;
+
+      arcdata.fls = (arc->sweep_angle > 0.0) ? 1 : 0;
+      arcdata.fla = (fabs (arc->sweep_angle) > 180.0) ? 1 : 0;
+
+      if (gcode_arc_radius_to_sweep (&arcdata) != 0)
+        return (1);
 
       arc->p[0] = p0[0];
       arc->p[1] = p0[1];
 
+      arc->start_angle = arcdata.start_angle;
+      arc->sweep_angle = arcdata.sweep_angle;
+
       break;
+    }
 
     case GCODE_GET_WITH_OFFSET:
     {

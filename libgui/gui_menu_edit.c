@@ -529,6 +529,7 @@ gui_menu_edit_attract_previous_menuitem_callback (GtkWidget *widget, gpointer da
       return;
 
     selected_block->ends (selected_block, p0, p1, GCODE_GET);
+
     if (selected_block->prev)
     {
       if (selected_block->prev->ends)
@@ -577,6 +578,8 @@ gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data)
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, selected_block);
+
+  update_project_modified_flag (gui, 1);
 }
 
 static void
