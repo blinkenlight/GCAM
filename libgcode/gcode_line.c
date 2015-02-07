@@ -189,25 +189,21 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
   gcode_block_t *other_block;
   gcode_vec2d_t e0, e1, p0, p1, normal;
   gfloat_t coef;
-  uint32_t sind, edited, picked;
+  uint32_t sindex, edited, picked;
 
   if (block->flags & GCODE_FLAGS_SUPPRESS)                                      // Do not draw the block if it's suppressed;
     return;
 
-  picked = 0;
-  edited = 0;
-  sind = 0;
+  sindex = picked = edited = 0;
 
-  if (selected)                                                                 // If a selected block does exists, test some selection-related flags:
-  {
-    if (block->name == selected->name)                                          // True if the block is the one currently selected in the GUI tree view;
-      picked = 1;                                                               // Tested by "name" rather than directly to allow for "snapshot" work copies;
-
-    if (block->parent == selected->parent)                                      // True if a block within the same sketch is selected (sketch in "edit mode"),
-      edited = 1;                                                               // implying that end-nodes (selection or discontinuity) should be drawn;
-
-    if ((block->parent == selected) || picked)                                  // True if the block OR its parent is selected therefore requiring highlight;
-      sind = 1;
+  if (selected)                                                                 // If a selected block does exists, test some selection-related flags;
+  {                                                                             // Coincidence is tested by "name" to allow for "snapshot" work copies.
+    if (block->parent == selected)                                              // 'selected' is the parent of 'block' : highlight this block;
+      sindex = 1;
+    else if (block->name == selected->name)                                     // 'selected' is the same as 'block' - this needs to be "else" since ALL bolt
+      sindex = picked = edited = 1;                                             // holes are named the same as their parent to help looking it up when clicked;
+    else if (block->parent == selected->parent)                                 // 'selected' is in the same list as 'block' : draw endpoint markers;
+      edited = 1;
   }
 
   if (picked)                                                                   // This is not exactly elegant, but since the "snapshot" work copy used here
@@ -225,14 +221,14 @@ gcode_line_draw (gcode_block_t *block, gcode_block_t *selected)
   glLineWidth (1);
 
   glBegin (GL_LINES);
-  glColor3f (coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][0],
-             coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][1],
-             coef * GCODE_OPENGL_SELECTABLE_COLORS[sind][2]);
+  glColor3f (coef * GCODE_OPENGL_SELECTABLE_COLORS[sindex][0],
+             coef * GCODE_OPENGL_SELECTABLE_COLORS[sindex][1],
+             coef * GCODE_OPENGL_SELECTABLE_COLORS[sindex][2]);
   glVertex3f (p0[0], p0[1], block->offset->z[0]);
 
-  glColor3f (GCODE_OPENGL_SELECTABLE_COLORS[sind][0],
-             GCODE_OPENGL_SELECTABLE_COLORS[sind][1],
-             GCODE_OPENGL_SELECTABLE_COLORS[sind][2]);
+  glColor3f (GCODE_OPENGL_SELECTABLE_COLORS[sindex][0],
+             GCODE_OPENGL_SELECTABLE_COLORS[sindex][1],
+             GCODE_OPENGL_SELECTABLE_COLORS[sindex][2]);
   glVertex3f (p1[0], p1[1], block->offset->z[1]);
   glEnd ();                                                                     // The line itself is drawn now but we might still need to draw end markers;
 
