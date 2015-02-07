@@ -549,7 +549,7 @@ gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2
   return -1;
 }
 
-void
+int
 gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode_block_t *fillet_arc_block, gfloat_t radius)
 {
   gcode_line_t *line1, *line2;
@@ -589,6 +589,9 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   GCODE_MATH_VEC2D_DOT (dot, vec1_u, vec2_u);
   offset = radius * tan (GCODE_HPI - 0.5 * acos (dot));
 
+  if (GCODE_MATH_IS_EQUAL (fabs (dot), 1.0))                                    // If the dot product of two unit vectors is +1.0 or -1.0, they are parallel;
+    return (1);                                                                 // Therefore, somewhat hard to "fillet" in any meaningful way. So don't bother.
+
   /* Used by Arc */
   GCODE_MATH_VEC2D_SUB (vec1_u, line1->p1, line1->p0);
   GCODE_MATH_VEC2D_UNITIZE (vec1_u);
@@ -607,6 +610,7 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   fillet_arc->p[0] = line1->p1[0];
   fillet_arc->p[1] = line1->p1[1];
   fillet_arc->radius = radius;
+
   /* Sweep angle is supplemental to dot product.  dot and -dot are supplementary */
   fillet_arc->sweep_angle = GCODE_RAD2DEG * acos (-dot);
 
@@ -638,6 +642,8 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
     fillet_arc->start_angle += 90.0;
     fillet_arc->sweep_angle *= -1.0;
   }
+
+  return (0);
 }
 
 /**

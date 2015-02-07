@@ -617,33 +617,40 @@ fillet_previous_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   gcode_arc_init (&fillet_block, &gui->gcode, selected_block->parent);
 
-  gcode_util_fillet (prev_connected_block, selected_block, fillet_block, radius);
-
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-  path = gtk_tree_model_get_path (model, &selected_iter);
-
-  if (selected_block->prev)
+  if (gcode_util_fillet (prev_connected_block, selected_block, fillet_block, radius) == 0)
   {
-    gtk_tree_path_prev (path);
-    gtk_tree_model_get_iter (model, &selected_iter, path);
-    insert_primitive (gui, fillet_block, selected_block->prev, &selected_iter, GUI_INSERT_AFTER);
+    model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+    path = gtk_tree_model_get_path (model, &selected_iter);
+
+    if (selected_block->prev)
+    {
+      gtk_tree_path_prev (path);
+      gtk_tree_model_get_iter (model, &selected_iter, path);
+      insert_primitive (gui, fillet_block, selected_block->prev, &selected_iter, GUI_INSERT_AFTER);
+    }
+    else
+    {
+      gtk_tree_path_up (path);
+      gtk_tree_model_get_iter (model, &selected_iter, path);
+      insert_primitive (gui, fillet_block, selected_block->parent, &selected_iter, GUI_INSERT_UNDER);
+    }
+
+    get_selected_block (gui, &selected_block, &selected_iter);
+    update_menu_by_selected_item (gui, selected_block);
+
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
+
+    update_project_modified_flag (gui, 1);
+
+    gtk_tree_path_free (path);
   }
-  else
+  else                                                                          // Something went wrong with the filleting operation;
   {
-    gtk_tree_path_up (path);
-    gtk_tree_model_get_iter (model, &selected_iter, path);
-    insert_primitive (gui, fillet_block, selected_block->parent, &selected_iter, GUI_INSERT_UNDER);
+    fillet_block->free (&fillet_block);                                         // The project remains unchanged, the new fillet block gets disposed of;
+
+    generic_error (gui, "\nA suitable filleting arc could not be found\n");     // Throw up a message just to make it clear no filleting happened;
   }
-
-  get_selected_block (gui, &selected_block, &selected_iter);
-  update_menu_by_selected_item (gui, selected_block);
-
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, selected_block);
-
-  update_project_modified_flag (gui, 1);
-
-  gtk_tree_path_free (path);
 }
 
 static void
@@ -667,17 +674,24 @@ fillet_next_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   gcode_arc_init (&fillet_block, &gui->gcode, selected_block->parent);
 
-  gcode_util_fillet (selected_block, next_connected_block, fillet_block, radius);
+  if (gcode_util_fillet (selected_block, next_connected_block, fillet_block, radius) == 0)
+  {
+    insert_primitive (gui, fillet_block, selected_block, &selected_iter, GUI_INSERT_AFTER);
 
-  insert_primitive (gui, fillet_block, selected_block, &selected_iter, GUI_INSERT_AFTER);
+    get_selected_block (gui, &selected_block, &selected_iter);
+    update_menu_by_selected_item (gui, selected_block);
 
-  get_selected_block (gui, &selected_block, &selected_iter);
-  update_menu_by_selected_item (gui, selected_block);
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
 
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, selected_block);
+    update_project_modified_flag (gui, 1);
+  }
+  else                                                                          // Something went wrong with the filleting operation;
+  {
+    fillet_block->free (&fillet_block);                                         // The project remains unchanged, the new fillet block gets disposed of;
 
-  update_project_modified_flag (gui, 1);
+    generic_error (gui, "\nA suitable filleting arc could not be found\n");     // Throw up a message just to make it clear no filleting happened;
+  }
 }
 
 static void

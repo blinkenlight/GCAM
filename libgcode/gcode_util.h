@@ -32,7 +32,7 @@ void gcode_util_remove_spaces (char *string);
 void gcode_util_remove_comment (char *string);
 void gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num);
 int gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip_array[2], int *ip_num);
-void gcode_util_fillet (gcode_block_t *line1, gcode_block_t *line2, gcode_block_t *fillet_arc, gfloat_t radius);
+int gcode_util_fillet (gcode_block_t *line1, gcode_block_t *line2, gcode_block_t *fillet_arc, gfloat_t radius);
 void gcode_util_flip_direction (gcode_block_t *block);
 int gcode_util_get_sublist_snapshot (gcode_block_t **listhead, gcode_block_t *start_block, gcode_block_t *end_block);
 int gcode_util_remove_null_sections (gcode_block_t **listhead);
