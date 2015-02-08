@@ -554,8 +554,11 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
 {
   gcode_line_t *line1, *line2;
   gcode_arc_t *fillet_arc;
-  gcode_vec2d_t vec1_u, vec2_u, vec;
-  gfloat_t magnitude1, magnitude2, dot, offset, test1_angle, test2_angle;
+  gcode_vec2d_t pt1, pt2, vec1_u, vec2_u, vec;
+  gfloat_t magnitude1, magnitude2, test1_angle, test2_angle;
+  gfloat_t dot, offset, eps;
+
+  eps = GCODE_PRECISION;
 
   line1 = (gcode_line_t *)line1_block->pdata;
   line2 = (gcode_line_t *)line2_block->pdata;
@@ -599,12 +602,36 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   /* Shorten Current Line */
   GCODE_MATH_VEC2D_SUB (vec, line1->p1, line1->p0);
   GCODE_MATH_VEC2D_SCALE (vec, (1.0 - (offset / magnitude1)));
-  GCODE_MATH_VEC2D_ADD (line1->p1, vec, line1->p0);
+  GCODE_MATH_VEC2D_ADD (pt1, vec, line1->p0);
 
   /* Shorten Next Line */
   GCODE_MATH_VEC2D_SUB (vec, line2->p1, line2->p0);
   GCODE_MATH_VEC2D_SCALE (vec, (1.0 - (offset / magnitude2)));
-  GCODE_MATH_VEC2D_SUB (line2->p0, line2->p1, vec);
+  GCODE_MATH_VEC2D_SUB (pt2, line2->p1, vec);
+
+  /* New endpoints must lie within the current line segment */
+
+  if (((pt1[0] < line1->p0[0] - eps) && (pt1[0] < line1->p1[0] - eps)) ||
+      ((pt1[0] > line1->p0[0] + eps) && (pt1[0] > line1->p1[0] + eps)))
+    return (1);                                                                 // If (x<a and x<b) or (x>a and x>b), x cannot belong to [a b];
+
+  if (((pt2[0] < line2->p0[0] - eps) && (pt2[0] < line2->p1[0] - eps)) ||
+      ((pt2[0] > line2->p0[0] + eps) && (pt2[0] > line2->p1[0] + eps)))
+    return (1);                                                                 // If (x<c and x<d) or (x>c and x>d), x cannot belong to [c d];
+
+  /* Since ptx is ON LINE X these are technically redundant */
+
+  if (((pt1[1] < line1->p0[1] - eps) && (pt1[1] < line1->p1[1] - eps)) ||
+      ((pt1[1] > line1->p0[1] + eps) && (pt1[1] > line1->p1[1] + eps)))
+    return (1);                                                                 // If (y<a and y<b) or (y>a and y>b), y cannot belong to [a b];
+
+  if (((pt2[1] < line2->p0[1] - eps) && (pt2[1] < line2->p1[1] - eps)) ||
+      ((pt2[1] > line2->p0[1] + eps) && (pt2[1] > line2->p1[1] + eps)))
+    return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d]; 
+
+  /* If we're still here, we should apply the new endpoints */
+  GCODE_MATH_VEC2D_COPY (line1->p1, pt1);
+  GCODE_MATH_VEC2D_COPY (line2->p0, pt2);
 
   /* Fillet Arc */
   fillet_arc->p[0] = line1->p1[0];
