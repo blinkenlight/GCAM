@@ -45,8 +45,13 @@ qsort_compare (const void *a, const void *b)
 }
 
 /**
+ * Assuming 'x' is the point closest to point '_p3' on the line given by points
+ * '_p1' and '_p2', find the ratio '_u' between the lengths of the segment '_p1'
+ * to 'x' and the segment '_p1' to '_p2' - or, to put it differently, find the
+ * scalar '_u' that vector '_p1' -> '_p2' needs to be multiplied with to obtain
+ * the vector whose tip 'x' is the projection of '_p3' onto the original vector.
+ *
  * Adapted from Paul Bourke - October 1988
- * Where 'u' is a unitized parametric value [0..1] given two end points and a test point.
  */
 
 #define SOLVE_U(_p1, _p2, _p3, _u) { \
@@ -1271,17 +1276,22 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
 
         p0[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (start_angle + arc->sweep_angle * 0.5));
         p0[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (start_angle + arc->sweep_angle * 0.5));
-        SOLVE_U (line->p0, line->p1, p0, u);
 
-        if ((u > 0.0 + GCODE_PRECISION) && (u < 1.0 - GCODE_PRECISION))
-        {
-          dpos[0] = line->p0[0] + u * (line->p1[0] - line->p0[0]);
-          dpos[1] = line->p0[1] + u * (line->p1[1] - line->p0[1]);
-          dist = GCODE_MATH_2D_DISTANCE (dpos, p0);
+        SOLVE_U (line->p0, line->p1, p0, u);                                    // Find the ratio 'u' yielding the projection of 'p0' onto 'line';
 
-          if (dist < trace_array[i].radius - GCODE_PRECISION)
-            remove = 1;
-        }
+        if (u < 0.0)                                                            // If the projection would fall outside the segment [p0, p1], clamp 'u';
+          u = 0.0;
+
+        if (u > 1.0)                                                            // If the projection would fall outside the segment [p0, p1], clamp 'u';
+          u = 1.0;
+
+        dpos[0] = line->p0[0] + u * (line->p1[0] - line->p0[0]);                // Calculate the actual projection point 'dpos' as given by 'u';
+        dpos[1] = line->p0[1] + u * (line->p1[1] - line->p0[1]);
+
+        dist = GCODE_MATH_2D_DISTANCE (dpos, p0);                               // See how far the midpoint 'p0' of the arc is from 'dpos';
+
+        if (dist < trace_array[i].radius - GCODE_PRECISION)                     // If it's closer than the trace radius, intruder alert...!
+          remove = 1;
       }
 
       if (remove)
