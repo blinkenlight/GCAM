@@ -1985,22 +1985,16 @@ tool_update_callback (GtkWidget *widget, gpointer data)
   g_free (text_field);
 
   {
-    gui_endmill_list_t endmill_list;
     int i;
 
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
-
-    for (i = 0; i < endmill_list.num; i++)
+    for (i = 0; i < gui->endmills.number; i++)
     {
-      if (strcmp (tool->label, endmill_list.endmill[i].description) == 0)
+      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
       {
-        tool->diameter = endmill_list.endmill[i].diameter;
-        tool->number = endmill_list.endmill[i].number;
+        tool->diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+        tool->number = gui->endmills.endmill[i].number;
       }
     }
-
-    gui_endmills_free (&endmill_list);
   }
 
   tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
@@ -2097,12 +2091,8 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   gtk_container_add (GTK_CONTAINER (alignment), tool_table);
 
   {
-    gui_endmill_list_t endmill_list;
     char string[32];
     int i;
-
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
 
     label = gtk_label_new ("End Mill");
     gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 2, row, row + 1);
@@ -2111,12 +2101,12 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
     end_mill_combo = gtk_combo_box_new_text ();
     selind = -1;
 
-    for (i = 0; i < endmill_list.num; i++)
+    for (i = 0; i < gui->endmills.number; i++)
     {
-      if (strcmp (tool->label, endmill_list.endmill[i].description) == 0)
+      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
         selind = i;
 
-      sprintf (string, "T%.2d - %s", endmill_list.endmill[i].number, endmill_list.endmill[i].description);
+      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
       gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
     }
 
@@ -2131,8 +2121,6 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
     g_signal_connect (end_mill_combo, "changed", G_CALLBACK (tool_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (tool_table), end_mill_combo, 0, 2, row, row + 1);
-
-    gui_endmills_free (&endmill_list);
   }
 
   row++;

@@ -161,6 +161,31 @@ generic_error (void *gui, char *message)
 }
 
 /**
+ * Display a generic 'error' styled message box then quit
+ */
+
+void
+generic_fatal (void *gui, char *message)
+{
+  GtkWidget *dialog;
+
+  dialog = gtk_message_dialog_new (GTK_WINDOW (((gui_t *)gui)->window),
+                                   GTK_DIALOG_DESTROY_WITH_PARENT,
+                                   GTK_MESSAGE_ERROR,
+                                   GTK_BUTTONS_OK,
+                                   "%s",
+                                   message);
+
+  gtk_window_set_title (GTK_WINDOW (dialog), "Fatal Error");
+
+  gtk_window_set_modal (GTK_WINDOW (dialog), TRUE);
+  gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (((gui_t *)gui)->window));
+  g_signal_connect (dialog, "response", G_CALLBACK (gtk_main_quit), NULL);
+
+  gtk_widget_show (dialog);
+}
+
+/**
  * Here be dragons - not sure this really works...
  */
 

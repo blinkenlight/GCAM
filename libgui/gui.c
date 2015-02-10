@@ -836,6 +836,7 @@ gui_init (char *filename)
   GtkWidget *window_vbox_main;
   GtkWidget *window_vbox_right;
   GtkWidget *gl_context;
+  char *fatal_message;
 
   gui.project_state = PROJECT_CLOSED;
   gui.selected_block = NULL;
@@ -846,8 +847,22 @@ gui_init (char *filename)
   gui.ignore_signals = 0;
   gui.first_render = 1;
 
+  fatal_message = NULL;
+
   gui_settings_init (&gui.settings);
-  gui_settings_read (&gui.settings);
+
+  if (gui_settings_read (&gui.settings) != 0)
+    fatal_message = (char *)GCAM_FATAL_SETTINGS;
+
+  gui_machines_init (&gui.machines);
+
+  if (gui_machines_read (&gui.machines) != 0)
+    fatal_message = (char *)GCAM_FATAL_MACHINES;
+
+  gui_endmills_init (&gui.endmills);
+
+  if (gui_endmills_read (&gui.endmills) != 0)
+    fatal_message = (char *)GCAM_FATAL_ENDMILLS;
 
   /**
    * Opengl Display Defaults
@@ -1062,7 +1077,12 @@ gui_init (char *filename)
   gtk_widget_show_all (gui.window);
 
   /* Try to load command line specified project if any */
-  if (filename)
+  /* but if any setting files failed to load, bail out */
+  if (fatal_message)
+  {
+    generic_fatal (&gui, fatal_message);
+  }
+  else if (filename)
   {
     gcode_init (&gui.gcode);
     gui_attach (&gui.gcode, &gui);

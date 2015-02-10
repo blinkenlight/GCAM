@@ -33,14 +33,14 @@
 void
 gui_endmills_init (gui_endmill_list_t *endmill_list)
 {
-  endmill_list->num = 0;
+  endmill_list->number = 0;
   endmill_list->endmill = NULL;
 }
 
 void
 gui_endmills_free (gui_endmill_list_t *endmill_list)
 {
-  endmill_list->num = 0;
+  endmill_list->number = 0;
   free (endmill_list->endmill);
   endmill_list->endmill = NULL;
 }
@@ -60,8 +60,8 @@ start (void *data, const char *xmlelem, const char **xmlattr)
 
   if (strcmp (tag, GCODE_XML_TAG_ENDMILL) == 0)
   {
-    endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->num + 1) * sizeof (gui_endmill_t));
-    strcpy (endmill_list->endmill[endmill_list->num].description, "");
+    endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->number + 1) * sizeof (gui_endmill_t));
+    strcpy (endmill_list->endmill[endmill_list->number].description, "");
 
     for (i = 0; xmlattr[i]; i += 2)
     {
@@ -72,30 +72,30 @@ start (void *data, const char *xmlelem, const char **xmlattr)
 
       if (strcmp (name, GCODE_XML_ATTR_ENDMILL_NUMBER) == 0)
       {
-        endmill_list->endmill[endmill_list->num].number = (uint8_t)atoi (value);
+        endmill_list->endmill[endmill_list->number].number = (uint8_t)atoi (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DIAMETER) == 0)
       {
-        endmill_list->endmill[endmill_list->num].diameter = atof (value);
+        endmill_list->endmill[endmill_list->number].diameter = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_UNIT) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_INCH) == 0)
         {
-          endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_INCH;
+          endmill_list->endmill[endmill_list->number].unit = GCODE_UNITS_INCH;
         }
         else if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_MILLIMETER) == 0)
         {
-          endmill_list->endmill[endmill_list->num].unit = GCODE_UNITS_MILLIMETER;
+          endmill_list->endmill[endmill_list->number].unit = GCODE_UNITS_MILLIMETER;
         }
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DESCRIPTION) == 0)
       {
-        strcpy (endmill_list->endmill[endmill_list->num].description, value);
+        strcpy (endmill_list->endmill[endmill_list->number].description, value);
       }
     }
 
-    endmill_list->num++;
+    endmill_list->number++;
   }
 }
 
@@ -105,7 +105,7 @@ end (void *data, const char *xmlelem)
 }
 
 int
-gui_endmills_read (gui_endmill_list_t *endmill_list, gcode_t *gcode)
+gui_endmills_read (gui_endmill_list_t *endmill_list)
 {
   FILE *fh = NULL;
   int length, nomore, i;
@@ -115,7 +115,7 @@ gui_endmills_read (gui_endmill_list_t *endmill_list, gcode_t *gcode)
 
   XML_Parser parser = XML_ParserCreate ("UTF-8");
 
-  endmill_list->num = 0;
+  endmill_list->number = 0;
 
   if (!parser)
   {
@@ -176,16 +176,17 @@ gui_endmills_read (gui_endmill_list_t *endmill_list, gcode_t *gcode)
   free (buffer);
   fclose (fh);
 
-  /* Alter diameter of end mill to match current unit system */
-
-  for (i = 0; i < endmill_list->num; i++)
-  {
-    if (endmill_list->endmill[i].unit == GCODE_UNITS_INCH && gcode->units == GCODE_UNITS_MILLIMETER)
-      endmill_list->endmill[i].diameter *= GCODE_INCH2MM;
-
-    if (endmill_list->endmill[i].unit == GCODE_UNITS_MILLIMETER && gcode->units == GCODE_UNITS_INCH)
-      endmill_list->endmill[i].diameter *= GCODE_MM2INCH;
-  }
-
   return (0);
+}
+
+gfloat_t
+gui_endmills_size (gui_endmill_t *endmill, uint8_t unit)
+{
+  if ((endmill->unit == GCODE_UNITS_INCH) && (unit == GCODE_UNITS_MILLIMETER))
+    return (endmill->diameter * GCODE_INCH2MM);
+
+  if ((endmill->unit == GCODE_UNITS_MILLIMETER) && (unit == GCODE_UNITS_INCH))
+    return (endmill->diameter * GCODE_MM2INCH);
+
+  return (endmill->diameter);
 }

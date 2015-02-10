@@ -118,7 +118,6 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   strcpy (gui->gcode.name, project_name);
 
-  /* Must be done before "gui_endmills_read" or unit conversion will fail */
   gui->gcode.units = chosen_unit;
 
   gui->gcode.material_type = material_type;
@@ -137,22 +136,16 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
 
   {
-    gui_machine_list_t machine_list;
     int i;
 
-    gui_machines_init (&machine_list);
-    gui_machines_read (&machine_list);
-
-    for (i = 0; i < machine_list.num; i++)
+    for (i = 0; i < gui->machines.number; i++)
     {
-      if (strcmp (text_field, machine_list.machine[i].name) == 0)
+      if (strcmp (text_field, gui->machines.machine[i].name) == 0)
       {
-        strcpy (gui->gcode.machine_name, machine_list.machine[i].name);
-        gui->gcode.machine_options = machine_list.machine[i].options;
+        strcpy (gui->gcode.machine_name, gui->machines.machine[i].name);
+        gui->gcode.machine_options = gui->machines.machine[i].options;
       }
     }
-
-    gui_machines_free (&machine_list);
   }
 
   g_free (text_field);
@@ -164,25 +157,19 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   g_free (text_field);
 
   {
-    gui_endmill_list_t endmill_list;
     int i;
 
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
-
     /* Initialize to first end mill */
-    tool_diameter = endmill_list.endmill[0].diameter;
+    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
 
-    for (i = 0; i < endmill_list.num; i++)
+    for (i = 0; i < gui->endmills.number; i++)
     {
-      if (strcmp (tool_name, endmill_list.endmill[i].description) == 0)
+      if (strcmp (tool_name, gui->endmills.endmill[i].description) == 0)
       {
-        tool_diameter = endmill_list.endmill[i].diameter;
-        tool_number = endmill_list.endmill[i].number;
+        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+        tool_number = gui->endmills.endmill[i].number;
       }
     }
-
-    gui_endmills_free (&endmill_list);
   }
 
   /**
@@ -359,47 +346,35 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   {
-    gui_endmill_list_t endmill_list;
     char string[32];
     int i;
-
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
 
     label = gtk_label_new ("End Mill");
     gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 6, 7);
     end_mill_combo = gtk_combo_box_new_text ();
 
-    for (i = 0; i < endmill_list.num; i++)
+    for (i = 0; i < gui->endmills.number; i++)
     {
-      sprintf (string, "T%.2d - %s", endmill_list.endmill[i].number, endmill_list.endmill[i].description);
+      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
       gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
     }
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), 0);
     gtk_table_attach (GTK_TABLE (table), end_mill_combo, 1, 4, 6, 7, GTK_FILL | GTK_EXPAND, 0, 0, 0);
-
-    gui_endmills_free (&endmill_list);
   }
 
   {
-    gui_machine_list_t machine_list;
     int i;
-
-    gui_machines_init (&machine_list);
-    gui_machines_read (&machine_list);
 
     label = gtk_label_new ("Machine");
     gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 7, 8);
     machine_combo = gtk_combo_box_new_text ();
 
-    for (i = 0; i < machine_list.num; i++)
-      gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), machine_list.machine[i].name);
+    for (i = 0; i < gui->machines.number; i++)
+      gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), gui->machines.machine[i].name);
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (machine_combo), 0);
     gtk_table_attach (GTK_TABLE (table), machine_combo, 1, 4, 7, 8, GTK_FILL | GTK_EXPAND, 0, 0, 0);
-
-    gui_machines_free (&machine_list);
   }
 
   wlist[1] = name_entry;
@@ -1362,26 +1337,20 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   {
-    gui_endmill_list_t endmill_list;
     int i;
 
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
-
     /* Initialize to first end mill */
-    tool_diameter = endmill_list.endmill[0].diameter;
-    tool_number = endmill_list.endmill[0].number;
+    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
+    tool_number = gui->endmills.endmill[0].number;
 
-    for (i = 0; i < endmill_list.num; i++)
+    for (i = 0; i < gui->endmills.number; i++)
     {
-      if (strcmp (text_field, endmill_list.endmill[i].description) == 0)
+      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
       {
-        tool_diameter = endmill_list.endmill[i].diameter;
-        tool_number = endmill_list.endmill[i].number;
+        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+        tool_number = gui->endmills.endmill[i].number;
       }
     }
-
-    gui_endmills_free (&endmill_list);
   }
 
   gcode_template_init (&template_block, &gui->gcode, NULL);                     // Create a new template block to import things into;
@@ -1688,24 +1657,18 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   {
-    gui_endmill_list_t endmill_list;
     int i;
-
-    gui_endmills_init (&endmill_list);
-    gui_endmills_read (&endmill_list, &gui->gcode);
 
     label = gtk_label_new ("End Mill");
     gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                 // 'hbox1' cell 1 <- label 'label'
 
     tool_combo = gtk_combo_box_new_text ();
 
-    for (i = 0; i < endmill_list.num; i++)
-      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), endmill_list.endmill[i].description);
+    for (i = 0; i < gui->endmills.number; i++)
+      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), gui->endmills.endmill[i].description);
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
     gtk_box_pack_start (GTK_BOX (hbox1), tool_combo, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'tool_combo'
-
-    gui_endmills_free (&endmill_list);
   }
 
   label = gtk_label_new ("Feed Rate");

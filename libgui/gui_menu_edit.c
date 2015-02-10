@@ -1157,22 +1157,16 @@ update_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
 
   {
-    gui_machine_list_t machine_list;
     int i;
 
-    gui_machines_init (&machine_list);
-    gui_machines_read (&machine_list);
-
-    for (i = 0; i < machine_list.num; i++)
+    for (i = 0; i < gui->machines.number; i++)
     {
-      if (strcmp (text_field, machine_list.machine[i].name) == 0)
+      if (strcmp (text_field, gui->machines.machine[i].name) == 0)
       {
-        strcpy (gui->gcode.machine_name, machine_list.machine[i].name);
-        gui->gcode.machine_options = machine_list.machine[i].options;
+        strcpy (gui->gcode.machine_name, gui->machines.machine[i].name);
+        gui->gcode.machine_options = gui->machines.machine[i].options;
       }
     }
-
-    gui_machines_free (&machine_list);
   }
 
   g_free (text_field);
@@ -1351,11 +1345,7 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   {
-    gui_machine_list_t machine_list;
     int i;
-
-    gui_machines_init (&machine_list);
-    gui_machines_read (&machine_list);
 
     label = gtk_label_new ("Machine");
     gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 6, 7);
@@ -1365,14 +1355,12 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
     if (strcmp (gui->gcode.machine_name, ""))
       gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), gui->gcode.machine_name);
 
-    for (i = 0; i < machine_list.num; i++)
-      if (strcmp (gui->gcode.machine_name, machine_list.machine[i].name))
-        gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), machine_list.machine[i].name);
+    for (i = 0; i < gui->machines.number; i++)
+      if (strcmp (gui->gcode.machine_name, gui->machines.machine[i].name))
+        gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), gui->machines.machine[i].name);
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (machine_combo), 0);
     gtk_table_attach (GTK_TABLE (table), machine_combo, 1, 4, 6, 7, GTK_FILL | GTK_EXPAND, 0, 0, 0);
-
-    gui_machines_free (&machine_list);
   }
 
   label = gtk_label_new ("Notes");

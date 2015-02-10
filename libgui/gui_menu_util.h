@@ -30,6 +30,7 @@ void base_unit_changed_callback (GtkWidget *widget, gpointer data);
 void update_progress (void *gui, gfloat_t progress);
 void generic_dialog (void *gui, char *message);
 void generic_error (void *gui, char *message);
+void generic_fatal (void *gui, char *message);
 GtkTreeIter gui_insert_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block);
 GtkTreeIter gui_append_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block);
 GtkTreeIter gui_insert_after_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block);

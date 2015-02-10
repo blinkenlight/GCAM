@@ -57,7 +57,7 @@ typedef struct gui_machine_s
 typedef struct gui_machine_list_s
 {
   gui_machine_t *machine;
-  int num;
+  int number;
 } gui_machine_list_t;
 
 void gui_machines_init (gui_machine_list_t *machine_list);

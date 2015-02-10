@@ -49,11 +49,12 @@ typedef struct gui_endmill_s
 typedef struct gui_endmill_list_s
 {
   gui_endmill_t *endmill;
-  uint8_t num;
+  uint8_t number;
 } gui_endmill_list_t;
 
 void gui_endmills_init (gui_endmill_list_t *endmill_list);
 void gui_endmills_free (gui_endmill_list_t *endmill_list);
-int gui_endmills_read (gui_endmill_list_t *endmill_list, gcode_t *gcode);
+int gui_endmills_read (gui_endmill_list_t *endmill_list);
+gfloat_t gui_endmills_size (gui_endmill_t *endmill, uint8_t unit);
 
 #endif

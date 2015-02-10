@@ -31,27 +31,21 @@ gui_menu_insert_tool_change_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   gcode_block_t *new_block, *selected_block;
   gcode_tool_t *tool;
-  gui_endmill_list_t endmill_list;
   GtkTreeIter selected_iter;
   gui_t *gui;
 
   gui = (gui_t *)data;
 
-  gui_endmills_init (&endmill_list);
-  gui_endmills_read (&endmill_list, &gui->gcode);
-
   gcode_tool_init (&new_block, &gui->gcode, NULL);
 
   tool = (gcode_tool_t *)new_block->pdata;
 
-  if (endmill_list.num > 0)
+  if (gui->endmills.number > 0)
   {
-    strcpy (tool->label, endmill_list.endmill[0].description);
-    tool->diameter = endmill_list.endmill[0].diameter;
-    tool->number = endmill_list.endmill[0].number;
+    strcpy (tool->label, gui->endmills.endmill[0].description);
+    tool->diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
+    tool->number = gui->endmills.endmill[0].number;
   }
-
-  gui_endmills_free (&endmill_list);
 
   get_selected_block (gui, &selected_block, &selected_iter);
 

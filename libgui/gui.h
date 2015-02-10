@@ -31,11 +31,18 @@
 #include <gtk/gtk.h>
 #include <gtk/gtkgl.h>
 
+static const char *GCAM_FATAL_SETTINGS = "\nFailed to load the list of settings - GCAM will now close...\n";
+static const char *GCAM_FATAL_MACHINES = "\nFailed to load the list of machines - GCAM will now close...\n";
+static const char *GCAM_FATAL_ENDMILLS = "\nFailed to load the list of endmills - GCAM will now close...\n";
+
 typedef struct gui_s
 {
   gcode_t gcode;
   gui_opengl_t opengl;
   gui_settings_t settings;
+
+  gui_machine_list_t machines;
+  gui_endmill_list_t endmills;
 
   GTimer *timer;
   double event_time;
