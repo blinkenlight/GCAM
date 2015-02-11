@@ -1282,8 +1282,39 @@ gerber_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 static void
 gerber_on_assistant_prepare (GtkWidget *assistant, GtkWidget *page, gpointer data)
 {
-  gint current_page, number_pages;
+  gui_t *gui;
+  GtkWidget **wlist;
+  char *text_field;
+  gfloat_t tool_diameter;
+  gfloat_t number_passes;
+  gfloat_t pass_overlap;
+  gfloat_t total_width;
+  gint current_page;
+  gint number_pages;
   gchar *title;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+
+  {
+    int i;
+
+    /* Initialize to first end mill */
+    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
+
+    for (i = 0; i < gui->endmills.number; i++)
+    {
+      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
+      {
+        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+      }
+    }
+
+    g_free (text_field);
+  }
 
   current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (assistant));
   number_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (assistant));
@@ -1291,6 +1322,18 @@ gerber_on_assistant_prepare (GtkWidget *assistant, GtkWidget *page, gpointer dat
   title = g_strdup_printf ("Import RS274X (Gerber) - Step %d of %d", current_page + 1, number_pages);
   gtk_window_set_title (GTK_WINDOW (assistant), title);
   g_free (title);
+
+  number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+
+  total_width = (1 + (number_passes - 1) * (1 - pass_overlap)) * tool_diameter;
+
+  /* Please note - the range below depends on the range of the other fields */
+
+  SIGNAL_HANDLER_BLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
+  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[7]), tool_diameter, 10 * tool_diameter);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), total_width);
+  SIGNAL_HANDLER_UNBLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
 }
 
 /**
@@ -1313,7 +1356,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   GtkTreeIter template_iter, parent_iter, selected_iter;
   gcode_block_t *template_block, *tool_block, *sketch_block, *selected_block;
   gcode_tool_t *tool;
-  gfloat_t depth, offset, initial, step, max, tool_diameter;
+  gfloat_t depth, offset, tool_diameter, number_passes, pass_overlap;
   uint8_t tool_number;
   gcode_vec2d_t aabb_min, aabb_max;
   char *text_field, filename[256];
@@ -1327,7 +1370,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   /* Perform a Test Run to see if File passes without errors */
   gcode_sketch_init (&sketch_block, &gui->gcode, NULL);
 
-  if (gcode_gerber_import (sketch_block, filename, 0, 0))
+  if (gcode_gerber_import (sketch_block, filename, 0, 0) != 0)
   {
     generic_error (gui, "\nSomething went wrong - failed to import the file\n");
     sketch_block->free (&sketch_block);
@@ -1401,28 +1444,18 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   g_free (text_field);
 
   depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
 
-  gcode_sketch_init (&sketch_block, &gui->gcode, template_block);
-  gcode_gerber_import (sketch_block, filename, depth, tool_diameter);
-  insert_primitive (gui, sketch_block, template_block, &template_iter, GUI_APPEND_UNDER);
+  offset = tool_diameter / 2;
 
-  initial = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
-  step = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
-  max = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
-
-  for (offset = initial; offset < max; offset += step)
+  for (int i = 0; i < number_passes; i++)
   {
     gcode_sketch_init (&sketch_block, &gui->gcode, template_block);
-    gcode_gerber_import (sketch_block, filename, depth, offset + tool_diameter);
+    gcode_gerber_import (sketch_block, filename, depth, offset);
     insert_primitive (gui, sketch_block, template_block, &template_iter, GUI_APPEND_UNDER);
-  }
 
-  /* Final pass */
-  if (max - offset > GCODE_PRECISION)
-  {
-    gcode_sketch_init (&sketch_block, &gui->gcode, template_block);
-    gcode_gerber_import (sketch_block, filename, depth, max + tool_diameter);
-    insert_primitive (gui, sketch_block, template_block, &template_iter, GUI_APPEND_UNDER);
+    offset += (1 - pass_overlap) * tool_diameter;
   }
 
   /* Get the bounding box for the sketch */
@@ -1539,6 +1572,88 @@ gerber_browse_file_callback (GtkWidget *widget, gpointer data)
   }
 
   gtk_widget_destroy (dialog);
+}
+
+static void
+gerber_on_spin_changed (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget **wlist;
+  char *text_field;
+  gfloat_t tool_diameter;
+  gfloat_t number_passes;
+  gfloat_t pass_overlap;
+  gfloat_t total_width;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+
+  {
+    int i;
+
+    /* Initialize to first end mill */
+    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
+
+    for (i = 0; i < gui->endmills.number; i++)
+    {
+      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
+      {
+        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+      }
+    }
+
+    g_free (text_field);
+  }
+
+  if (widget == GTK_WIDGET (wlist[5]))
+  {
+    number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+    pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+
+    total_width = (1 + (number_passes - 1) * (1 - pass_overlap)) * tool_diameter;
+
+    SIGNAL_HANDLER_BLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), total_width);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
+  }
+  else if (widget == GTK_WIDGET (wlist[6]))
+  {
+    number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+    pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+
+    total_width = (1 + (number_passes - 1) * (1 - pass_overlap)) * tool_diameter;
+
+    SIGNAL_HANDLER_BLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), total_width);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (G_OBJECT (wlist[7]), wlist);
+  }
+  else if (widget == GTK_WIDGET (wlist[7]))
+  {
+    pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+    total_width = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
+
+    number_passes = ceil ((total_width / tool_diameter - 1) / (1 - pass_overlap) + 1);
+    pass_overlap = 1 - (total_width / tool_diameter - 1) / (number_passes - 1);
+
+    while ((number_passes > 10) && (pass_overlap > 0))
+    {
+      pass_overlap = (pass_overlap >= 0.1) ? pass_overlap - 0.1 : 0.0;
+
+      number_passes = ceil ((total_width / tool_diameter - 1) / (1 - pass_overlap) + 1);
+      pass_overlap = 1 - (total_width / tool_diameter - 1) / (number_passes - 1);
+    }
+
+    SIGNAL_HANDLER_BLOCK_USING_DATA (G_OBJECT (wlist[5]), wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), number_passes);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (G_OBJECT (wlist[5]), wlist);
+
+    SIGNAL_HANDLER_BLOCK_USING_DATA (G_OBJECT (wlist[6]), wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), pass_overlap);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (G_OBJECT (wlist[6]), wlist);
+  }
 }
 
 /**
@@ -1721,21 +1836,42 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   GtkWidget *hbox2;
   GtkWidget *hbox3;
   GtkWidget *label;
-  GtkWidget *initial_spin;
-  GtkWidget *step_spin;
-  GtkWidget *max_spin;
+  GtkWidget *passes_spin;
+  GtkWidget *overlap_spin;
+  GtkWidget *width_spin;
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
+  char *text_field;
+  gfloat_t tool_diameter;
 
   wlist = (GtkWidget **)data;
 
   gui = (gui_t *)wlist[0];
 
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+
+  {
+    int i;
+
+    /* Initialize to first end mill */
+    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
+
+    for (i = 0; i < gui->endmills.number; i++)
+    {
+      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
+      {
+        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
+      }
+    }
+
+    g_free (text_field);
+  }
+
   vbox1 = gtk_vbox_new (FALSE, BORDER_WIDTH);                                   // New vertical 2-cell box 'vbox1'
   gtk_container_set_border_width (GTK_CONTAINER (vbox1), BORDER_WIDTH);
 
-  label = gtk_label_new ("The isolation values control the separation between traces and surrounding copper. "
-                         "The Step value should typically be less than the tip diameter of the selected tool. "
+  label = gtk_label_new ("The isolation settings control the separation between traces and surrounding copper. "
+                         "The tool makes partially overlapping passes until the target gap width is reached. "
                          "A sketch for each isolation pass will be generated.");
 
   gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
@@ -1758,39 +1894,44 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_container_set_border_width (GTK_CONTAINER (hbox3), 0);
   gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
-  label = gtk_label_new ("Initial");
+  label = gtk_label_new ("Number of Passes");
   gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                   // 'hbox1' cell 1 <- label 'label'
 
-  initial_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (0.1), SCALED_INCHES (0.001));
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (initial_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (initial_spin), SCALED_INCHES (0.002));
-  gtk_box_pack_start (GTK_BOX (hbox1), initial_spin, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'initial_spin'
+  passes_spin = gtk_spin_button_new_with_range (1.0, 10.0, 1.0);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (passes_spin), 0);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (passes_spin), 1.0);
+  gtk_box_pack_start (GTK_BOX (hbox1), passes_spin, TRUE, TRUE, 0);             // 'hbox1' cell 2 <- spin 'passes_spin'
 
-  g_signal_connect_swapped (initial_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+  g_signal_connect (passes_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
+  g_signal_connect_swapped (passes_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Step");
+  label = gtk_label_new ("Pass Overlap");
   gtk_box_pack_start (GTK_BOX (hbox2), label, TRUE, TRUE, 0);                   // 'hbox2' cell 1 <- label 'label'
 
-  step_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (0.1), SCALED_INCHES (0.001));
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (step_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (step_spin), SCALED_INCHES (0.004));
-  gtk_box_pack_start (GTK_BOX (hbox2), step_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'step_spin'
+  overlap_spin = gtk_spin_button_new_with_range (0.0, 1.0, 0.1);
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (overlap_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (overlap_spin), 0.5);
+  gtk_box_pack_start (GTK_BOX (hbox2), overlap_spin, TRUE, TRUE, 0);            // 'hbox2' cell 2 <- spin 'overlap_spin'
 
-  g_signal_connect_swapped (step_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+  g_signal_connect (overlap_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
+  g_signal_connect_swapped (overlap_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Max");
+  label = gtk_label_new ("Total Gap Width");
   gtk_box_pack_start (GTK_BOX (hbox3), label, TRUE, TRUE, 0);                   // 'hbox3' cell 1 <- label 'label'
 
-  max_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.001), SCALED_INCHES (1.0), SCALED_INCHES (0.001));
-  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (max_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (max_spin), SCALED_INCHES (0.02));
-  gtk_box_pack_start (GTK_BOX (hbox3), max_spin, TRUE, TRUE, 0);                // 'hbox3' cell 2 <- spin 'max_spin'
+  /* Please note - the defaults below should depend on the defaults above */
 
-  g_signal_connect_swapped (max_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+  width_spin = gtk_spin_button_new_with_range (tool_diameter, tool_diameter * 10, SCALED_INCHES (0.001));
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (width_spin), MANTISSA);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (width_spin), tool_diameter);
+  gtk_box_pack_start (GTK_BOX (hbox3), width_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'width_spin'
 
-  wlist[5] = initial_spin;
-  wlist[6] = step_spin;
-  wlist[7] = max_spin;
+  g_signal_connect (width_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
+  g_signal_connect_swapped (width_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
+  wlist[5] = passes_spin;
+  wlist[6] = overlap_spin;
+  wlist[7] = width_spin;
 
   gtk_widget_show_all (vbox1);
 
@@ -1893,7 +2034,7 @@ gui_menu_file_import_excellon_menuitem_callback (GtkWidget *widget, gpointer dat
 
     gcode_template_init (&template_block, &gui->gcode, NULL);                   // Create a new template block to import things into;
 
-    if (gcode_excellon_import (template_block, filename))                       // Try to import the file and abort if that fails;
+    if (gcode_excellon_import (template_block, filename) != 0)                  // Try to import the file and abort if that fails;
     {
       generic_error (gui, "\nSomething went wrong - failed to import the file\n");
       template_block->free (&template_block);
@@ -1998,7 +2139,7 @@ gui_menu_file_import_svg_menuitem_callback (GtkWidget *widget, gpointer data)
 
     gcode_template_init (&template_block, &gui->gcode, NULL);                   // Create a new template block to import things into;
 
-    if (gcode_svg_import (template_block, filename))                            // Try to import the file and abort if that fails;
+    if (gcode_svg_import (template_block, filename) != 0)                       // Try to import the file and abort if that fails;
     {
       generic_error (gui, "\nSomething went wrong - failed to import the file\n");
       template_block->free (&template_block);
@@ -2103,7 +2244,7 @@ gui_menu_file_import_stl_menuitem_callback (GtkWidget *widget, gpointer data)
 
     gcode_stl_init (&stl_block, &gui->gcode, NULL);                             // Create a new stl block to import things into;
 
-    if (gcode_stl_import (stl_block, filename))                                 // Try to import the file and abort if that fails;
+    if (gcode_stl_import (stl_block, filename) != 0)                            // Try to import the file and abort if that fails;
     {
       generic_error (gui, "\nSomething went wrong - failed to import the file\n");
       stl_block->free (&stl_block);

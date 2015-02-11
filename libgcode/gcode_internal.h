@@ -43,6 +43,7 @@
 /**
  * Machine specific options.
  */
+
 #define GCODE_MACHINE_OPTION_SPINDLE_CONTROL        0x01
 #define GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE  0x02
 #define GCODE_MACHINE_OPTION_HOME_SWITCHES          0x04
@@ -53,6 +54,7 @@
  * ids found in the header of each block that begin with the id 0x00.
  * For this reason we count backwards from 0xff for these special #defines.
  */
+
 #define GCODE_BIN_DATA_BLOCK_FLAGS    0xFE
 #define GCODE_BIN_DATA_BLOCK_COMMENT  0xFF
 
@@ -128,6 +130,7 @@ static const char *GCODE_TYPE_STRING[GCODE_TYPE_NUM] =
  * NOTE: vaporware types ('CODE', 'BEZIER', 'STL') are all invalid now;
  * if and when they get implemented, this will have to be revised...
  */
+ 
 static const bool GCODE_IS_VALID_IF_NO_PARENT[GCODE_TYPE_NUM] =
   {1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0};
 
@@ -138,6 +141,7 @@ static const bool GCODE_IS_VALID_IF_NO_PARENT[GCODE_TYPE_NUM] =
  * valid, neither as a parent nor as a child of any other block type;
  * if and when they get implemented, this will have to be revised...
  */ 
+ 
 static const bool GCODE_IS_VALID_PARENT_CHILD[GCODE_TYPE_NUM][GCODE_TYPE_NUM] =
 { 
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -165,6 +169,7 @@ static const bool GCODE_IS_VALID_PARENT_CHILD[GCODE_TYPE_NUM][GCODE_TYPE_NUM] =
  * constants DO NOT. Therefore making sure any XML strings ARE actually valid
  * sounds like a REALLY good idea.
  */
+
 static const int GCODE_XML_BUFFER_SIZE = 0x00001000;
 
 static const uint8_t GCODE_XML_FLAG_PROJECT = 0x01;
@@ -207,12 +212,14 @@ static const char *GCODE_XML_ATTR_BLOCK_FLAGS = "flags";
 /**
  * Pre-declaration of circular-referenced structs
  */
+
 struct gcode_s;
 struct gcode_block_s;
 
 /**
  * Type definitions for block-specific functions
  */
+
 typedef void gcode_free_t (struct gcode_block_s **block);
 typedef void gcode_save_t (struct gcode_block_s *block, FILE *fh);
 typedef void gcode_load_t (struct gcode_block_s *block, FILE *fh);
@@ -234,6 +241,7 @@ typedef void gcode_message_callback_t (void *gui, char *message);
 /**
  * Type definitions for commonly used structs
  */
+
 typedef struct gcode_offset_s
 {
   gfloat_t side;
@@ -344,6 +352,7 @@ typedef struct xml_context_s
 /**
  * Function prototypes
  */
+
 void gcode_internal_init (gcode_block_t *block, gcode_t *gcode, gcode_block_t *parent, uint8_t type, uint8_t flags);
 void gsprintf (char *target, unsigned int number, char *format, ...);
 void strswp (char *target, char oldchar, char newchar);
@@ -351,6 +360,7 @@ void strswp (char *target, char oldchar, char newchar);
 /**
  * Miscellaneous macros
  */
+
 #define REMARK(...) { \
         fprintf (stderr, "Error in '%s()' near line %d:\n", __func__, __LINE__); \
         fprintf (stderr, ## __VA_ARGS__); }
@@ -360,6 +370,7 @@ void strswp (char *target, char oldchar, char newchar);
  * NOTE: the input value must ALWAYS be in INCHES (eg. numeric constants for default values);
  * One should NEVER USE THIS on variables already scaled to metric units in metric projects.
  */
+
 #define EQUIV_UNITS(_unit, _num) \
         ((_unit == GCODE_UNITS_MILLIMETER) ? _num * 25.0 : _num)
 
@@ -368,6 +379,7 @@ void strswp (char *target, char oldchar, char newchar);
  * NOTE: the input value must ALWAYS be in INCHES (eg. numeric constants for default values);
  * One should NEVER USE THIS on variables already scaled to metric units in metric projects.
  */
+
 #define GCODE_UNITS(_gcode, _num) \
         EQUIV_UNITS(_gcode->units, _num)
 
@@ -384,6 +396,7 @@ void strswp (char *target, char oldchar, char newchar);
  * increase by 64kB + string length + 1 if request to append greater than current buffer size.
  * includes optimized manual strcat code to vastly improve performance for large strings.
  */
+
 #define GCODE_APPEND(_block, _str) { \
         int _slen = strlen (_str) + 1, _i; \
         if (_block->code_len + _slen > _block->code_alloc) \

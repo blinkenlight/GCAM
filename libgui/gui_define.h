@@ -112,4 +112,14 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 #define GCAM_STOCK_VIEW_FRONT             "gcam-view-front"
 #define GCAM_STOCK_VIEW_BACK              "gcam-view-back"
 
+/**
+ * GTK signal handling macros
+ */
+
+#define SIGNAL_HANDLER_BLOCK_USING_DATA(_instance, _data) \
+  g_signal_handlers_block_matched (_instance, G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, _data);
+
+#define SIGNAL_HANDLER_UNBLOCK_USING_DATA(_instance, _data) \
+  g_signal_handlers_unblock_matched (_instance, G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, _data);
+
 #endif

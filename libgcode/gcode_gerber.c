@@ -212,7 +212,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
           aperture_set[aperture_num].ind = inum;
-          aperture_set[aperture_num].v[0] = diameter + offset;
+          aperture_set[aperture_num].v[0] = diameter + 2 * offset;
           aperture_num++;
         }
         else if (buffer[index] == 'R')
@@ -253,8 +253,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
           aperture_set[aperture_num].ind = inum;
-          aperture_set[aperture_num].v[0] = x + offset;
-          aperture_set[aperture_num].v[1] = y + offset;
+          aperture_set[aperture_num].v[0] = x + 2 * offset;
+          aperture_set[aperture_num].v[1] = y + 2 * offset;
           aperture_num++;
         }
         else if (buffer[index] == 'O' && buffer[index + 1] == 'C')              /* Convert Octagon pads to Circles */
@@ -283,7 +283,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
           aperture_set[aperture_num].ind = inum;
-          aperture_set[aperture_num].v[0] = diameter + offset;
+          aperture_set[aperture_num].v[0] = diameter + 2 * offset;
           aperture_num++;
         }
       }
@@ -418,7 +418,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
            * Use the tangent of the previous trace to determine start angle of arc.
            * Use the tangent of the previous trace to calculate the normal to space the arcs apart.
            * Starting point of arc is simply current position.
-           * NOTES!!!
+           * NOTES:
            * - An elbow may need to be inserted into the list after an arc.
            * - Store a previous normal.
            * - Make sure that cur_pos gets updated when a G02/G03 occures, not just after a line.
