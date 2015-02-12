@@ -88,20 +88,20 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
   gcode_sketch_t *sketch;
   char buf[10], *buffer = NULL;
   long int length, nomore, index;
-  int i, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
+  int i, j, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
   uint8_t aperture_ind = 0, aperture_closed, trace_elbow_match;
   gcode_gerber_aperture_t *aperture_set;
   gcode_vec2d_t cur_pos = { 0.0, 0.0 };
   gcode_vec2d_t cur_ij = { 0.0, 0.0 };
   gcode_vec2d_t normal = { 0.0, 0.0 };
-  gfloat_t x_scale, y_scale;
+  gfloat_t digit_scale, unit_scale;
 
   aperture_num = 0;
   aperture_cmd = 2;                                                             // Default command is 'aperture closed'
   aperture_set = NULL;
   aperture_closed = 1;
-  x_scale = 1.0;
-  y_scale = 1.0;
+  digit_scale = 1.0;                                                            // Scale factor for integer-formatted X/Y coordinates
+  unit_scale = 1.0;                                                             // Scale factor for cross-unit import (inches <-> mm)
   arc_dir = GCODE_GERBER_ARC_CW;
 
   sketch = (gcode_sketch_t *)sketch_block->pdata;
@@ -131,8 +131,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           if (sketch_block->gcode->units == GCODE_UNITS_MILLIMETER)
           {
-            x_scale *= GCODE_INCH2MM;
-            y_scale *= GCODE_INCH2MM;
+            unit_scale *= GCODE_INCH2MM;
           }
         }
         else if (buffer[index] == 'M' && buffer[index + 1] == 'M')
@@ -141,41 +140,82 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           if (sketch_block->gcode->units == GCODE_UNITS_INCH)
           {
-            x_scale *= GCODE_MM2INCH;
-            y_scale *= GCODE_MM2INCH;
+            unit_scale *= GCODE_MM2INCH;
           }
         }
-      }
-      else if (buffer[index] == 'F' && buffer[index + 1] == 'S' && buffer[index + 2] == 'L' && buffer[index + 3] == 'A')
-      {
-        index += 4;
-
-        if (buffer[index] == 'X')
+        else
         {
-          index += 2;
-
-          x_scale = 1.0;
-          buf[0] = buffer[index];
-          buf[1] = 0;
-
-          for (i = 0; i < atoi (buf); i++)
-            x_scale *= 0.1;
-
-          index++;
+          REMARK ("Unsupported Gerber units (neither inches nor millimeters)\n");
+          return (1);
         }
+      }
+      else if (buffer[index] == 'F' && buffer[index + 1] == 'S')
+      {
+        index += 2;
 
-        if (buffer[index] == 'Y')
+        if (buffer[index] == 'L')
         {
-          index += 2;
-
-          y_scale = 1.0;
-          buf[0] = buffer[index];
-          buf[1] = 0;
-
-          for (i = 0; i < atoi (buf); i++)
-            y_scale *= 0.1;
-
           index++;
+
+          if (buffer[index] == 'A')
+          {
+            index++;
+
+            if (buffer[index] == 'X')
+            {
+              index += 2;
+
+              buf[0] = buffer[index];
+              buf[1] = 0;
+
+              i = atoi (buf);
+
+              index++;
+            }
+            else
+            {
+              REMARK ("Gerber X coordinate format is missing\n");
+              return (1);
+            }
+
+            if (buffer[index] == 'Y')
+            {
+              index += 2;
+
+              buf[0] = buffer[index];
+              buf[1] = 0;
+
+              j = atoi (buf);
+
+              index++;
+            }
+            else
+            {
+              REMARK ("Gerber Y coordinate format is missing\n");
+              return (1);
+            }
+
+            if (i == j)
+            {
+              for (i = 0; i < j; i++)
+                digit_scale *= 0.1;
+            }
+            else
+            {
+              REMARK ("Gerber X and Y coordinate formats do not match (%i X decimals vs. %i Y decimals)\n", i, j);
+              return (1);
+            }
+          }
+          else
+          {
+            REMARK ("Unsupported Gerber coordinate format (other than 'absolute notation')\n");
+            return (1);
+          }
+        }
+        else
+        {
+          REMARK ("Unsupported Gerber coordinate format (other than 'omit leading zeros')\n");
+          return (1);
         }
       }
       else if (buffer[index] == 'A' && buffer[index + 1] == 'D' && buffer[index + 2] == 'D')
@@ -207,7 +247,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           }
 
           buf[buf_ind] = 0;
-          diameter = atof (buf);
+          diameter = atof (buf) * unit_scale;
 
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
@@ -234,7 +274,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           }
 
           buf[buf_ind] = 0;
-          x = atof (buf);
+          x = atof (buf) * unit_scale;
 
           index++;                                                              /* Skip 'X' */
 
@@ -248,7 +288,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           }
 
           buf[buf_ind] = 0;
-          y = atof (buf);
+          y = atof (buf) * unit_scale;
 
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
@@ -278,13 +318,23 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           }
 
           buf[buf_ind] = 0;
-          diameter = atof (buf);
+          diameter = atof (buf) * unit_scale;
 
           aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
           aperture_set[aperture_num].ind = inum;
           aperture_set[aperture_num].v[0] = diameter + 2 * offset;
           aperture_num++;
+        }
+        else if (buffer[index] == 'O')
+        {
+          REMARK ("Unsupported Gerber aperture definition (Obround)\n");
+          return (1);
+        }
+        else if (buffer[index] == 'P')
+        {
+          REMARK ("Unsupported Gerber aperture definition (Polygon)\n");
+          return (1);
         }
       }
 
@@ -322,7 +372,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           buf[buf_ind] = 0;
 
-          pos[0] = x_scale * atof (buf);
+          pos[0] = atof (buf) * digit_scale * unit_scale;
           xy_mask |= 1;
         }
 
@@ -340,7 +390,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           buf[buf_ind] = 0;
 
-          pos[1] = y_scale * atof (buf);
+          pos[1] = atof (buf) * digit_scale * unit_scale;
           xy_mask |= 2;
         }
 
@@ -358,7 +408,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           buf[buf_ind] = 0;
 
-          cur_ij[0] = x_scale * atof (buf);
+          cur_ij[0] = atof (buf) * digit_scale * unit_scale;
           ij_mask |= 1;
         }
 
@@ -376,7 +426,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           buf[buf_ind] = 0;
 
-          cur_ij[1] = y_scale * atof (buf);
+          cur_ij[1] = atof (buf) * digit_scale * unit_scale;
           ij_mask |= 2;
         }
 
