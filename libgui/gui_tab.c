@@ -1964,6 +1964,7 @@ tool_update_callback (GtkWidget *widget, gpointer data)
   gui_t *gui;
   gcode_block_t *block;
   gcode_tool_t *tool;
+  gui_endmill_t *endmill;
   uint16_t wind;
   char *text_field;
 
@@ -1984,18 +1985,10 @@ tool_update_callback (GtkWidget *widget, gpointer data)
   strcpy (tool->label, &text_field[6]);
   g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool->label, TRUE);
 
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
-      {
-        tool->diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-        tool->number = gui->endmills.endmill[i].number;
-      }
-    }
-  }
+  tool->diameter = gui_endmills_size (endmill, gui->gcode.units);
+  tool->number = endmill->number;
 
   tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
 

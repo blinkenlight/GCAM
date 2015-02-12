@@ -56,5 +56,6 @@ void gui_endmills_init (gui_endmill_list_t *endmill_list);
 void gui_endmills_free (gui_endmill_list_t *endmill_list);
 int gui_endmills_read (gui_endmill_list_t *endmill_list);
 gfloat_t gui_endmills_size (gui_endmill_t *endmill, uint8_t unit);
+gui_endmill_t *gui_endmills_find (gui_endmill_list_t *endmill_list, char *endmill_name, uint8_t fallback);
 
 #endif

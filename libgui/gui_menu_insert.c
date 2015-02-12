@@ -31,6 +31,7 @@ gui_menu_insert_tool_change_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   gcode_block_t *new_block, *selected_block;
   gcode_tool_t *tool;
+  gui_endmill_t *endmill;
   GtkTreeIter selected_iter;
   gui_t *gui;
 
@@ -40,12 +41,11 @@ gui_menu_insert_tool_change_menuitem_callback (GtkWidget *widget, gpointer data)
 
   tool = (gcode_tool_t *)new_block->pdata;
 
-  if (gui->endmills.number > 0)
-  {
-    strcpy (tool->label, gui->endmills.endmill[0].description);
-    tool->diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-    tool->number = gui->endmills.endmill[0].number;
-  }
+  endmill = &gui->endmills.endmill[0];
+
+  strcpy (tool->label, endmill->description);
+  tool->diameter = gui_endmills_size (endmill, gui->gcode.units);
+  tool->number = endmill->number;
 
   get_selected_block (gui, &selected_block, &selected_iter);
 

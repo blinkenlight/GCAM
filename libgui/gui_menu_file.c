@@ -64,6 +64,8 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   gui_t *gui;
   GtkWidget **wlist;
   gcode_block_t *block;
+  gui_machine_t *machine;
+  gui_endmill_t *endmill;
   gfloat_t tool_diameter;
   int chosen_unit, material_type, tool_number;
   char *text_field, tool_name[32], project_name[32];
@@ -135,42 +137,22 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   /* Machine Name */
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
 
-  {
-    int i;
+  machine = gui_machines_find (&gui->machines, text_field, TRUE);
 
-    for (i = 0; i < gui->machines.number; i++)
-    {
-      if (strcmp (text_field, gui->machines.machine[i].name) == 0)
-      {
-        strcpy (gui->gcode.machine_name, gui->machines.machine[i].name);
-        gui->gcode.machine_options = gui->machines.machine[i].options;
-      }
-    }
-  }
+  strcpy (gui->gcode.machine_name, machine->name);
+  gui->gcode.machine_options = machine->options;
 
   g_free (text_field);
 
   /* Endmill Label */
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[12]));
   strcpy (tool_name, &text_field[6]);
-
   g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool_name, TRUE);
 
-    /* Initialize to first end mill */
-    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (tool_name, gui->endmills.endmill[i].description) == 0)
-      {
-        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-        tool_number = gui->endmills.endmill[i].number;
-      }
-    }
-  }
+  tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
+  tool_number = endmill->number;
 
   /**
    * Setup G-Code Block List and Populate with a Begin, Initial Tool, and End.
@@ -1285,6 +1267,8 @@ gerber_on_assistant_prepare (GtkWidget *assistant, GtkWidget *page, gpointer dat
   gui_t *gui;
   GtkWidget **wlist;
   char *text_field;
+  char tool_name[32];
+  gui_endmill_t *endmill;
   gfloat_t tool_diameter;
   gfloat_t number_passes;
   gfloat_t pass_overlap;
@@ -1298,23 +1282,12 @@ gerber_on_assistant_prepare (GtkWidget *assistant, GtkWidget *page, gpointer dat
   gui = (gui_t *)wlist[0];
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+  strcpy (tool_name, &text_field[6]);
+  g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool_name, TRUE);
 
-    /* Initialize to first end mill */
-    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
-      {
-        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-      }
-    }
-
-    g_free (text_field);
-  }
+  tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
 
   current_page = gtk_assistant_get_current_page (GTK_ASSISTANT (assistant));
   number_pages = gtk_assistant_get_n_pages (GTK_ASSISTANT (assistant));
@@ -1356,10 +1329,11 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   GtkTreeIter template_iter, parent_iter, selected_iter;
   gcode_block_t *template_block, *tool_block, *sketch_block, *selected_block;
   gcode_tool_t *tool;
+  gui_endmill_t *endmill;
   gfloat_t depth, offset, tool_diameter, number_passes, pass_overlap;
   uint8_t tool_number;
   gcode_vec2d_t aabb_min, aabb_max;
-  char *text_field, filename[256];
+  char *text_field, tool_name[32], filename[256];
 
   wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
 
@@ -1378,23 +1352,13 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   }
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+  strcpy (tool_name, &text_field[6]);
+  g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool_name, TRUE);
 
-    /* Initialize to first end mill */
-    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-    tool_number = gui->endmills.endmill[0].number;
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
-      {
-        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-        tool_number = gui->endmills.endmill[i].number;
-      }
-    }
-  }
+  tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
+  tool_number = endmill->number;
 
   gcode_template_init (&template_block, &gui->gcode, NULL);                     // Create a new template block to import things into;
 
@@ -1439,9 +1403,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
   tool->diameter = tool_diameter;
   tool->number = tool_number;
-  strcpy (tool->label, text_field);
-
-  g_free (text_field);
+  strcpy (tool->label, tool_name);
 
   depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
   number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
@@ -1580,6 +1542,8 @@ gerber_on_spin_changed (GtkWidget *widget, gpointer data)
   gui_t *gui;
   GtkWidget **wlist;
   char *text_field;
+  char tool_name[32];
+  gui_endmill_t *endmill;
   gfloat_t tool_diameter;
   gfloat_t number_passes;
   gfloat_t pass_overlap;
@@ -1590,23 +1554,12 @@ gerber_on_spin_changed (GtkWidget *widget, gpointer data)
   gui = (gui_t *)wlist[0];
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+  strcpy (tool_name, &text_field[6]);
+  g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool_name, TRUE);
 
-    /* Initialize to first end mill */
-    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
-      {
-        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-      }
-    }
-
-    g_free (text_field);
-  }
+  tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
 
   if (widget == GTK_WIDGET (wlist[5]))
   {
@@ -1772,6 +1725,7 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   {
+    char string[32];
     int i;
 
     label = gtk_label_new ("End Mill");
@@ -1780,7 +1734,10 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
     tool_combo = gtk_combo_box_new_text ();
 
     for (i = 0; i < gui->endmills.number; i++)
-      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), gui->endmills.endmill[i].description);
+    {
+      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), string);
+    }
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
     gtk_box_pack_start (GTK_BOX (hbox1), tool_combo, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'tool_combo'
@@ -1842,6 +1799,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
   char *text_field;
+  char tool_name[32];
+  gui_endmill_t *endmill;
   gfloat_t tool_diameter;
 
   wlist = (GtkWidget **)data;
@@ -1849,23 +1808,12 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gui = (gui_t *)wlist[0];
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+  strcpy (tool_name, &text_field[6]);
+  g_free (text_field);
 
-  {
-    int i;
+  endmill = gui_endmills_find (&gui->endmills, tool_name, TRUE);
 
-    /* Initialize to first end mill */
-    tool_diameter = gui_endmills_size (&gui->endmills.endmill[0], gui->gcode.units);
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (text_field, gui->endmills.endmill[i].description) == 0)
-      {
-        tool_diameter = gui_endmills_size (&gui->endmills.endmill[i], gui->gcode.units);
-      }
-    }
-
-    g_free (text_field);
-  }
+  tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
 
   vbox1 = gtk_vbox_new (FALSE, BORDER_WIDTH);                                   // New vertical 2-cell box 'vbox1'
   gtk_container_set_border_width (GTK_CONTAINER (vbox1), BORDER_WIDTH);

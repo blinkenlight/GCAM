@@ -234,3 +234,22 @@ gui_machines_read (gui_machine_list_t *machine_list)
 
   return (0);
 }
+
+gui_machine_t *
+gui_machines_find (gui_machine_list_t *machine_list, char *machine_name, uint8_t fallback)
+{
+  int i;
+
+  for (i = 0; i < machine_list->number; i++)
+  {
+    if (strcmp (machine_name, machine_list->machine[i].name) == 0)
+    {
+      return (&machine_list->machine[i]);
+    }
+  }
+
+  if (fallback)
+    return (&machine_list->machine[0]);
+
+  return (NULL);
+}

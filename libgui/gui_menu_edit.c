@@ -1080,6 +1080,7 @@ update_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   gcode_block_t *selected_block;
   int unit_in_use, chosen_unit, material_type;
   char *text_field, project_name[32];
+  gui_machine_t *machine;
   gfloat_t scale_factor;
 
   wlist = (GtkWidget **)data;
@@ -1156,18 +1157,10 @@ update_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
   /* Machine Name */
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
 
-  {
-    int i;
+  machine = gui_machines_find (&gui->machines, text_field, TRUE);
 
-    for (i = 0; i < gui->machines.number; i++)
-    {
-      if (strcmp (text_field, gui->machines.machine[i].name) == 0)
-      {
-        strcpy (gui->gcode.machine_name, gui->machines.machine[i].name);
-        gui->gcode.machine_options = gui->machines.machine[i].options;
-      }
-    }
-  }
+  strcpy (gui->gcode.machine_name, machine->name);
+  gui->gcode.machine_options = machine->options;
 
   g_free (text_field);
 
@@ -1352,11 +1345,11 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
     machine_combo = gtk_combo_box_new_text ();
 
     /* Current name is first if one exists */
-    if (strcmp (gui->gcode.machine_name, ""))
+    if (strcmp (gui->gcode.machine_name, "") != 0)
       gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), gui->gcode.machine_name);
 
     for (i = 0; i < gui->machines.number; i++)
-      if (strcmp (gui->gcode.machine_name, gui->machines.machine[i].name))
+      if (strcmp (gui->gcode.machine_name, gui->machines.machine[i].name) != 0)
         gtk_combo_box_append_text (GTK_COMBO_BOX (machine_combo), gui->machines.machine[i].name);
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (machine_combo), 0);

@@ -190,3 +190,22 @@ gui_endmills_size (gui_endmill_t *endmill, uint8_t unit)
 
   return (endmill->diameter);
 }
+
+gui_endmill_t *
+gui_endmills_find (gui_endmill_list_t *endmill_list, char *endmill_name, uint8_t fallback)
+{
+  int i;
+
+  for (i = 0; i < endmill_list->number; i++)
+  {
+    if (strcmp (endmill_name, endmill_list->endmill[i].description) == 0)
+    {
+      return (&endmill_list->endmill[i]);
+    }
+  }
+
+  if (fallback)
+    return (&endmill_list->endmill[0]);
+
+  return (NULL);
+}

@@ -63,5 +63,6 @@ typedef struct gui_machine_list_s
 void gui_machines_init (gui_machine_list_t *machine_list);
 void gui_machines_free (gui_machine_list_t *machine_list);
 int gui_machines_read (gui_machine_list_t *machine_list);
+gui_machine_t *gui_machines_find (gui_machine_list_t *machine_list, char *machine_name, uint8_t fallback);
 
 #endif
