@@ -32,7 +32,6 @@ generic_destroy_callback (GtkWidget *widget, gpointer data)
   GtkWidget **wlist;
 
   wlist = (GtkWidget **)data;
-  free (wlist[0]);                                                              /* hids array */
   free (wlist);
 }
 
@@ -40,27 +39,19 @@ static void
 begin_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_begin_t *begin;
-  uint16_t wind;
   char *text_field;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   begin = (gcode_begin_t *)block->pdata;
-  wind++;
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[wind]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   if (strcmp (text_field, "None") == 0)
   {
@@ -103,14 +94,13 @@ static void
 gui_tab_begin (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *begin_tab;
   GtkWidget *alignment;
   GtkWidget *begin_table;
   GtkWidget *label;
   GtkWidget *cs_combo;
   gcode_begin_t *begin;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Begin Parameters
@@ -118,9 +108,7 @@ gui_tab_begin (gui_t *gui, gcode_block_t *block)
 
   begin = (gcode_begin_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (1 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
   row = 0;
 
   begin_tab = gtk_frame_new ("Begin Parameters");
@@ -138,6 +126,7 @@ gui_tab_begin (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Coord System");
   gtk_table_attach_defaults (GTK_TABLE (begin_table), label, 0, 1, row, row + 1);
+
   cs_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (cs_combo), "None");
   gtk_combo_box_append_text (GTK_COMBO_BOX (cs_combo), "Workspace 1 (G54)");
@@ -147,44 +136,35 @@ gui_tab_begin (gui_t *gui, gcode_block_t *block)
   gtk_combo_box_append_text (GTK_COMBO_BOX (cs_combo), "Workspace 5 (G58)");
   gtk_combo_box_append_text (GTK_COMBO_BOX (cs_combo), "Workspace 6 (G59)");
   gtk_combo_box_set_active (GTK_COMBO_BOX (cs_combo), begin->coordinate_system);
-  hids[0] = g_signal_connect (cs_combo, "changed", G_CALLBACK (begin_update_callback), wlist);
+  g_signal_connect (cs_combo, "changed", G_CALLBACK (begin_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (begin_table), cs_combo, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = cs_combo;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = cs_combo;
 }
 
 static void
 end_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_end_t *end;
-  uint16_t wind;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   end = (gcode_end_t *)block->pdata;
-  wind++;
 
-  end->retract_position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
-  end->retract_position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
-  end->retract_position[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  end->retract_position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  end->retract_position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  end->retract_position[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
 
-  end->home_all_axes = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[6]));
+  end->home_all_axes = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[5]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -196,7 +176,6 @@ static void
 gui_tab_end (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *end_tab;
   GtkWidget *alignment;
   GtkWidget *end_table;
@@ -207,7 +186,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   GtkWidget *home_check_button;
   gcode_t *gcode;
   gcode_end_t *end;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * End Parameters
@@ -217,9 +196,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
 
   end = (gcode_end_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (7 * sizeof (GtkWidget *));
-  hids = NULL;
+  wlist = (GtkWidget **)malloc (6 * sizeof (GtkWidget *));
   row = 0;
 
   end_tab = gtk_frame_new ("End Parameters");
@@ -236,6 +213,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   gtk_container_add (GTK_CONTAINER (alignment), end_table);
 
   label = gtk_label_new ("Retract(X)");
+
   posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 20.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posx_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (posx_spin), end->retract_position[0]);
@@ -249,6 +227,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Retract(Y)");
+
   posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 20.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posy_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (posy_spin), end->retract_position[1]);
@@ -262,6 +241,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Retract(Z)");
+
   posz_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 3.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posz_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (posz_spin), end->retract_position[2]);
@@ -275,6 +255,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Home all Axes (G28)");
+
   home_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (home_check_button), end->home_all_axes);
   g_signal_connect (home_check_button, "toggled", G_CALLBACK (end_update_callback), wlist);
@@ -286,20 +267,18 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = posx_spin;
-  wlist[wind++] = posy_spin;
-  wlist[wind++] = posz_spin;
-  wlist[wind++] = home_check_button;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = posx_spin;
+  wlist[3] = posy_spin;
+  wlist[4] = posz_spin;
+  wlist[5] = home_check_button;
 }
 
 static void
 line_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_line_t *line;
@@ -308,16 +287,15 @@ line_update_callback (GtkWidget *widget, gpointer data)
 
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[0];
-  gui = (gui_t *)wlist[1];
+  gui = (gui_t *)wlist[0];
 
-  block = (gcode_block_t *)wlist[2];
+  block = (gcode_block_t *)wlist[1];
   line = (gcode_line_t *)block->pdata;
 
-  p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
-  p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
-  p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
-  p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+  p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
 
   /* If a value for the position changed then update them otherwise check length and angle */
   if (fabs (p0[0] - line->p0[0]) > GCODE_PRECISION ||
@@ -332,21 +310,21 @@ line_update_callback (GtkWidget *widget, gpointer data)
 
     if (dist < GCODE_PRECISION)
     {
-      g_signal_handler_block (wlist[3], hids[3 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[3]), line->p0[0]);
-      g_signal_handler_unblock (wlist[3], hids[3 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[2], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[2]), line->p0[0]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[2], wlist);
 
-      g_signal_handler_block (wlist[4], hids[4 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[4]), line->p0[1]);
-      g_signal_handler_unblock (wlist[4], hids[4 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[3], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[3]), line->p0[1]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[3], wlist);
 
-      g_signal_handler_block (wlist[5], hids[5 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[0]);
-      g_signal_handler_unblock (wlist[5], hids[5 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[4], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[4]), line->p1[0]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[4], wlist);
 
-      g_signal_handler_block (wlist[6], hids[6 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), line->p1[1]);
-      g_signal_handler_unblock (wlist[6], hids[6 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[5], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[1]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[5], wlist);
       return;
     }
 
@@ -358,21 +336,21 @@ line_update_callback (GtkWidget *widget, gpointer data)
     clength = GCODE_MATH_2D_DISTANCE (line->p1, line->p0);
     gcode_math_xy_to_angle (line->p0, line->p1, &cangle);
 
-    g_signal_handler_block (wlist[7], hids[7 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), clength);
-    g_signal_handler_unblock (wlist[7], hids[7 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[6], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), clength);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[6], wlist);
 
-    g_signal_handler_block (wlist[8], hids[8 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), cangle);
-    g_signal_handler_unblock (wlist[8], hids[8 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[7], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), cangle);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[7], wlist);
   }
   else
   {
     clength = GCODE_MATH_2D_DISTANCE (line->p1, line->p0);
     gcode_math_xy_to_angle (line->p0, line->p1, &cangle);
 
-    nlength = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
-    nangle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
+    nlength = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+    nangle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
 
     if (fabs (clength - nlength) > GCODE_PRECISION)
     {
@@ -382,13 +360,13 @@ line_update_callback (GtkWidget *widget, gpointer data)
       line->p1[0] = line->p0[0] + vec[0];
       line->p1[1] = line->p0[1] + vec[1];
 
-      g_signal_handler_block (wlist[5], hids[5 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[0]);
-      g_signal_handler_unblock (wlist[5], hids[5 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[4], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[4]), line->p1[0]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[4], wlist);
 
-      g_signal_handler_block (wlist[6], hids[6 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), line->p1[1]);
-      g_signal_handler_unblock (wlist[6], hids[6 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[5], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[1]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[5], wlist);
     }
 
     if (fabs (cangle - nangle) > GCODE_PRECISION)
@@ -396,13 +374,13 @@ line_update_callback (GtkWidget *widget, gpointer data)
       line->p1[0] = line->p0[0] + clength * cos (nangle * GCODE_DEG2RAD);
       line->p1[1] = line->p0[1] + clength * sin (nangle * GCODE_DEG2RAD);
 
-      g_signal_handler_block (wlist[5], hids[5 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[0]);
-      g_signal_handler_unblock (wlist[5], hids[5 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[4], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[4]), line->p1[0]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[4], wlist);
 
-      g_signal_handler_block (wlist[6], hids[6 - 3]);
-      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), line->p1[1]);
-      g_signal_handler_unblock (wlist[6], hids[6 - 3]);
+      SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[5], wlist);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), line->p1[1]);
+      SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[5], wlist);
     }
   }
 
@@ -416,7 +394,6 @@ static void
 gui_tab_line (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *line_tab;
   GtkWidget *alignment;
   GtkWidget *line_table;
@@ -429,7 +406,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
   GtkWidget *angle_spin;
   gcode_t *gcode;
   gcode_line_t *line;
-  uint16_t wind, row;
+  uint16_t row;
   gfloat_t length, angle;
 
   /**
@@ -440,9 +417,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
   line = (gcode_line_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (9 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (6 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
   row = 0;
 
   line_tab = gtk_frame_new ("Line Parameters");
@@ -462,37 +437,41 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
   {
     label = gtk_label_new ("P0(X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p0x_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p0x_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p0x_spin), line->p0[0]);
-    hids[0] = g_signal_connect (p0x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p0x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0x_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P0(Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p0y_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Z), GCODE_UNITS (gcode, MAX_DIM_Z), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p0y_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p0y_spin), line->p0[1]);
-    hids[1] = g_signal_connect (p0y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p0y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0y_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P1(X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p1x_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p1x_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p1x_spin), line->p1[0]);
-    hids[2] = g_signal_connect (p1x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p1x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1x_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P1(Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p1y_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Z), GCODE_UNITS (gcode, MAX_DIM_Z), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p1y_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p1y_spin), line->p1[1]);
-    hids[3] = g_signal_connect (p1y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p1y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1y_spin, 1, 2, row, row + 1);
     row++;
 
@@ -500,10 +479,11 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
     label = gtk_label_new ("Length");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     length_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (length_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (length_spin), length);
-    hids[4] = g_signal_connect (length_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (length_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), length_spin, 1, 2, row, row + 1);
     row++;
 
@@ -511,10 +491,11 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
     label = gtk_label_new ("Angle");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     angle_spin = gtk_spin_button_new_with_range (0.0, 360.0, 0.01);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (angle_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (angle_spin), angle);
-    hids[5] = g_signal_connect (angle_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (angle_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), angle_spin, 1, 2, row, row + 1);
     row++;
   }
@@ -522,37 +503,41 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
   {
     label = gtk_label_new ("P0(X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p0x_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p0x_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p0x_spin), line->p0[0]);
-    hids[0] = g_signal_connect (p0x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p0x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0x_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P0(Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p0y_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p0y_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p0y_spin), line->p0[1]);
-    hids[1] = g_signal_connect (p0y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p0y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0y_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P1(X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p1x_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p1x_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p1x_spin), line->p1[0]);
-    hids[2] = g_signal_connect (p1x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p1x_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1x_spin, 1, 2, row, row + 1);
     row++;
 
     label = gtk_label_new ("P1(Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     p1y_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (p1y_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (p1y_spin), line->p1[1]);
-    hids[3] = g_signal_connect (p1y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (p1y_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1y_spin, 1, 2, row, row + 1);
     row++;
 
@@ -560,10 +545,11 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
     label = gtk_label_new ("Length");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     length_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (length_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (length_spin), length);
-    hids[4] = g_signal_connect (length_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (length_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), length_spin, 1, 2, row, row + 1);
     row++;
 
@@ -571,30 +557,29 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
     label = gtk_label_new ("Angle");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
+
     angle_spin = gtk_spin_button_new_with_range (0.0, 360.0, 0.01);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (angle_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (angle_spin), angle);
-    hids[5] = g_signal_connect (angle_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
+    g_signal_connect (angle_spin, "value-changed", G_CALLBACK (line_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (line_table), angle_spin, 1, 2, row, row + 1);
     row++;
   }
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = p0x_spin;
-  wlist[wind++] = p0y_spin;
-  wlist[wind++] = p1x_spin;
-  wlist[wind++] = p1y_spin;
-  wlist[wind++] = length_spin;
-  wlist[wind++] = angle_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = p0x_spin;
+  wlist[3] = p0y_spin;
+  wlist[4] = p1x_spin;
+  wlist[5] = p1y_spin;
+  wlist[6] = length_spin;
+  wlist[7] = angle_spin;
 }
 
 static void
 arc_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_arc_t *arc;
@@ -602,28 +587,28 @@ arc_update_callback (GtkWidget *widget, gpointer data)
 
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[0];
-  gui = (gui_t *)wlist[1];
-  block = (gcode_block_t *)wlist[2];
+  gui = (gui_t *)wlist[0];
+
+  block = (gcode_block_t *)wlist[1];
   arc = (gcode_arc_t *)block->pdata;
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   if (strcmp (text_field, "Sweep") == 0)
   {
-    arc->p[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
-    arc->p[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
-    arc->radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
-    arc->start_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
-    arc->sweep_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[11]));
+    arc->p[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+    arc->p[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
+    arc->radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
+    arc->start_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
+    arc->sweep_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
   }
   else if (strcmp (text_field, "Radius") == 0)
   {
     gcode_arcdata_t arcdata;
     char *direction, *magnitude;
 
-    direction = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[12]));
-    magnitude = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[13]));
+    direction = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[11]));
+    magnitude = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[12]));
 
     arcdata.fls = strcmp (direction, "CW") ? 1 : 0;
     arcdata.fla = strcmp (magnitude, "Small") ? 1 : 0;
@@ -631,11 +616,11 @@ arc_update_callback (GtkWidget *widget, gpointer data)
     g_free (direction);
     g_free (magnitude);
 
-    arcdata.p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[14]));
-    arcdata.p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[15]));
-    arcdata.p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[16]));
-    arcdata.p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[17]));
-    arcdata.radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[18]));
+    arcdata.p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[13]));
+    arcdata.p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[14]));
+    arcdata.p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[15]));
+    arcdata.p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[16]));
+    arcdata.radius = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[17]));
 
     if (gcode_arc_radius_to_sweep (&arcdata) == 0)
     {
@@ -651,18 +636,18 @@ arc_update_callback (GtkWidget *widget, gpointer data)
     gcode_arcdata_t arcdata;
     char *direction;
 
-    direction = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[19]));
+    direction = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[18]));
 
     arcdata.fls = strcmp (direction, "CW") ? 1 : 0;
 
     g_free (direction);
 
-    arcdata.p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[20]));
-    arcdata.p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[21]));
-    arcdata.p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[22]));
-    arcdata.p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[23]));
-    arcdata.cp[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[24]));
-    arcdata.cp[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[25]));
+    arcdata.p0[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[19]));
+    arcdata.p0[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[20]));
+    arcdata.p1[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[21]));
+    arcdata.p1[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[22]));
+    arcdata.cp[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[23]));
+    arcdata.cp[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[24]));
 
     if (gcode_arc_center_to_sweep (&arcdata) == 0)
     {
@@ -686,83 +671,85 @@ static void
 arc_interface_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
+  gui_t *gui;
   gcode_block_t *block;
   gcode_arc_t *arc;
   char *text_field;
 
   wlist = (GtkWidget **)data;
-  hids = (gulong *) wlist[0];
-  block = (gcode_block_t *)wlist[2];
+
+  gui = (gui_t *)wlist[0];
+
+  block = (gcode_block_t *)wlist[1];
   arc = (gcode_arc_t *)block->pdata;
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
   if (strcmp (text_field, "Sweep") == 0)
   {
     arc->native_mode = GCODE_ARC_INTERFACE_SWEEP;
-    gtk_widget_set_child_visible (wlist[4], 1);
+    gtk_widget_set_child_visible (wlist[3], 1);
+    gtk_widget_set_child_visible (wlist[4], 0);
     gtk_widget_set_child_visible (wlist[5], 0);
-    gtk_widget_set_child_visible (wlist[6], 0);
 
-    g_signal_handler_block (wlist[7], hids[7 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), arc->p[0]);
-    g_signal_handler_unblock (wlist[7], hids[7 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[6], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), arc->p[0]);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[6], wlist);
 
-    g_signal_handler_block (wlist[8], hids[8 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), arc->p[1]);
-    g_signal_handler_unblock (wlist[8], hids[8 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[7], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), arc->p[1]);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[7], wlist);
 
-    g_signal_handler_block (wlist[9], hids[9 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[9]), arc->radius);
-    g_signal_handler_unblock (wlist[9], hids[9 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[8], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), arc->radius);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[8], wlist);
 
-    g_signal_handler_block (wlist[10], hids[10 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), arc->start_angle);
-    g_signal_handler_unblock (wlist[10], hids[10 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[9], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[9]), arc->start_angle);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[9], wlist);
 
-    g_signal_handler_block (wlist[11], hids[11 - 3]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[11]), arc->sweep_angle);
-    g_signal_handler_unblock (wlist[11], hids[11 - 3]);
+    SIGNAL_HANDLER_BLOCK_USING_DATA (wlist[10], wlist);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), arc->sweep_angle);
+    SIGNAL_HANDLER_UNBLOCK_USING_DATA (wlist[10], wlist);
   }
   else if (strcmp (text_field, "Radius") == 0)
   {
     gcode_vec2d_t p0, p1;
 
     arc->native_mode = GCODE_ARC_INTERFACE_RADIUS;
-    gtk_widget_set_child_visible (wlist[4], 0);
-    gtk_widget_set_child_visible (wlist[5], 1);
-    gtk_widget_set_child_visible (wlist[6], 0);
+    gtk_widget_set_child_visible (wlist[3], 0);
+    gtk_widget_set_child_visible (wlist[4], 1);
+    gtk_widget_set_child_visible (wlist[5], 0);
 
     gcode_arc_ends (block, p0, p1, GCODE_GET);
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[12]), arc->sweep_angle > 0.0 ? 1 : 0);
-    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[13]), fabs (arc->sweep_angle) > 180.0 ? 1 : 0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[14]), p0[0]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[15]), p0[1]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[16]), p1[0]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[17]), p1[1]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[18]), arc->radius);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[11]), arc->sweep_angle > 0.0 ? 1 : 0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[12]), fabs (arc->sweep_angle) > 180.0 ? 1 : 0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[13]), p0[0]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[14]), p0[1]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[15]), p1[0]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[16]), p1[1]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[17]), arc->radius);
   }
   else if (strcmp (text_field, "Center") == 0)
   {
     gcode_vec2d_t p0, p1, center;
 
     arc->native_mode = GCODE_ARC_INTERFACE_CENTER;
+    gtk_widget_set_child_visible (wlist[3], 0);
     gtk_widget_set_child_visible (wlist[4], 0);
-    gtk_widget_set_child_visible (wlist[5], 0);
-    gtk_widget_set_child_visible (wlist[6], 1);
+    gtk_widget_set_child_visible (wlist[5], 1);
 
     gcode_arc_ends (block, p0, p1, GCODE_GET);
     gcode_arc_center (block, center, GCODE_GET);
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[19]), arc->sweep_angle > 0.0 ? 1 : 0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[20]), p0[0]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[21]), p0[1]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[22]), p1[0]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[23]), p1[1]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[24]), center[0]);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[25]), center[1]);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (wlist[18]), arc->sweep_angle > 0.0 ? 1 : 0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[19]), p0[0]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[20]), p0[1]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[21]), p1[0]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[22]), p1[1]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[23]), center[0]);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[24]), center[1]);
   }
 
   g_free (text_field);
@@ -772,7 +759,6 @@ static void
 gui_tab_arc (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *arc_tab;
   GtkWidget *alignment;
   GtkWidget *arc_table;
@@ -805,7 +791,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gcode_t *gcode;
   gcode_arc_t *arc;
   gcode_vec2d_t p0, p1, center;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Arc Parameters
@@ -818,14 +804,11 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gcode_arc_ends (block, p0, p1, GCODE_GET);
   gcode_arc_center (block, center, GCODE_GET);
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (26 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (23 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (25 * sizeof (GtkWidget *));
   row = 0;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
 
   arc_tab = gtk_frame_new ("Arc Parameters");
   g_signal_connect (arc_tab, "destroy", G_CALLBACK (generic_destroy_callback), wlist);
@@ -842,6 +825,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Arc Interface");
   gtk_table_attach_defaults (GTK_TABLE (arc_table), label, 0, 1, row, row + 1);
+
   arc_interface_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (arc_interface_combo), "Sweep");
   gtk_combo_box_append_text (GTK_COMBO_BOX (arc_interface_combo), "Radius");
@@ -851,7 +835,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_table), arc_interface_combo, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = arc_interface_combo;
+  wlist[2] = arc_interface_combo;
 
   arc_sweep_table = gtk_table_new (8, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (arc_sweep_table), TABLE_SPACING);
@@ -871,14 +855,14 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (arc_center_table), 0);
   gtk_table_attach_defaults (GTK_TABLE (arc_table), arc_center_table, 0, 2, row, row + 1);
 
-  wlist[wind++] = arc_sweep_table;
-  wlist[wind++] = arc_radius_table;
-  wlist[wind++] = arc_center_table;
+  wlist[3] = arc_sweep_table;
+  wlist[4] = arc_radius_table;
+  wlist[5] = arc_center_table;
 
+  gtk_widget_set_child_visible (wlist[3], 0);
   gtk_widget_set_child_visible (wlist[4], 0);
   gtk_widget_set_child_visible (wlist[5], 0);
-  gtk_widget_set_child_visible (wlist[6], 0);
-  gtk_widget_set_child_visible (wlist[arc->native_mode + 4], 1);
+  gtk_widget_set_child_visible (wlist[arc->native_mode + 3], 1);
 
   /**
    * SWEEP INTERFACE
@@ -887,37 +871,41 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   row = 0;
   label = gtk_label_new ("Start Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
   sweep_start_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_start_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_start_posx_spin), p0[0]);
-  hids[4] = g_signal_connect (sweep_start_posx_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (sweep_start_posx_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_start_posx_spin, 1, 2, row, row + 1);
   row++;
 
   label = gtk_label_new ("Start Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
   sweep_start_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_start_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_start_posy_spin), p0[1]);
-  hids[5] = g_signal_connect (sweep_start_posy_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (sweep_start_posy_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_start_posy_spin, 1, 2, row, row + 1);
   row++;
 
   label = gtk_label_new ("Radius");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
   sweep_radius_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_radius_spin), arc->radius);
-  hids[6] = g_signal_connect (sweep_radius_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (sweep_radius_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_radius_spin, 1, 2, row, row + 1);
   row++;
 
   label = gtk_label_new ("Start Angle");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
   sweep_start_angle_spin = gtk_spin_button_new_with_range (0.0, 360.0, 0.1);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_start_angle_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_start_angle_spin), arc->start_angle);
-  hids[7] = g_signal_connect (sweep_start_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+  g_signal_connect (sweep_start_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_start_angle_spin, 1, 2, row, row + 1);
   row++;
 
@@ -925,10 +913,11 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   {
     label = gtk_label_new ("Sweep");
     gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
     sweep_sweep_angle_spin = gtk_spin_button_new_with_range (-90.0, 90.0, 1.0);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_sweep_angle_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_sweep_angle_spin), arc->sweep_angle);
-    hids[8] = g_signal_connect (sweep_sweep_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+    g_signal_connect (sweep_sweep_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_sweep_angle_spin, 1, 2, row, row + 1);
     row++;
   }
@@ -936,19 +925,20 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   {
     label = gtk_label_new ("Sweep");
     gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
+
     sweep_sweep_angle_spin = gtk_spin_button_new_with_range (-360.0, 360.0, 1.0);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sweep_sweep_angle_spin), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (sweep_sweep_angle_spin), arc->sweep_angle);
-    hids[8] = g_signal_connect (sweep_sweep_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
+    g_signal_connect (sweep_sweep_angle_spin, "value-changed", G_CALLBACK (arc_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_sweep_angle_spin, 1, 2, row, row + 1);
     row++;
   }
 
-  wlist[wind++] = sweep_start_posx_spin;
-  wlist[wind++] = sweep_start_posy_spin;
-  wlist[wind++] = sweep_radius_spin;
-  wlist[wind++] = sweep_start_angle_spin;
-  wlist[wind++] = sweep_sweep_angle_spin;
+  wlist[6] = sweep_start_posx_spin;
+  wlist[7] = sweep_start_posy_spin;
+  wlist[8] = sweep_radius_spin;
+  wlist[9] = sweep_start_angle_spin;
+  wlist[10] = sweep_sweep_angle_spin;
 
   /**
    * RADIUS INTERFACE
@@ -957,6 +947,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   row = 0;
   label = gtk_label_new ("Direction");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_direction_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (radius_direction_combo), "CW");
   gtk_combo_box_append_text (GTK_COMBO_BOX (radius_direction_combo), "CCW");
@@ -966,6 +957,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Magnitude");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_magnitude_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (radius_magnitude_combo), "Small");
   gtk_combo_box_append_text (GTK_COMBO_BOX (radius_magnitude_combo), "Large");
@@ -975,6 +967,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Start Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_start_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_start_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_start_posx_spin), p0[0]);
@@ -983,6 +976,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Start Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_start_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_start_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_start_posy_spin), p0[1]);
@@ -991,6 +985,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("End Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_end_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_end_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_end_posx_spin), p1[0]);
@@ -999,6 +994,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("End Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_end_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_end_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_end_posy_spin), p1[1]);
@@ -1007,6 +1003,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Radius");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
+
   radius_radius_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_radius_spin), arc->radius);
@@ -1017,13 +1014,13 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   g_signal_connect (radius_apply_changes_button, "clicked", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_apply_changes_button, 0, 2, row, row + 1);
 
-  wlist[wind++] = radius_direction_combo;
-  wlist[wind++] = radius_magnitude_combo;
-  wlist[wind++] = radius_start_posx_spin;
-  wlist[wind++] = radius_start_posy_spin;
-  wlist[wind++] = radius_end_posx_spin;
-  wlist[wind++] = radius_end_posy_spin;
-  wlist[wind++] = radius_radius_spin;
+  wlist[11] = radius_direction_combo;
+  wlist[12] = radius_magnitude_combo;
+  wlist[13] = radius_start_posx_spin;
+  wlist[14] = radius_start_posy_spin;
+  wlist[15] = radius_end_posx_spin;
+  wlist[16] = radius_end_posy_spin;
+  wlist[17] = radius_radius_spin;
 
   /**
    * CENTER INTERFACE
@@ -1032,6 +1029,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   row = 0;
   label = gtk_label_new ("Direction");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_direction_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (center_direction_combo), "CW");
   gtk_combo_box_append_text (GTK_COMBO_BOX (center_direction_combo), "CCW");
@@ -1041,6 +1039,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Start Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_start_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_start_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_start_posx_spin), p0[0]);
@@ -1049,6 +1048,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Start Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_start_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_start_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_start_posy_spin), p0[1]);
@@ -1057,6 +1057,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("End Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_end_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_end_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_end_posx_spin), p1[0]);
@@ -1065,6 +1066,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("End Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_end_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_end_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_end_posy_spin), p1[1]);
@@ -1073,6 +1075,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Center Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_center_posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_center_posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_center_posx_spin), center[0]);
@@ -1081,6 +1084,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Center Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
+
   center_center_posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (center_center_posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (center_center_posy_spin), center[1]);
@@ -1091,27 +1095,19 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   g_signal_connect (center_apply_changes_button, "clicked", G_CALLBACK (arc_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_apply_changes_button, 0, 2, row, row + 1);
 
-  wlist[wind++] = center_direction_combo;
-  wlist[wind++] = center_start_posx_spin;
-  wlist[wind++] = center_start_posy_spin;
-  wlist[wind++] = center_end_posx_spin;
-  wlist[wind++] = center_end_posy_spin;
-  wlist[wind++] = center_center_posx_spin;
-  wlist[wind++] = center_center_posy_spin;
+  wlist[18] = center_direction_combo;
+  wlist[19] = center_start_posx_spin;
+  wlist[20] = center_start_posy_spin;
+  wlist[21] = center_end_posx_spin;
+  wlist[22] = center_end_posy_spin;
+  wlist[23] = center_center_posx_spin;
+  wlist[24] = center_center_posy_spin;
 }
 
 static void
 bolt_holes_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
-  GtkWidget *posx_spin;
-  GtkWidget *posy_spin;
-  GtkWidget *hole_diameter_spin;
-  GtkWidget *offset_distance_spin;
-  GtkWidget *type_combo;
-  GtkWidget *generic_spin[2];
-  GtkWidget *pocket_check_button;
   gui_t *gui;
   gcode_block_t *block;
   gcode_bolt_holes_t *bolt_holes;
@@ -1119,76 +1115,65 @@ bolt_holes_update_callback (GtkWidget *widget, gpointer data)
 
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[0];
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[1];
-
-  block = (gcode_block_t *)wlist[2];
+  block = (gcode_block_t *)wlist[1];
   bolt_holes = (gcode_bolt_holes_t *)block->pdata;
 
-  posx_spin = wlist[3];
-  posy_spin = wlist[4];
-  hole_diameter_spin = wlist[5];
-  offset_distance_spin = wlist[6];
-  type_combo = wlist[7];
-  generic_spin[0] = wlist[9];
-  generic_spin[1] = wlist[11];
-  pocket_check_button = wlist[12];
+  bolt_holes->position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  bolt_holes->position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  bolt_holes->hole_diameter = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  bolt_holes->offset_distance = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
 
-  bolt_holes->position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (posx_spin));
-  bolt_holes->position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (posy_spin));
-  bolt_holes->hole_diameter = gtk_spin_button_get_value (GTK_SPIN_BUTTON (hole_diameter_spin));
-  bolt_holes->offset_distance = gtk_spin_button_get_value (GTK_SPIN_BUTTON (offset_distance_spin));
-
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (type_combo));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[6]));
 
   if ((strcmp (text_field, "Radial") == 0) && (bolt_holes->type != GCODE_BOLT_HOLES_TYPE_RADIAL))
   {
     bolt_holes->type = GCODE_BOLT_HOLES_TYPE_RADIAL;
 
     /* Update the labels and spin buttons */
-    gtk_label_set_text (GTK_LABEL (wlist[8]), "Hole Num");
-    gtk_spin_button_set_range (GTK_SPIN_BUTTON (generic_spin[0]), 1, 100);
-    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[0]), 0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[0]), bolt_holes->number[0]);
+    gtk_label_set_text (GTK_LABEL (wlist[7]), "Hole Num");
+    gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[8]), 1, 100);
+    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[8]), 0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), bolt_holes->number[0]);
 
-    gtk_label_set_text (GTK_LABEL (wlist[10]), "Offset Angle");
-    gtk_spin_button_set_range (GTK_SPIN_BUTTON (generic_spin[1]), 0.0, 360.0);
-    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[1]), MANTISSA);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[1]), bolt_holes->offset_angle);
+    gtk_label_set_text (GTK_LABEL (wlist[9]), "Offset Angle");
+    gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[10]), 0.0, 360.0);
+    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[10]), MANTISSA);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), bolt_holes->offset_angle);
   }
   else if ((strcmp (text_field, "Matrix") == 0) && (bolt_holes->type != GCODE_BOLT_HOLES_TYPE_MATRIX))
   {
     bolt_holes->type = GCODE_BOLT_HOLES_TYPE_MATRIX;
 
     /* Update the labels and spin buttons */
-    gtk_label_set_text (GTK_LABEL (wlist[8]), "Hole Num(X)");
-    gtk_spin_button_set_range (GTK_SPIN_BUTTON (generic_spin[0]), 1, 100);
-    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[0]), 0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[0]), bolt_holes->number[0]);
+    gtk_label_set_text (GTK_LABEL (wlist[7]), "Hole Num(X)");
+    gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[8]), 1, 100);
+    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[8]), 0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), bolt_holes->number[0]);
 
-    gtk_label_set_text (GTK_LABEL (wlist[10]), "Hole Num(Y)");
-    gtk_spin_button_set_range (GTK_SPIN_BUTTON (generic_spin[1]), 1, 100);
-    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[1]), 0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[1]), bolt_holes->number[1]);
+    gtk_label_set_text (GTK_LABEL (wlist[9]), "Hole Num(Y)");
+    gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[10]), 1, 100);
+    gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[10]), 0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), bolt_holes->number[1]);
   }
 
-  bolt_holes->number[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (generic_spin[0]));
+  bolt_holes->number[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
 
   if (strcmp (text_field, "Radial") == 0)
   {
     bolt_holes->type = GCODE_BOLT_HOLES_TYPE_RADIAL;
-    bolt_holes->offset_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (generic_spin[1]));
+    bolt_holes->offset_angle = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
   }
   else if (strcmp (text_field, "Matrix") == 0)
   {
     bolt_holes->type = GCODE_BOLT_HOLES_TYPE_MATRIX;
-    bolt_holes->number[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (generic_spin[1]));
+    bolt_holes->number[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
   }
 
   g_free (text_field);
 
-  bolt_holes->pocket = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (pocket_check_button));
+  bolt_holes->pocket = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[11]));
 
   gcode_bolt_holes_rebuild (block);
 
@@ -1202,7 +1187,6 @@ static void
 gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *bolt_holes_tab;
   GtkWidget *alignment;
   GtkWidget *bolt_holes_table;
@@ -1216,7 +1200,6 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
   GtkWidget *pocket_check_button;
   gcode_t *gcode;
   gcode_bolt_holes_t *bolt_holes;
-  uint16_t wind;
 
   /**
    * Bolt Holes Parameters
@@ -1226,9 +1209,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   bolt_holes = (gcode_bolt_holes_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (13 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (10 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (12 * sizeof (GtkWidget *));
 
   bolt_holes_tab = gtk_frame_new ("Bolt Holes Parameters");
   g_signal_connect (bolt_holes_tab, "destroy", G_CALLBACK (generic_destroy_callback), wlist);
@@ -1245,6 +1226,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 0, 1);
+
   posx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (posx_spin), bolt_holes->position[0]);
@@ -1253,6 +1235,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 1, 2);
+
   posy_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posy_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (posy_spin), bolt_holes->position[1]);
@@ -1261,6 +1244,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Hole Diameter");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 2, 3);
+
   hole_diameter_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (hole_diameter_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (hole_diameter_spin), bolt_holes->hole_diameter);
@@ -1269,105 +1253,108 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Offset Distance");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 3, 4);
+
   offset_distance_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (offset_distance_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (offset_distance_spin), bolt_holes->offset_distance);
   g_signal_connect (offset_distance_spin, "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), offset_distance_spin, 1, 2, 3, 4);
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = posx_spin;
-  wlist[wind++] = posy_spin;
-  wlist[wind++] = hole_diameter_spin;
-  wlist[wind++] = offset_distance_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = posx_spin;
+  wlist[3] = posy_spin;
+  wlist[4] = hole_diameter_spin;
+  wlist[5] = offset_distance_spin;
 
   label = gtk_label_new ("Type");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 4, 5);
+
   type_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (type_combo), "Radial");
   gtk_combo_box_append_text (GTK_COMBO_BOX (type_combo), "Matrix");
   gtk_combo_box_set_active (GTK_COMBO_BOX (type_combo), bolt_holes->type);
   g_signal_connect (type_combo, "changed", G_CALLBACK (bolt_holes_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), type_combo, 1, 2, 4, 5);
-  wlist[wind++] = type_combo;
+  wlist[6] = type_combo;
 
   if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_RADIAL)
   {
     label = gtk_label_new ("Hole Num");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 5, 6);
+
     generic_spin[0] = gtk_spin_button_new_with_range (1, 100, 1);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[0]), 0);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[0]), bolt_holes->number[0]);
     g_signal_connect (generic_spin[0], "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), generic_spin[0], 1, 2, 5, 6);
-    wlist[wind++] = label;
-    wlist[wind++] = generic_spin[0];
+    wlist[7] = label;
+    wlist[8] = generic_spin[0];
 
     label = gtk_label_new ("Offset Angle");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 6, 7);
+
     generic_spin[1] = gtk_spin_button_new_with_range (0.0, 360.0, 1.0);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[1]), MANTISSA);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[1]), bolt_holes->offset_angle);
     g_signal_connect (generic_spin[1], "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), generic_spin[1], 1, 2, 6, 7);
-    wlist[wind++] = label;
-    wlist[wind++] = generic_spin[1];
+    wlist[9] = label;
+    wlist[10] = generic_spin[1];
   }
   else if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)
   {
     label = gtk_label_new ("Hole Num(X)");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 5, 6);
+
     generic_spin[0] = gtk_spin_button_new_with_range (1, 100, 1);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[0]), 0);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[0]), bolt_holes->number[0]);
     g_signal_connect (generic_spin[0], "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), generic_spin[0], 1, 2, 5, 6);
-    wlist[wind++] = label;
-    wlist[wind++] = generic_spin[0];
+    wlist[7] = label;
+    wlist[8] = generic_spin[0];
 
     label = gtk_label_new ("Hole Num(Y)");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 6, 7);
+
     generic_spin[1] = gtk_spin_button_new_with_range (1, 100, 1);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (generic_spin[1]), 0);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (generic_spin[1]), bolt_holes->number[1]);
     g_signal_connect (generic_spin[1], "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), generic_spin[1], 1, 2, 6, 7);
-    wlist[wind++] = label;
-    wlist[wind++] = generic_spin[1];
+    wlist[9] = label;
+    wlist[10] = generic_spin[1];
   }
 
   label = gtk_label_new ("Pocket");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 7, 8);
+
   pocket_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (pocket_check_button), bolt_holes->pocket);
   g_signal_connect (pocket_check_button, "toggled", G_CALLBACK (bolt_holes_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), pocket_check_button, 1, 2, 7, 8);
-  wlist[wind++] = pocket_check_button;
+  wlist[11] = pocket_check_button;
 }
 
 static void
 drill_holes_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_drill_holes_t *drill_holes;
 
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[0];
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[1];
-
-  block = (gcode_block_t *)wlist[2];
+  block = (gcode_block_t *)wlist[1];
   drill_holes = (gcode_drill_holes_t *)block->pdata;
 
-  drill_holes->depth = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
-  drill_holes->increment = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
-  drill_holes->optimal_path = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[5]));
+  drill_holes->depth = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  drill_holes->increment = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  drill_holes->optimal_path = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[4]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -1379,7 +1366,6 @@ static void
 gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *drill_holes_tab;
   GtkWidget *alignment;
   GtkWidget *table;
@@ -1389,7 +1375,6 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
   GtkWidget *optimal_path_check_button;
   gcode_t *gcode;
   gcode_drill_holes_t *drill_holes;
-  uint16_t wind;
 
   /**
    * Drill Holes Parameters
@@ -1399,9 +1384,7 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 
   drill_holes = (gcode_drill_holes_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (6 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (3 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
 
   drill_holes_tab = gtk_frame_new ("Drill Holes Parameters");
   g_signal_connect (drill_holes_tab, "destroy", G_CALLBACK (generic_destroy_callback), wlist);
@@ -1418,6 +1401,7 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Depth");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
   depth_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Z), 0.0, GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depth_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), drill_holes->depth);
@@ -1426,6 +1410,7 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Peck Increment");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
+
   peck_increment_spin = gtk_spin_button_new_with_range (0.0, GCODE_UNITS (gcode, MAX_DIM_Z), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (peck_increment_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (peck_increment_spin), drill_holes->increment);
@@ -1434,44 +1419,36 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Optimal Path");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
+
   optimal_path_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (optimal_path_check_button), drill_holes->optimal_path);
   g_signal_connect (optimal_path_check_button, "toggled", G_CALLBACK (drill_holes_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (table), optimal_path_check_button, 1, 2, 2, 3);
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = (GtkWidget *)depth_spin;
-  wlist[wind++] = (GtkWidget *)peck_increment_spin;
-  wlist[wind++] = (GtkWidget *)optimal_path_check_button;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = (GtkWidget *)depth_spin;
+  wlist[3] = (GtkWidget *)peck_increment_spin;
+  wlist[4] = (GtkWidget *)optimal_path_check_button;
 }
 
 static void
 point_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_point_t *point;
-  uint16_t wind;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   point = (gcode_point_t *)block->pdata;
-  wind++;
 
-  point->p[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
-  point->p[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
+  point->p[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  point->p[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -1483,7 +1460,6 @@ static void
 gui_tab_point (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *point_tab;
   GtkWidget *alignment;
   GtkWidget *table;
@@ -1492,7 +1468,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
   GtkWidget *py_spin;
   gcode_t *gcode;
   gcode_point_t *point;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Point Parameters
@@ -1502,9 +1478,8 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
 
   point = (gcode_point_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (2 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+
   row = 0;
 
   point_tab = gtk_frame_new ("Point Parameters");
@@ -1522,6 +1497,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Pos(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   px_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (px_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (px_spin), point->p[0]);
@@ -1531,6 +1507,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Pos(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   py_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (py_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (py_spin), point->p[1]);
@@ -1538,39 +1515,30 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), py_spin, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = px_spin;
-  wlist[wind++] = py_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = px_spin;
+  wlist[3] = py_spin;
 }
 
 static void
 template_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_template_t *template;
-  uint16_t wind;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   template = (gcode_template_t *)block->pdata;
-  wind++;
 
-  template->position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
-  template->position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
-  template->rotation = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
+  template->position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  template->position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  template->rotation = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -1582,7 +1550,6 @@ static void
 gui_tab_template (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *template_tab;
   GtkWidget *alignment;
   GtkWidget *template_table;
@@ -1592,7 +1559,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
   GtkWidget *rotation_spin;
   gcode_t *gcode;
   gcode_template_t *template;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Template Parameters
@@ -1602,9 +1569,8 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
 
   template = (gcode_template_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (6 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (3 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
+
   row = 0;
 
   template_tab = gtk_frame_new ("Template Parameters");
@@ -1622,6 +1588,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Position(X)");
   gtk_table_attach_defaults (GTK_TABLE (template_table), label, 0, 1, row, row + 1);
+
   positionx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_X), GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (positionx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (positionx_spin), template->position[0]);
@@ -1631,6 +1598,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Position(Y)");
   gtk_table_attach_defaults (GTK_TABLE (template_table), label, 0, 1, row, row + 1);
+
   positiony_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Y), GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (positiony_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (positiony_spin), template->position[1]);
@@ -1640,6 +1608,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Rotation");
   gtk_table_attach_defaults (GTK_TABLE (template_table), label, 0, 1, row, row + 1);
+
   rotation_spin = gtk_spin_button_new_with_range (0.0, 360.0, 1.0);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotation_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotation_spin), template->rotation);
@@ -1647,63 +1616,59 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (template_table), rotation_spin, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = positionx_spin;
-  wlist[wind++] = positiony_spin;
-  wlist[wind++] = rotation_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = positionx_spin;
+  wlist[3] = positiony_spin;
+  wlist[4] = rotation_spin;
 }
 
 static void
 sketch_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_sketch_t *sketch;
 
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[0];
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[1];
-
-  block = (gcode_block_t *)wlist[2];
+  block = (gcode_block_t *)wlist[1];
   sketch = (gcode_sketch_t *)block->pdata;
 
-  sketch->taper_offset[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
-  sketch->taper_offset[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
-  sketch->zero_pass = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[6]));
+  sketch->taper_offset[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  sketch->taper_offset[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  sketch->zero_pass = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[5]));
 
   if (fabs (sketch->taper_offset[0]) > 0.0 || fabs (sketch->taper_offset[1]) > 0.0)
   {
-    gtk_widget_set_sensitive (wlist[7], 0);
+    gtk_widget_set_sensitive (wlist[6], 0);
     sketch->helical = 0;
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[7]), sketch->helical);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[6]), sketch->helical);
   }
   else
   {
-    gtk_widget_set_sensitive (wlist[7], 1);
+    gtk_widget_set_sensitive (wlist[6], 1);
   }
 
-  if (sketch->pocket && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[7])))
+  if (sketch->pocket && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[6])))
   {
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[5]), 0);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[4]), 0);
     sketch->pocket = 0;
     sketch->helical = 1;
   }
-  else if (sketch->helical && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[5])))
+  else if (sketch->helical && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[4])))
   {
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[7]), 0);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wlist[6]), 0);
     sketch->helical = 0;
     sketch->pocket = 1;
   }
   else
   {
-    sketch->pocket = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[5]));
-    sketch->helical = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[7]));
+    sketch->pocket = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[4]));
+    sketch->helical = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[6]));
   }
 
   gui->opengl.rebuild_view_display_list = 1;
@@ -1716,7 +1681,6 @@ static void
 gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *sketch_tab;
   GtkWidget *alignment;
   GtkWidget *sketch_table;
@@ -1729,7 +1693,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
   gcode_t *gcode;
   gcode_sketch_t *sketch;
   int taper_exists;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Sketch Parameters
@@ -1739,9 +1703,8 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   sketch = (gcode_sketch_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (4 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (7 * sizeof (GtkWidget *));
+
   row = 0;
 
   sketch_tab = gtk_frame_new ("Sketch Parameters");
@@ -1759,6 +1722,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Taper Offset(X)");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
+
   taper_offsetx_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -1.0), GCODE_UNITS (gcode, 1.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (taper_offsetx_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (taper_offsetx_spin), sketch->taper_offset[0]);
@@ -1768,6 +1732,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Taper Offset(Y)");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
+
   taper_offsety_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -1.0), GCODE_UNITS (gcode, 1.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (taper_offsety_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (taper_offsety_spin), sketch->taper_offset[1]);
@@ -1777,6 +1742,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Pocket");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
+
   pocket_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (pocket_check_button), sketch->pocket);
   g_signal_connect (pocket_check_button, "toggled", G_CALLBACK (sketch_update_callback), wlist);
@@ -1785,6 +1751,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Zero Pass");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
+
   zero_pass_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (zero_pass_check_button), sketch->zero_pass);
   g_signal_connect (zero_pass_check_button, "toggled", G_CALLBACK (sketch_update_callback), wlist);
@@ -1798,6 +1765,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Helical");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
+
   helical_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (helical_check_button), sketch->helical);
   g_signal_connect (helical_check_button, "toggled", G_CALLBACK (sketch_update_callback), wlist);
@@ -1807,43 +1775,34 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
   if (taper_exists || (fabs (sketch->taper_offset[0]) > GCODE_PRECISION) || (fabs (sketch->taper_offset[1]) > GCODE_PRECISION))
     gtk_widget_set_sensitive (helical_check_button, 0);
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = taper_offsetx_spin;
-  wlist[wind++] = taper_offsety_spin;
-  wlist[wind++] = pocket_check_button;
-  wlist[wind++] = zero_pass_check_button;
-  wlist[wind++] = helical_check_button;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = taper_offsetx_spin;
+  wlist[3] = taper_offsety_spin;
+  wlist[4] = pocket_check_button;
+  wlist[5] = zero_pass_check_button;
+  wlist[6] = helical_check_button;
 }
 
 static void
 extrusion_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_extrusion_t *extrusion;
-  uint16_t wind;
   char *text_field;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   extrusion = (gcode_extrusion_t *)block->pdata;
-  wind++;
 
-  extrusion->resolution = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
+  extrusion->resolution = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[wind++]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
 
   if (strcmp (text_field, "Inside") == 0)
   {
@@ -1870,7 +1829,6 @@ static void
 gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *extrusion_tab;
   GtkWidget *alignment;
   GtkWidget *extrusion_table;
@@ -1879,7 +1837,7 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
   GtkWidget *cut_side_combo;
   gcode_t *gcode;
   gcode_extrusion_t *extrusion;
-  uint16_t wind, row;
+  uint16_t row;
   uint8_t option = 1;
 
   /**
@@ -1890,9 +1848,8 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
 
   extrusion = (gcode_extrusion_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (2 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+
   row = 0;
 
   extrusion_tab = gtk_frame_new ("Extrusion Parameters");
@@ -1910,6 +1867,7 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Resolution");
   gtk_table_attach_defaults (GTK_TABLE (extrusion_table), label, 0, 1, row, row + 1);
+
   resolution_spin = gtk_spin_button_new_with_range (0.001, gcode->material_size[2], GCODE_UNITS (gcode, 0.001));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (resolution_spin), 3);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (resolution_spin), extrusion->resolution);
@@ -1922,6 +1880,7 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Cut Side");
   gtk_table_attach_defaults (GTK_TABLE (extrusion_table), label, 0, 1, row, row + 1);
+
   cut_side_combo = gtk_combo_box_new_text ();
 
   if (option)
@@ -1948,40 +1907,30 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
     gtk_widget_set_sensitive (cut_side_combo, 0);
   }
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = resolution_spin;
-  wlist[wind++] = cut_side_combo;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = resolution_spin;
+  wlist[3] = cut_side_combo;
 }
 
 static void
 tool_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
-  GtkWidget *prompt_combo;
   gui_t *gui;
   gcode_block_t *block;
   gcode_tool_t *tool;
   gui_endmill_t *endmill;
-  uint16_t wind;
   char *text_field;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   tool = (gcode_tool_t *)block->pdata;
-  wind++;
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
   strcpy (tool->label, &text_field[6]);
   g_free (text_field);
 
@@ -1990,11 +1939,9 @@ tool_update_callback (GtkWidget *widget, gpointer data)
   tool->diameter = gui_endmills_size (endmill, gui->gcode.units);
   tool->number = endmill->number;
 
-  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
 
-  prompt_combo = wlist[wind++];
-
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[5]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[4]));
 
   if (strcmp (text_field, "On") == 0)
   {
@@ -2007,11 +1954,11 @@ tool_update_callback (GtkWidget *widget, gpointer data)
 
   g_free (text_field);
 
-  tool->change_position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
-  tool->change_position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
-  tool->change_position[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
+  tool->change_position[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  tool->change_position[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+  tool->change_position[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
 
-  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[9]));
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[8]));
 
   if (strcmp (text_field, "100%") == 0)
     tool->plunge_ratio = 1.0;
@@ -2024,9 +1971,9 @@ tool_update_callback (GtkWidget *widget, gpointer data)
 
   g_free (text_field);
 
-  tool->spindle_rpm = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
+  tool->spindle_rpm = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
 
-  tool->coolant = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[11]));
+  tool->coolant = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wlist[10]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -2038,7 +1985,6 @@ static void
 gui_tab_tool (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *tool_tab;
   GtkWidget *alignment;
   GtkWidget *tool_table;
@@ -2054,7 +2000,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   GtkWidget *coolant_check_button;
   gcode_t *gcode;
   gcode_tool_t *tool;
-  uint16_t wind, row;
+  uint16_t row;
   int selind;
 
   /**
@@ -2065,9 +2011,8 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
   tool = (gcode_tool_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (12 * sizeof (GtkWidget *));
-  hids = NULL;
+  wlist = (GtkWidget **)malloc (11 * sizeof (GtkWidget *));
+
   row = 0;
 
   tool_tab = gtk_frame_new ("Tool Parameters");
@@ -2120,6 +2065,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Feed Rate");
   gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 1, row, row + 1);
+
   feed_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.01), GCODE_UNITS (gcode, 80.0), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (feed_spin), 2);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), tool->feed);
@@ -2129,6 +2075,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Prompt");
   gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 1, row, row + 1);
+
   prompt_combo = gtk_combo_box_new_text ();
   gtk_combo_box_append_text (GTK_COMBO_BOX (prompt_combo), "Off");
   gtk_combo_box_append_text (GTK_COMBO_BOX (prompt_combo), "On");
@@ -2138,6 +2085,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   row++;
 
   label = gtk_label_new ("Change(X)");
+
   changex_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 20.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changex_spin), 1);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (changex_spin), tool->change_position[0]);
@@ -2151,6 +2099,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Change(Y)");
+
   changey_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 20.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changey_spin), 1);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (changey_spin), tool->change_position[1]);
@@ -2164,6 +2113,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Change(Z)");
+
   changez_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 0.0), GCODE_UNITS (gcode, 3.0), GCODE_UNITS (gcode, 0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changez_spin), 1);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (changez_spin), tool->change_position[2]);
@@ -2178,6 +2128,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Plunge Ratio");
   gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 1, row, row + 1);
+
   plunge_ratio_combo = gtk_combo_box_new_text ();
 
   gtk_combo_box_append_text (GTK_COMBO_BOX (plunge_ratio_combo), "100%");
@@ -2207,6 +2158,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   row++;
 
   label = gtk_label_new ("Spindle RPM");
+
   spindle_rpm_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, 15.0), GCODE_UNITS (gcode, 80000.0), GCODE_UNITS (gcode, 1.0));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (spindle_rpm_spin), 0);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (spindle_rpm_spin), tool->spindle_rpm);
@@ -2220,6 +2172,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   }
 
   label = gtk_label_new ("Coolant");
+
   coolant_check_button = gtk_check_button_new ();
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (coolant_check_button), tool->coolant);
   g_signal_connect (coolant_check_button, "toggled", G_CALLBACK (tool_update_callback), wlist);
@@ -2231,46 +2184,37 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = end_mill_combo;
-  wlist[wind++] = feed_spin;
-  wlist[wind++] = prompt_combo;
-  wlist[wind++] = changex_spin;
-  wlist[wind++] = changey_spin;
-  wlist[wind++] = changez_spin;
-  wlist[wind++] = plunge_ratio_combo;
-  wlist[wind++] = spindle_rpm_spin;
-  wlist[wind++] = coolant_check_button;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = end_mill_combo;
+  wlist[3] = feed_spin;
+  wlist[4] = prompt_combo;
+  wlist[5] = changex_spin;
+  wlist[6] = changey_spin;
+  wlist[7] = changez_spin;
+  wlist[8] = plunge_ratio_combo;
+  wlist[9] = spindle_rpm_spin;
+  wlist[10] = coolant_check_button;
 }
 
 static void
 image_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_image_t *image;
-  uint16_t wind;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   image = (gcode_image_t *)block->pdata;
-  wind++;
 
-  image->size[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
-  image->size[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
-  image->size[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
+  image->size[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+  image->size[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  image->size[2] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
 
   gui->opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui->opengl, block);
@@ -2282,7 +2226,6 @@ static void
 gui_tab_image (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *image_tab;
   GtkWidget *alignment;
   GtkWidget *table;
@@ -2292,7 +2235,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
   GtkWidget *depthz_spin;
   gcode_t *gcode;
   gcode_image_t *image;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * Image Paramters
@@ -2302,9 +2245,8 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
 
   image = (gcode_image_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (6 * sizeof (GtkWidget *));
-  hids = (gulong *) malloc (2 * sizeof (gulong));
+  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
+
   row = 0;
 
   image_tab = gtk_frame_new ("Image Parameters");
@@ -2322,6 +2264,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Size(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   sizex_spin = gtk_spin_button_new_with_range (0.0, GCODE_UNITS (gcode, MAX_DIM_X), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sizex_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sizex_spin), image->size[0]);
@@ -2331,6 +2274,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Size(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   sizey_spin = gtk_spin_button_new_with_range (0, GCODE_UNITS (gcode, MAX_DIM_Y), GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (sizey_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (sizey_spin), image->size[1]);
@@ -2340,6 +2284,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Depth(Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   depthz_spin = gtk_spin_button_new_with_range (GCODE_UNITS (gcode, -MAX_DIM_Z), 0, GCODE_UNITS (gcode, 0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depthz_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (depthz_spin), image->size[2]);
@@ -2347,38 +2292,29 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), depthz_spin, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = sizex_spin;
-  wlist[wind++] = sizey_spin;
-  wlist[wind++] = depthz_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = sizex_spin;
+  wlist[3] = sizey_spin;
+  wlist[4] = depthz_spin;
 }
 
 static void
 stl_update_callback (GtkWidget *widget, gpointer data)
 {
   GtkWidget **wlist;
-  gulong *hids;
   gui_t *gui;
   gcode_block_t *block;
   gcode_stl_t *stl;
-  uint16_t wind;
 
-  wind = 0;
   wlist = (GtkWidget **)data;
 
-  hids = (gulong *) wlist[wind];
-  wind++;
+  gui = (gui_t *)wlist[0];
 
-  gui = (gui_t *)wlist[wind];
-  wind++;
-
-  block = (gcode_block_t *)wlist[wind];
+  block = (gcode_block_t *)wlist[1];
   stl = (gcode_stl_t *)block->pdata;
-  wind++;
 
-  stl->slices = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[wind++]));
+  stl->slices = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
 
   gcode_stl_generate_slice_contours (block);
 
@@ -2392,14 +2328,13 @@ static void
 gui_tab_stl (gui_t *gui, gcode_block_t *block)
 {
   GtkWidget **wlist;
-  gulong *hids;
   GtkWidget *stl_tab;
   GtkWidget *alignment;
   GtkWidget *table;
   GtkWidget *label;
   GtkWidget *slices_spin;
   gcode_stl_t *stl;
-  uint16_t wind, row;
+  uint16_t row;
 
   /**
    * STL Paramters
@@ -2407,9 +2342,8 @@ gui_tab_stl (gui_t *gui, gcode_block_t *block)
 
   stl = (gcode_stl_t *)block->pdata;
 
-  wind = 0;
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
-  hids = NULL;
+  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+
   row = 0;
 
   stl_tab = gtk_frame_new ("STL Parameters");
@@ -2427,6 +2361,7 @@ gui_tab_stl (gui_t *gui, gcode_block_t *block)
 
   label = gtk_label_new ("Slices");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
+
   slices_spin = gtk_spin_button_new_with_range (2, 1000, 1);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (slices_spin), 0);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (slices_spin), stl->slices);
@@ -2434,10 +2369,9 @@ gui_tab_stl (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), slices_spin, 1, 2, row, row + 1);
   row++;
 
-  wlist[wind++] = (GtkWidget *)hids;
-  wlist[wind++] = (GtkWidget *)gui;
-  wlist[wind++] = (GtkWidget *)block;
-  wlist[wind++] = slices_spin;
+  wlist[0] = (GtkWidget *)gui;
+  wlist[1] = (GtkWidget *)block;
+  wlist[2] = slices_spin;
 }
 
 void
