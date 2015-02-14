@@ -120,24 +120,26 @@ gcode_util_qsort_compare_asc (const void *a, const void *b)
 void
 gcode_util_remove_spaces (char *string)
 {
-  uint32_t i, n;
+  uint32_t i, j;
 
-  i = 0;
+  i = j = 0;
 
-  while (i < strlen (string))
+  while (string[j] != '\0')
   {
-    if (string[i] == ' ')
+    if (string[j] != ' ')
     {
-      for (n = i; n < strlen (string); n++)
+      if (j > i)
       {
-        string[n] = string[n + 1];
+        string[i] = string[j];
       }
-    }
-    else
-    {
+
       i++;
     }
+
+    j++;
   }
+
+  string[i] = '\0';
 }
 
 void
@@ -150,7 +152,7 @@ gcode_util_remove_comment (char *string)
   while (string[i] != '\0' && string[i] != ';')
     i++;
 
-  string[i] = 0;
+  string[i] = '\0';
 }
 
 void
