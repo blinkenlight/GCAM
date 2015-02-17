@@ -469,6 +469,7 @@ draw_top_level_blocks (gui_opengl_t *opengl, gcode_block_t *selected_block)
   gcode_block_t *block;
 
   glEnable (GL_DEPTH_TEST);
+  glClear (GL_DEPTH_BUFFER_BIT);                                                // Skip doing this, get depth-clipped out of existence. Just sayin'.
 
   if (opengl->rebuild_view_display_list)
   {
@@ -740,6 +741,7 @@ gui_opengl_context_redraw (gui_opengl_t *opengl, gcode_block_t *block)
         glTranslatef (-opengl->views[view].pos[0], -opengl->views[view].pos[1], -opengl->views[view].pos[2]);
 
         glEnable (GL_DEPTH_TEST);
+        glClear (GL_DEPTH_BUFFER_BIT);                                          // Skip doing this, get depth-clipped out of existence. Just sayin'.
 
         if (opengl->projection == GUI_OPENGL_PROJECTION_PERSPECTIVE)
           size = (int)((opengl->context_w / 500.0) * 5.0 / opengl->views[view].zoom);
