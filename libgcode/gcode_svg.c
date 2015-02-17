@@ -1121,22 +1121,37 @@ gcode_svg_import (gcode_block_t *template_block, char *filename)
 
   fseek (fh, 0, SEEK_END);                                                      // Read the entire file into the newly allocated 'buffer';
   length = ftell (fh);
+
+  if (!length)                                                                  // A zero length file is not an error, strictly speaking;
+  {
+    fclose (fh);
+    XML_ParserFree (parser);
+    return (0);
+  }
+
   buffer = (char *)malloc (length);
+
+  if (!buffer)
+  {
+    REMARK ("Failed to allocate memory for SVG import buffer\n");
+    XML_ParserFree (parser);
+    return (1);
+  }
+
   fseek (fh, 0, SEEK_SET);
   nomore = fread (buffer, 1, length, fh);
+  fclose (fh);
 
   if (XML_Parse (parser, buffer, nomore, 1) == XML_STATUS_ERROR)                // Try to feed all of it to Expat - if it squeals, bail;
   {
     REMARK ("XML parse error in file '%s' at line %d: %s\n", basename (filename), (int)XML_GetCurrentLineNumber (parser), XML_ErrorString (XML_GetErrorCode (parser)));
     XML_ParserFree (parser);
     free (buffer);
-    fclose (fh);
     return (1);
   }
 
   XML_ParserFree (parser);                                                      // If we're still here, it worked - time to clean up, starting with the parser;
   free (buffer);
-  fclose (fh);
 
   if (svg.gcode->material_size[0] < svg.size[0])                                // If the imported stuff is wider than the project material, embiggen that;
     svg.gcode->material_size[0] = svg.size[0];

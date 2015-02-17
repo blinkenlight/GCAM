@@ -174,7 +174,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
             }
             else
             {
-              REMARK ("Gerber X coordinate format is missing\n");
+              REMARK ("Gerber X coordinate format definition is missing\n");
               return (1);
             }
 
@@ -191,7 +191,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
             }
             else
             {
-              REMARK ("Gerber Y coordinate format is missing\n");
+              REMARK ("Gerber Y coordinate format definition is missing\n");
               return (1);
             }
 

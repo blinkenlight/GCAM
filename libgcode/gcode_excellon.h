@@ -27,7 +27,7 @@
 
 typedef struct gcode_excellon_tool_s
 {
-  uint8_t index;
+  uint8_t number;
   gfloat_t diameter;
 } gcode_excellon_tool_t;
 
