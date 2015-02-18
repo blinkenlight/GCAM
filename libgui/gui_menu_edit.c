@@ -173,7 +173,7 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Translate(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
 
-  translatex_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  translatex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatex_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 0, 1);
@@ -183,7 +183,7 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Translate(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
-  translatey_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  translatey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatey_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 1, 2);
@@ -324,7 +324,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Rotate About(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
 
-  rotate_aboutx_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  rotate_aboutx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), rotate_about[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 0, 1);
@@ -334,7 +334,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Rotate About(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
-  rotate_abouty_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  rotate_abouty_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), rotate_about[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 1, 2);
@@ -459,7 +459,7 @@ scale_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Factor");
   gtk_box_pack_start (GTK_BOX (hbox), label, TRUE, TRUE, 0);
 
-  factor_spin = gtk_spin_button_new_with_range (0.0001, SCALED_INCHES (10.0), 0.001);
+  factor_spin = gtk_spin_button_new_with_range (0.01, 100.0, 0.1);
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (factor_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (factor_spin), 1.0);
   gtk_box_pack_start (GTK_BOX (hbox), factor_spin, TRUE, TRUE, 0);
@@ -720,7 +720,7 @@ fillet_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Radius");
   gtk_box_pack_start (GTK_BOX (hbox), label, TRUE, TRUE, 0);
 
-  radius_spin = gtk_spin_button_new_with_range (0.0001, SCALED_INCHES (10.0), 0.001);
+  radius_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, SCALED_INCHES (10.0), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), 0.5 * tool->diameter);
   gtk_box_pack_start (GTK_BOX (hbox), radius_spin, TRUE, TRUE, 0);
@@ -960,7 +960,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Translate(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
-  translatex_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  translatex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatex_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatex_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatex_spin, 1, 2, 1, 2);
@@ -970,7 +970,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Translate(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
 
-  translatey_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  translatey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (translatey_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (translatey_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), translatey_spin, 1, 2, 2, 3);
@@ -980,7 +980,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Rotate About(X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
 
-  rotate_aboutx_spin = gtk_spin_button_new_with_range (-MAX_DIM_X, MAX_DIM_X, 0.01);
+  rotate_aboutx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_aboutx_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 3, 4);
@@ -990,7 +990,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Rotate About(Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
 
-  rotate_abouty_spin = gtk_spin_button_new_with_range (-MAX_DIM_Y, MAX_DIM_Y, 0.01);
+  rotate_abouty_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), 0.0);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 4, 5);

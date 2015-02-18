@@ -26,6 +26,9 @@
 #include "gui_menu_util.h"
 #include "gcode.h"
 
+/* NOT AN EXACT CONVERSION - uses x25 for round values */
+#define SCALED_INCHES(x) (GCODE_UNITS ((&gui->gcode), x))
+
 static void
 polygon_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
@@ -124,9 +127,9 @@ polygon_create_page1 (GtkWidget *assistant, gpointer data)
   label = gtk_label_new ("Radius");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
-  radius_spin = gtk_spin_button_new_with_range (0.0001, GCODE_UNITS ((&gui->gcode), 10.0), 0.001);
+  radius_spin = gtk_spin_button_new_with_range (GCODE_PRECISION, SCALED_INCHES (10.0), SCALED_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (radius_spin), MANTISSA);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), GCODE_UNITS ((&gui->gcode), 0.5));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (radius_spin), SCALED_INCHES (0.5));
   gtk_table_attach_defaults (GTK_TABLE (table), radius_spin, 1, 2, 1, 2);
 
   g_signal_connect_swapped (radius_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
