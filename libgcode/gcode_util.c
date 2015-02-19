@@ -149,7 +149,7 @@ gcode_util_remove_comment (char *string)
 
   i = 0;
 
-  while (string[i] != '\0' && string[i] != ';')
+  while ((string[i] != '\0') && (string[i] != ';') && (string[i] != '('))
     i++;
 
   string[i] = '\0';
