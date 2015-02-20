@@ -359,7 +359,8 @@ gcode_stl_generate_slice_contours (gcode_block_t *block)
   int i, j, pt_num;
   gfloat_t d, t[3];
   gcode_vec3d_t pt[2];
-  gcode_block_t *last_block2, **last_block, *line_block;
+  gcode_block_t *last_block;
+  gcode_block_t *line_block;
 
   stl = (gcode_stl_t *)block->pdata;
 
@@ -382,7 +383,6 @@ gcode_stl_generate_slice_contours (gcode_block_t *block)
     d = block->gcode->material_size[2] * (1.0 - ((gfloat_t)i / (gfloat_t)(stl->slices - 1)));
 
     stl->slice_list[i] = NULL;
-    last_block = &stl->slice_list[i];
 
     /* Intersect z-plane with each triangle to generate unsorted contours from triangle geometry. */
     for (j = 0; j < stl->tri_num; j++)
@@ -450,15 +450,14 @@ gcode_stl_generate_slice_contours (gcode_block_t *block)
 
         if (stl->slice_list[i])
         {
-          gcode_list_insert (&last_block2, line_block);
+          gcode_insert_after_block (last_block, line_block);
         }
         else
         {
-          gcode_list_insert (&stl->slice_list[i], line_block);
+          stl->slice_list[i] = line_block;
         }
 
-        last_block2 = line_block;
-        last_block = &line_block;
+        last_block = line_block;
       }
     }
 

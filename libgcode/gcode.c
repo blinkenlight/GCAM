@@ -334,38 +334,6 @@ gcode_get_circular_next (gcode_block_t **block)
 }
 
 void
-gcode_list_insert (gcode_block_t **list, gcode_block_t *block)
-{
-  if (*list)
-  {
-    gcode_block_t *tmp;
-
-    if ((*list)->next)
-    {
-      tmp = (*list)->next;
-
-      (*list)->next = block;
-      block->prev = *list;
-      block->next = tmp;
-
-      tmp->prev = block;
-    }
-    else
-    {
-      (*list)->next = block;
-      block->prev = *list;
-      block->next = NULL;
-    }
-  }
-  else
-  {
-    *list = block;
-    (*list)->prev = NULL;
-    (*list)->next = NULL;
-  }
-}
-
-void
 gcode_list_make (gcode_t *gcode)
 {
   gcode_block_t *index_block;

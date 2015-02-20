@@ -67,7 +67,6 @@ void gcode_get_furthest_next (gcode_block_t **block);
 void gcode_get_circular_prev (gcode_block_t **block);
 void gcode_get_circular_next (gcode_block_t **block);
 
-void gcode_list_insert (gcode_block_t **list, gcode_block_t *block);
 void gcode_list_make (gcode_t *gcode);
 void gcode_list_free (gcode_block_t **list);
 

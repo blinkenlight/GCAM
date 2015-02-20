@@ -30,6 +30,27 @@
 #define GCODE_GERBER_ARC_CCW  0
 #define GCODE_GERBER_ARC_CW   1
 
+/**
+ * Assuming 'x' is the point closest to point '_p3' on the line given by points
+ * '_p1' and '_p2', find the ratio '_u' between the lengths of the segment '_p1'
+ * to 'x' and the segment '_p1' to '_p2' - or, to put it differently, find the
+ * scalar '_u' that vector '_p1' -> '_p2' needs to be multiplied with to obtain
+ * the vector whose tip 'x' is the projection of '_p3' onto the original vector.
+ *
+ * Adapted from Paul Bourke - October 1988
+ */
+
+#define SOLVE_U(_p1, _p2, _p3, _u) { \
+  gfloat_t _dist = (_p1[0]-_p2[0])*(_p1[0]-_p2[0]) + (_p1[1]-_p2[1])*(_p1[1]-_p2[1]); \
+  _u = ((_p3[0]-_p1[0])*(_p2[0]-_p1[0]) + (_p3[1]-_p1[1])*(_p2[1]-_p1[1])) / _dist; }
+
+/**
+ * The compare function used by qsort when sorting intersection points further
+ * on below - the idea is that the actual point data is in the first two items
+ * of a 3D vector and the third item holds the value we want to sort by, which
+ * can be the distance of each point to something, its angle along an arc etc.
+ */
+
 static int
 qsort_compare (const void *a, const void *b)
 {
@@ -45,18 +66,11 @@ qsort_compare (const void *a, const void *b)
 }
 
 /**
- * Assuming 'x' is the point closest to point '_p3' on the line given by points
- * '_p1' and '_p2', find the ratio '_u' between the lengths of the segment '_p1'
- * to 'x' and the segment '_p1' to '_p2' - or, to put it differently, find the
- * scalar '_u' that vector '_p1' -> '_p2' needs to be multiplied with to obtain
- * the vector whose tip 'x' is the projection of '_p3' onto the original vector.
- *
- * Adapted from Paul Bourke - October 1988
+ * Insert an "elbow" element into the "elbow table", but only if it's a NEW one
+ * NOTE: the "elbow table" stores the position of every single point where a
+ * trace segment starts or ends, offering a way to "round up" all those joints,
+ * considering the trace segments themselves are inserted without any "endcaps"
  */
-
-#define SOLVE_U(_p1, _p2, _p3, _u) { \
-  gfloat_t _dist = (_p1[0]-_p2[0])*(_p1[0]-_p2[0]) + (_p1[1]-_p2[1])*(_p1[1]-_p2[1]); \
-  _u = ((_p3[0]-_p1[0])*(_p2[0]-_p1[0]) + (_p3[1]-_p1[1])*(_p2[1]-_p1[1])) / _dist; }
 
 static void
 insert_trace_elbow (int *trace_elbow_num, gcode_vec3d_t **trace_elbow, uint8_t aperture_ind, gcode_gerber_aperture_t *aperture_set, gcode_vec2d_t pos)
@@ -67,19 +81,24 @@ insert_trace_elbow (int *trace_elbow_num, gcode_vec3d_t **trace_elbow, uint8_t a
   trace_elbow_match = 0;
 
   for (i = 0; i < *trace_elbow_num; i++)
-    if ((GCODE_MATH_2D_DISTANCE ((*trace_elbow)[i], pos) < GCODE_PRECISION) &&
-        GCODE_MATH_IS_EQUAL ((*trace_elbow)[i][2], aperture_set[aperture_ind].v[0]))
-      trace_elbow_match = 1;
+    if (GCODE_MATH_IS_EQUAL ((*trace_elbow)[i][2], aperture_set[aperture_ind].v[0]))
+      if (GCODE_MATH_2D_DISTANCE ((*trace_elbow)[i], pos) < GCODE_PRECISION)
+        trace_elbow_match = 1;
 
   if (!trace_elbow_match)
   {
-    *trace_elbow = (gcode_vec3d_t *)realloc (*trace_elbow, (*trace_elbow_num + 1) * sizeof (gcode_vec3d_t));
+    *trace_elbow = realloc (*trace_elbow, (*trace_elbow_num + 1) * sizeof (gcode_vec3d_t));
     (*trace_elbow)[*trace_elbow_num][0] = pos[0];
     (*trace_elbow)[*trace_elbow_num][1] = pos[1];
     (*trace_elbow)[*trace_elbow_num][2] = aperture_set[aperture_ind].v[0];
     (*trace_elbow_num)++;
   }
 }
+
+/**
+ * PASS 1 - Parse the Gerber file to create aperture, exposure and elbow tables
+ * and open-ended ("endcap-less") trace outlines inserted under 'sketch_block';
+ */
 
 static int
 gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode_gerber_trace_t **trace_array, int *trace_elbow_num,
@@ -89,13 +108,14 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
   char buf[10], *buffer = NULL;
   long int length, nomore, index;
   int i, j, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
-  uint8_t aperture_ind = 0, aperture_closed, trace_elbow_match;
+  uint8_t aperture_ind, aperture_closed, trace_elbow_match;
   gcode_gerber_aperture_t *aperture_set;
   gcode_vec2d_t cur_pos = { 0.0, 0.0 };
   gcode_vec2d_t cur_ij = { 0.0, 0.0 };
   gcode_vec2d_t normal = { 0.0, 0.0 };
   gfloat_t digit_scale, unit_scale;
 
+  aperture_ind = 0;
   aperture_num = 0;
   aperture_cmd = 2;                                                             // Default command is 'aperture closed'
   aperture_set = NULL;
@@ -249,7 +269,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           buf[buf_ind] = 0;
           diameter = atof (buf) * unit_scale;
 
-          aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
+          aperture_set = realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
           aperture_set[aperture_num].ind = inum;
           aperture_set[aperture_num].v[0] = diameter + 2 * offset;
@@ -290,7 +310,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           buf[buf_ind] = 0;
           y = atof (buf) * unit_scale;
 
-          aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
+          aperture_set = realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
           aperture_set[aperture_num].ind = inum;
           aperture_set[aperture_num].v[0] = x + 2 * offset;
@@ -320,7 +340,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           buf[buf_ind] = 0;
           diameter = atof (buf) * unit_scale;
 
-          aperture_set = (gcode_gerber_aperture_t *)realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
+          aperture_set = realloc (aperture_set, (aperture_num + 1) * sizeof (gcode_gerber_aperture_t));
           aperture_set[aperture_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
           aperture_set[aperture_num].ind = inum;
           aperture_set[aperture_num].v[0] = diameter + 2 * offset;
@@ -498,31 +518,27 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
           /* Arc 1 */
           gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-          arc_block->offset = &sketch->offset;
-          arc_block->prev = NULL;
-          arc_block->next = NULL;
-          gcode_list_insert (&sketch_block->listhead, arc_block);
+
+          gcode_append_as_listtail (sketch_block, arc_block);
 
           arc = (gcode_arc_t *)arc_block->pdata;
           arc->p[0] = cur_pos[0] + 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
           arc->p[1] = cur_pos[1] + 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
+          arc->radius = radius;
           arc->start_angle = start_angle;
           arc->sweep_angle = sweep_angle;
-          arc->radius = radius;
 
           /* Arc 2 */
           gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-          arc_block->offset = &sketch->offset;
-          arc_block->prev = NULL;
-          arc_block->next = NULL;
-          gcode_list_insert (&sketch_block->listhead, arc_block);
+
+          gcode_append_as_listtail (sketch_block, arc_block);
 
           arc = (gcode_arc_t *)arc_block->pdata;
           arc->p[0] = cur_pos[0] - 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
           arc->p[1] = cur_pos[1] - 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
+          arc->radius = radius;
           arc->start_angle = start_angle;
           arc->sweep_angle = sweep_angle;
-          arc->radius = radius;
 
           insert_trace_elbow (trace_elbow_num, trace_elbow, aperture_ind, aperture_set, pos);
         }
@@ -561,7 +577,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
             if (!duplicate_trace)
             {
-              *trace_array = (gcode_gerber_trace_t *)realloc (*trace_array, (*trace_num + 1) * sizeof (gcode_gerber_trace_t));
+              *trace_array = realloc (*trace_array, (*trace_num + 1) * sizeof (gcode_gerber_trace_t));
               (*trace_array)[*trace_num].p0[0] = cur_pos[0];
               (*trace_array)[*trace_num].p0[1] = cur_pos[1];
               (*trace_array)[*trace_num].p1[0] = pos[0];
@@ -571,10 +587,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 1 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = cur_pos[0] + 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
@@ -584,10 +598,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 2 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = cur_pos[0] - 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
@@ -620,19 +632,18 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* arc 1 */
               gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-              arc_block->offset = &sketch->offset;
-              arc_block->prev = NULL;
-              arc_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, arc_block);
+
+              gcode_append_as_listtail (sketch_block, arc_block);
 
               arc = (gcode_arc_t *)arc_block->pdata;
-              arc->p[0] = pos[0] - 0.5 * aperture_set[aperture_ind].v[0];
-              arc->p[1] = pos[1];
-              arc->start_angle = 180.0;
-              arc->sweep_angle = -360.0;
-              arc->radius = 0.5 * aperture_set[aperture_ind].v[0];
 
-              *exposure_array = (gcode_gerber_exposure_t *)realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
+              arc->radius = 0.5 * aperture_set[aperture_ind].v[0];
+              arc->p[0] = pos[0];
+              arc->p[1] = pos[1] + arc->radius;
+              arc->start_angle = 90.0;
+              arc->sweep_angle = -360.0;
+
+              *exposure_array = realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
               (*exposure_array)[*exposure_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
               (*exposure_array)[*exposure_num].pos[0] = pos[0];
               (*exposure_array)[*exposure_num].pos[1] = pos[1];
@@ -646,10 +657,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 1 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = pos[0] - 0.5 * aperture_set[aperture_ind].v[0];
@@ -659,10 +668,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 2 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = pos[0] + 0.5 * aperture_set[aperture_ind].v[0];
@@ -672,10 +679,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 3 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = pos[0] + 0.5 * aperture_set[aperture_ind].v[0];
@@ -685,10 +690,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
               /* Line 4 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-              line_block->offset = &sketch->offset;
-              line_block->prev = NULL;
-              line_block->next = NULL;
-              gcode_list_insert (&sketch_block->listhead, line_block);
+
+              gcode_append_as_listtail (sketch_block, line_block);
 
               line = (gcode_line_t *)line_block->pdata;
               line->p0[0] = pos[0] - 0.5 * aperture_set[aperture_ind].v[0];
@@ -696,7 +699,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
               line->p1[0] = pos[0] - 0.5 * aperture_set[aperture_ind].v[0];
               line->p1[1] = pos[1] + 0.5 * aperture_set[aperture_ind].v[1];
 
-              *exposure_array = (gcode_gerber_exposure_t *)realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
+              *exposure_array = realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
               (*exposure_array)[*exposure_num].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
               (*exposure_array)[*exposure_num].pos[0] = pos[0];
               (*exposure_array)[*exposure_num].pos[1] = pos[1];
@@ -787,13 +790,13 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
   return (0);
 }
 
+/**
+ * PASS 2 - Insert "trace elbows" (full circles) at all trace segment endpoints
+ */
+
 static void
 gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_num, gcode_vec3d_t *trace_elbow)
 {
-  /**
-   * PASS 2
-   * Insert Trace Elbows
-   */
   gcode_block_t *arc_block;
   gcode_sketch_t *sketch;
   gcode_arc_t *arc;
@@ -803,297 +806,246 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_num, gcode_vec3
 
   for (i = 0; i < trace_elbow_num; i++)
   {
-    /* Circle Transition */
     gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-    arc_block->offset = &sketch->offset;
-    arc_block->prev = NULL;
-    arc_block->next = NULL;
-    gcode_list_insert (&sketch_block->listhead, arc_block);
+
+    gcode_append_as_listtail (sketch_block, arc_block);
 
     arc = (gcode_arc_t *)arc_block->pdata;
+
     arc->radius = 0.5 * trace_elbow[i][2];
-    arc->p[0] = trace_elbow[i][0] - arc->radius;
-    arc->p[1] = trace_elbow[i][1];
-    arc->start_angle = 180;
+    arc->p[0] = trace_elbow[i][0];
+    arc->p[1] = trace_elbow[i][1] + arc->radius;
+    arc->start_angle = 90.0;
     arc->sweep_angle = -360.0;
   }
 }
 
+/**
+ * PASS 3 - Create intersections: loop through each line and arc segment trying
+ * to intersect it with every other, then divide each one up into smaller lines
+ * or arcs, from one endpoint through all the intersection points to the other
+ * endpoint - the new segments end-to-end must match the old one they replace;
+ */
+
 static void
 gcode_gerber_pass3 (gcode_block_t *sketch_block)
 {
-  /**
-   * PASS 3 - Create Intersections.
-   * Loop through each line and arc and segment for each intersection.
-   */
-  gcode_block_t *index1_block, *index2_block, *intersection_listhead = NULL;
-  gcode_sketch_t *sketch;
+  gcode_block_t *index1_block, *index2_block;
+  gcode_block_t *original_listhead;
+  gcode_vec2d_t p0, p1;
+  gcode_vec2d_t ip_array[2];
+  gcode_vec2d_t full_ip_array[256];
   gcode_vec3d_t full_ip_sorted_array[256];
-  gcode_vec2d_t full_ip_array[256], ip_array[2];
-  int i, full_ip_num, ip_num;
+  int i, j, ip_count, full_ip_count, full_ip_sorted_count;
 
-  sketch = (gcode_sketch_t *)sketch_block->pdata;
+  original_listhead = sketch_block->listhead;                                   // Save a reference to the current (original) list of 'sketch_block';
 
-  index1_block = sketch_block->listhead;
+  sketch_block->listhead = NULL;                                                // Detach it from 'sketch_block' so a new list can be built in its place;
 
-  while (index1_block)
+  index1_block = original_listhead;                                             // Start with the first block on the original list of 'sketch_block';
+
+  while (index1_block)                                                          // Take every single block and intersect it with ever other block;
   {
-    full_ip_num = 0;
+    full_ip_count = 0;                                                          // The total number of intersections 'index1_block' has with anything else;
+    full_ip_sorted_count = 0;                                                   // The total number of UNIQUE intersections 'index1_block' has;
 
-    index2_block = sketch_block->listhead;
+    index1_block->ends (index1_block, p0, p1, GCODE_GET);                       // We'll need the endpoints of the scrutinized block soon, so we save them;
 
-    while (index2_block)
+    index2_block = original_listhead;                                           // Starting from the same listhead,
+
+    while (index2_block)                                                        // loop through all the other blocks of 'sketch_block' with a second index;
     {
-      if (index1_block != index2_block)                                         /* Don't perform intersection against self. */
+      if (index1_block != index2_block)                                         // Don't perform intersection against self.
       {
-        if (!gcode_util_intersect (index1_block, index2_block, ip_array, &ip_num))
+        if (!gcode_util_intersect (index1_block, index2_block, ip_array, &ip_count))
         {
-          for (i = 0; i < ip_num; i++)
+          for (i = 0; i < ip_count; i++)                                        // Examine every intersection point returned (if any):
           {
-            full_ip_array[full_ip_num][0] = ip_array[i][0];
-            full_ip_array[full_ip_num][1] = ip_array[i][1];
-            full_ip_num++;
+            if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)     // Something touching one of the endpoints of 'index1_block', while technically
+              continue;                                                         // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
+
+            if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)     // Same with the other endpoint - if the only intersections found coincide with
+              continue;                                                         // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
+
+            GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);  // If we're here, this is a genuine intersection that will divide the block...
+
+            full_ip_count++;                                                    // So save it into the full array and increase the total intersection count;
           }
         }
       }
 
-      index2_block = index2_block->next;
+      index2_block = index2_block->next;                                        // Move on to the next block to attempt to intersect with 'index1_block';
     }
 
-    if (index1_block->type == GCODE_TYPE_LINE)
+    if (index1_block->type == GCODE_TYPE_LINE)                                  // The division process is type-specific, so this is what we do for lines:
     {
       gcode_block_t *line_block;
       gcode_line_t *line, *new_line;
+      gfloat_t distance;
 
-      line = (gcode_line_t *)index1_block->pdata;
+      line = (gcode_line_t *)index1_block->pdata;                               // Have 'line' point to the line-specific data of the block to be divided;
 
-      /**
-       * Generate line segments in order from line->p0 to p1 by sorting
-       * the full_ip_num based on distance from line->p0.
-       */
-      if (full_ip_num)
+      if (full_ip_count)                                                        // There were intersections...
       {
-        /* There were intersections. */
-        for (i = 0; i < full_ip_num; i++)
+        for (i = 0; i < full_ip_count; i++)                                     // Loop through each intersection point,
         {
-          full_ip_sorted_array[i][0] = full_ip_array[i][0];
-          full_ip_sorted_array[i][1] = full_ip_array[i][1];
-          full_ip_sorted_array[i][2] = GCODE_MATH_2D_DISTANCE (line->p0, full_ip_array[i]);
-        }
-        qsort (full_ip_sorted_array, full_ip_num, sizeof (gcode_vec3d_t), qsort_compare);
+          distance = GCODE_MATH_2D_DISTANCE (p0, full_ip_array[i]);             // and find out how far is is from p0 (the first endpoint of the line);
 
-        /* First point to first segment */
-        if (full_ip_sorted_array[0][2] > GCODE_PRECISION)
-        {
-          gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-          line_block->offset = &sketch->offset;
-          line_block->prev = NULL;
-          line_block->next = NULL;
-          gcode_list_insert (&intersection_listhead, line_block);
+          for (j = 0; j < full_ip_sorted_count; j++)                            // Now loop through each of the ALREADY COPIED intersection points,
+            if (GCODE_MATH_IS_EQUAL (full_ip_sorted_array[j][2], distance))     // and see if there is any with the exact same distance from p0;
+              break;
 
-          new_line = (gcode_line_t *)line_block->pdata;
-          new_line->p0[0] = line->p0[0];
-          new_line->p0[1] = line->p0[1];
-          new_line->p1[0] = full_ip_sorted_array[0][0];
-          new_line->p1[1] = full_ip_sorted_array[0][1];
-        }
-
-        /* Generate a line segment from full_ip_sorted_array[n] to full_ip_sorted_array[n+1] */
-        for (i = 0; i < full_ip_num - 1; i++)
-        {
-          if (full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2] > GCODE_PRECISION)
+          if (j == full_ip_sorted_count)                                        // If the loop ran all the way up, there were no matches;
           {
-            gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-            line_block->offset = &sketch->offset;
-            line_block->prev = NULL;
-            line_block->next = NULL;
-            gcode_list_insert (&intersection_listhead, line_block);
-
-            new_line = (gcode_line_t *)line_block->pdata;
-            new_line->p0[0] = full_ip_sorted_array[i][0];
-            new_line->p0[1] = full_ip_sorted_array[i][1];
-            new_line->p1[0] = full_ip_sorted_array[i + 1][0];
-            new_line->p1[1] = full_ip_sorted_array[i + 1][1];
+            GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[j], full_ip_array[i]);  // So take the current point and copy it over into the sorted array;
+            full_ip_sorted_array[j][2] = distance;                              // Add the "sorting metric" (distance from p0) as the third value;
+            full_ip_sorted_count++;                                             // Increment number of unique intersection points waiting to be sorted;
           }
         }
 
-        /* Last segment to last point */
-        if (GCODE_MATH_2D_DISTANCE (line->p1, full_ip_sorted_array[full_ip_num - 1]) > GCODE_PRECISION)
+        GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[full_ip_sorted_count], p0); // Add the first endpoint of the line (p0) to the list;
+        full_ip_sorted_array[full_ip_sorted_count][2] = 0;
+        full_ip_sorted_count++;
+
+        distance = GCODE_MATH_2D_DISTANCE (p0, p1);
+
+        GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[full_ip_sorted_count], p1); // Add the second endpoint of the line (p1) to the list;
+        full_ip_sorted_array[full_ip_sorted_count][2] = distance;
+        full_ip_sorted_count++;
+
+        qsort (full_ip_sorted_array, full_ip_sorted_count, sizeof (gcode_vec3d_t), qsort_compare);
+
+        for (i = 0; i < full_ip_sorted_count - 1; i++)                          // Create connecting lines between each intersection point and the next one;
         {
           gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-          line_block->offset = &sketch->offset;
-          line_block->prev = NULL;
-          line_block->next = NULL;
-          gcode_list_insert (&intersection_listhead, line_block);
+
+          gcode_append_as_listtail (sketch_block, line_block);
 
           new_line = (gcode_line_t *)line_block->pdata;
-          new_line->p0[0] = full_ip_sorted_array[full_ip_num - 1][0];
-          new_line->p0[1] = full_ip_sorted_array[full_ip_num - 1][1];
-          new_line->p1[0] = line->p1[0];
-          new_line->p1[1] = line->p1[1];
+
+          GCODE_MATH_VEC2D_COPY (new_line->p0, full_ip_sorted_array[i]);
+          GCODE_MATH_VEC2D_COPY (new_line->p1, full_ip_sorted_array[i + 1]);
         }
       }
-      else
+      else                                                                      // If there were no intersections, copy the line verbatim to the new list;
       {
         /* Just copy the line, do nothing, no intersections. */
         gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-        line_block->offset = &sketch->offset;
-        line_block->prev = NULL;
-        line_block->next = NULL;
-        gcode_list_insert (&intersection_listhead, line_block);
+
+        gcode_append_as_listtail (sketch_block, line_block);
 
         new_line = (gcode_line_t *)line_block->pdata;
-        new_line->p0[0] = line->p0[0];
-        new_line->p0[1] = line->p0[1];
-        new_line->p1[0] = line->p1[0];
-        new_line->p1[1] = line->p1[1];
+
+        GCODE_MATH_VEC2D_COPY (new_line->p0, p0);
+        GCODE_MATH_VEC2D_COPY (new_line->p1, p1);
       }
     }
-    else if (index1_block->type == GCODE_TYPE_ARC)
+    else if (index1_block->type == GCODE_TYPE_ARC)                              // On the other hand, if 'index1_block' is an arc, divide it like this:
     {
-      /* XXX - ARCS exist either as traces or elbows */
       gcode_block_t *arc_block;
       gcode_arc_t *arc, *new_arc;
       gcode_vec2d_t center;
-      gfloat_t angle;
+      gfloat_t angle, delta;
 
       arc = (gcode_arc_t *)index1_block->pdata;
 
-      if (!full_ip_num)
+      if (full_ip_count)                                                        // There were intersections...
       {
-        /* Just copy the arc, do nothing, no intersections. */
-        gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-        arc_block->offset = &sketch->offset;
-        arc_block->prev = NULL;
-        arc_block->next = NULL;
-        gcode_list_insert (&intersection_listhead, arc_block);
+        gcode_arc_center (index1_block, center, GCODE_GET);                     // We'll need the position of the center of this arc, so find it;
 
-        new_arc = (gcode_arc_t *)arc_block->pdata;
-        new_arc->p[0] = arc->p[0];
-        new_arc->p[1] = arc->p[1];
-        new_arc->start_angle = arc->start_angle;
-        new_arc->sweep_angle = arc->sweep_angle;
-        new_arc->radius = arc->radius;
-      }
-      else
-      {
-        gcode_vec2d_t origin, p0, span, test_span;
-        gfloat_t radius_offset, mid;
-
-        /* There were intersections. */
-        gcode_arc_with_offset (index1_block, origin, center, p0, &radius_offset, &angle);
-
-        for (i = 0; i < full_ip_num; i++)
+        for (i = 0; i < full_ip_count; i++)                                     // Loop through each intersection point,
         {
-          gcode_math_xy_to_angle (center, full_ip_array[i], &angle);
+          gcode_math_xy_to_angle (center, full_ip_array[i], &angle);            // and find out what angle it is at, on the circle the arc is part of;
 
-          full_ip_sorted_array[i][0] = full_ip_array[i][0];
-          full_ip_sorted_array[i][1] = full_ip_array[i][1];
-          full_ip_sorted_array[i][2] = angle;
-        }
-        qsort (full_ip_sorted_array, full_ip_num, sizeof (gcode_vec3d_t), qsort_compare);
+          if ((arc->sweep_angle > 0) && (angle < arc->start_angle))             // If the sweep is positive (CCW) but the angle is smaller than 'start_angle',
+            angle += 360.0;                                                     // wrap it around CCW to make sure it's "bigger" therefore sortable;
 
-        /* 
-         * You have the original start angle and sweep, therefore you can prevent arcs from being formed outside that region.
-         * original arc is: "arc"
-         */
-        for (i = 0; i < full_ip_num - 1; i++)
-        {
-          /* Make sure the arc is big enough */
-          if (arc->radius > GCODE_PRECISION && full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2] > GCODE_ANGULAR_PRECISION)
+          if ((arc->sweep_angle < 0) && (angle > arc->start_angle))             // If the sweep is negative (CW) but the angle is larger than 'start_angle',
+            angle -= 360.0;                                                     // wrap it around CW to make sure it's "smaller" therefore sortable;
+
+          delta = fabs (angle - arc->start_angle);                              // To be able to sort either CW or CCW arcs, we have to use relative angles;
+
+          for (j = 0; j < full_ip_sorted_count; j++)                            // Now loop through each of the ALREADY COPIED intersection points,
+            if (GCODE_MATH_IS_EQUAL (full_ip_sorted_array[j][2], delta))        // and see if there is any the exact same angle away from p0;
+              break;
+
+          if (j == full_ip_sorted_count)                                        // If the loop ran all the way up, there were no matches;
           {
-            if (arc->sweep_angle > 0.0)
-            {
-              span[0] = arc->start_angle;
-              span[1] = arc->start_angle + arc->sweep_angle;
-            }
-            else
-            {
-              span[0] = arc->start_angle + arc->sweep_angle;
-              span[1] = arc->start_angle;
-            }
-
-            if (full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2] > 0.0)
-            {
-              test_span[0] = full_ip_sorted_array[i][2];
-              test_span[1] = full_ip_sorted_array[i][2] + (full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2]);
-            }
-            else
-            {
-              test_span[0] = full_ip_sorted_array[i][2] + (full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2]);
-              test_span[1] = full_ip_sorted_array[i][2];
-            }
-
-            mid = (test_span[0] + test_span[1]) * 0.5;
-
-            /* Make sure that new arc falls within the existing arcs region. */
-            if ((((test_span[0] >= span[0] - GCODE_ANGULAR_PRECISION - 360.0) && (test_span[0] <= span[1] + GCODE_ANGULAR_PRECISION - 360.0)) ||
-                 ((test_span[0] >= span[0] - GCODE_ANGULAR_PRECISION) && (test_span[0] <= span[1] + GCODE_ANGULAR_PRECISION)) ||
-                 ((test_span[0] >= span[0] - GCODE_ANGULAR_PRECISION + 360.0) && (test_span[0] <= span[1] + GCODE_ANGULAR_PRECISION + 360.0))) &&
-                (((test_span[1] >= span[0] - GCODE_ANGULAR_PRECISION - 360.0) && (test_span[1] <= span[1] + GCODE_ANGULAR_PRECISION - 360.0)) ||
-                 ((test_span[1] >= span[0] - GCODE_ANGULAR_PRECISION) && (test_span[1] <= span[1] + GCODE_ANGULAR_PRECISION)) ||
-                 ((test_span[1] >= span[0] - GCODE_ANGULAR_PRECISION + 360.0) && (test_span[1] <= span[1] + GCODE_ANGULAR_PRECISION + 360.0))) &&
-                (((mid >= span[0] - GCODE_ANGULAR_PRECISION - 360.0) && (mid <= span[1] + GCODE_ANGULAR_PRECISION - 360.0)) ||
-                 ((mid >= span[0] - GCODE_ANGULAR_PRECISION) && (mid <= span[1] + GCODE_ANGULAR_PRECISION)) ||
-                 ((mid >= span[0] - GCODE_ANGULAR_PRECISION + 360.0) && (mid <= span[1] + GCODE_ANGULAR_PRECISION + 360.0))))
-            {
-              gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-              arc_block->offset = &sketch->offset;
-              arc_block->prev = NULL;
-              arc_block->next = NULL;
-              gcode_list_insert (&intersection_listhead, arc_block);
-
-              new_arc = (gcode_arc_t *)arc_block->pdata;
-              new_arc->p[0] = full_ip_sorted_array[i][0];
-              new_arc->p[1] = full_ip_sorted_array[i][1];
-              new_arc->start_angle = full_ip_sorted_array[i][2];
-              new_arc->sweep_angle = full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2];
-              new_arc->radius = arc->radius;
-            }
+            GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[j], full_ip_array[i]);  // So take the current point and copy it over into the sorted array;
+            full_ip_sorted_array[j][2] = delta;                                 // Add the "sorting metric" (angle away from p0) as the third value;
+            full_ip_sorted_count++;                                             // Increment number of unique intersection points waiting to be sorted;
           }
         }
 
-        /* Link the Last segment with the first one (if arc is a complete circle) */
+        GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[full_ip_sorted_count], p0); // Add the first endpoint of the arc (p0) to the list;
+        full_ip_sorted_array[full_ip_sorted_count][2] = 0;
+        full_ip_sorted_count++;
+
+        delta = fabs (arc->sweep_angle);                                        // The "angle away from p0" of p1 is the sweep angle itself;
+
+        GCODE_MATH_VEC2D_COPY (full_ip_sorted_array[full_ip_sorted_count], p1); // Add the second endpoint of the arc (p1) to the list;
+        full_ip_sorted_array[full_ip_sorted_count][2] = delta;
+        full_ip_sorted_count++;
+
+        qsort (full_ip_sorted_array, full_ip_sorted_count, sizeof (gcode_vec3d_t), qsort_compare);
+
+        for (i = 0; i < full_ip_sorted_count - 1; i++)                          // Create connecting arcs between each intersection point and the next one;
+        {
+          gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+          gcode_append_as_listtail (sketch_block, arc_block);
+
+          new_arc = (gcode_arc_t *)arc_block->pdata;
+
+          GCODE_MATH_VEC2D_COPY (new_arc->p, full_ip_sorted_array[i]);          // The starting point of the arc is trivial: one of the intersection points;
+
+          new_arc->radius = arc->radius;                                        // The radius is the same as that of the original arc;
+
+          if (arc->sweep_angle > 0)                                             // The start angle is "sort value" away from the start angle of the original;
+            new_arc->start_angle = arc->start_angle + full_ip_sorted_array[i][2];
+          else
+            new_arc->start_angle = arc->start_angle - full_ip_sorted_array[i][2];
+
+          GCODE_MATH_WRAP_TO_360_DEGREES (new_arc->start_angle);                // As always, the start angle must be wrapped back to within [0...360);
+
+          if (arc->sweep_angle > 0)                                             // The sweep angle is simply the difference between the two "sort values";
+            new_arc->sweep_angle = full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2];
+          else
+            new_arc->sweep_angle = -(full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2]);
+        }
+      }
+      else                                                                      // If there were no intersections, copy the arc verbatim to the new list;
+      {
+        /* Just copy the arc, do nothing, no intersections. */
         gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-        arc_block->offset = &sketch->offset;
-        arc_block->prev = NULL;
-        arc_block->next = NULL;
-        gcode_list_insert (&intersection_listhead, arc_block);
+
+        gcode_append_as_listtail (sketch_block, arc_block);
 
         new_arc = (gcode_arc_t *)arc_block->pdata;
-        new_arc->p[0] = full_ip_sorted_array[full_ip_num - 1][0];
-        new_arc->p[1] = full_ip_sorted_array[full_ip_num - 1][1];
-        new_arc->start_angle = full_ip_sorted_array[full_ip_num - 1][2];
-        new_arc->sweep_angle = 360.0 - (full_ip_sorted_array[full_ip_num - 1][2] - full_ip_sorted_array[0][2]);
+
+        GCODE_MATH_VEC2D_COPY (new_arc->p, p0);
+
         new_arc->radius = arc->radius;
+        new_arc->start_angle = arc->start_angle;
+        new_arc->sweep_angle = arc->sweep_angle;
       }
     }
 
-    index1_block = index1_block->next;
+    index1_block = index1_block->next;                                          // Move on to the next block in the original list of 'sketch_block';
   }
 
-  gcode_remove_and_destroy (sketch_block->listhead);
-  sketch_block->listhead = intersection_listhead;
-
-  /**
-   * Set parent to be the correct pointers for all blocks.
-   * This will allow removal of blocks to operate on valid pointers.
-   */
-  index1_block = sketch_block->listhead;
-
-  while (index1_block)
-  {
-    index1_block->parent = sketch_block;
-    index1_block = index1_block->next;
-  }
+  gcode_list_free (&original_listhead);                                         // Free the original list of 'sketch_block', it's no longer needed;
 }
+
+/**
+ * PASS 4 - Eliminate internal intersections: out of all those partial segments
+ * created in pass 3, remove all that fall within a trace or a within a pad;
+ * 
+ */
 
 static void
 gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_trace_t *trace_array, int exposure_num, gcode_gerber_exposure_t *exposure_array)
 {
-  /**
-   * PASS 4 - Eliminate internal intersections.
-   */
   gcode_block_t *line_block, *index1_block, *index2_block;
   gcode_sketch_t *sketch;
   gcode_line_t *line;
@@ -1360,13 +1312,15 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
   line_block->free (&line_block);
 }
 
+/**
+ * PASS 5 - Remove exact overlaps of segments as the result of two pads/traces
+ * being perfectly adjacent. If an overlap occurs only remove one of the two,
+ * not both.
+ */
+
 static void
 gcode_gerber_pass5 (gcode_block_t *sketch_block)
 {
-  /**
-   * PASS 5 - Remove exact overlaps of segments as the result of two pads or traces being perfectly adjacent.
-   * If an overlap occurs only remove one of the two, not both.
-   */
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t e0[2], e1[2];
   gfloat_t dist0, dist1;
@@ -1411,21 +1365,23 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
   }
 }
 
+/**
+ * PASS 6 - Correct the orientation and sequence (continuity) of all segments.
+ */
+
 static void
 gcode_gerber_pass6 (gcode_block_t *sketch_block)
 {
-  /**
-   * PASS 6 - Correct the orientation and sequence of all segments.
-   */
   gcode_util_merge_list_fragments (&sketch_block->listhead);
 }
+
+/**
+ * PASS 7 - Merge adjacent lines with matching slopes.
+ */
 
 static void
 gcode_gerber_pass7 (gcode_block_t *sketch_block)
 {
-  /**
-   * PASS 7 - Merge adjacent lines with matching slopes.
-   */
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t v0, v1, e0[2], e1[2];
   int merge;
@@ -1495,6 +1451,19 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
     index2_block = index1_block->next;                                          // Either way, block 2 is always the one following block 1;
   }
 }
+
+/**
+ * Main Gerber import routine - read 'filename', call all processing passes
+ * and return the resulting contours inserted under the supplied 'sketch_block'
+ * NOTE: the supplied sketch will see its extrusion depth set to 'depth', with
+ * a single pass (since resolution also equals 'depth');
+ * NOTE: the generated contour is 'offset' amount "larger" than the precise
+ * Gerber outline itself: as the first pass offset normally equals tool radius;
+ * NOTE: as tempting as it looks, this is NOT a general-purpose algorithm that
+ * can enlarge/shrink arbitrary outlines that we could use for, say, pocketing
+ * too - it relies on knowledge derived from the Gerber trace/pad "skeleton" 
+ * inside the generated contour to decide what gets removed and what remains.
+ */
 
 int
 gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth, gfloat_t offset)
