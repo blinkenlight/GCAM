@@ -27,12 +27,13 @@
 
 #define GCODE_GERBER_APERTURE_TYPE_CIRCLE     0x00
 #define GCODE_GERBER_APERTURE_TYPE_RECTANGLE  0x01
+#define GCODE_GERBER_APERTURE_TYPE_OBROUND    0x02
 
 typedef struct gcode_gerber_exposure_s
 {
   uint8_t type;
   gcode_vec2d_t pos;
-  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, otherwise v[0] = x and v[1] = y if RECTANGLE */
+  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, v[0] = x and v[1] = y if RECTANGLE or OBROUND */
 } gcode_gerber_exposure_t;
 
 typedef struct gcode_gerber_trace_s
@@ -44,9 +45,9 @@ typedef struct gcode_gerber_trace_s
 
 typedef struct gcode_gerber_aperture_s
 {
-  uint8_t type;                                                                 /* Circle or Rectangle */
+  uint8_t type;                                                                 /* Circle, Rectangle or Obround */
   uint8_t ind;                                                                  /* Wheel Position */
-  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, otherwise v[0] = x and v[1] = y if RECTANGLE */
+  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, v[0] = x and v[1] = y if RECTANGLE or OBROUND */
 } gcode_gerber_aperture_t;
 
 int gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth, gfloat_t offset);
