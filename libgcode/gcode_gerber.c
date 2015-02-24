@@ -30,6 +30,23 @@
 #define GCODE_GERBER_ARC_CCW  0
 #define GCODE_GERBER_ARC_CW   1
 
+#define GERBER_PASS_1         0
+#define GERBER_PASS_2         1
+#define GERBER_PASS_3         2
+#define GERBER_PASS_4         3
+#define GERBER_PASS_5         4
+#define GERBER_PASS_6         5
+#define GERBER_PASS_7         6
+#define GERBER_PASSES         7
+
+/**
+ * Convert the [0.0 ... 1.0] progress fraction of a specific Gerber pass into 
+ * a [0.0 ... 1.0] progress fraction relevant to the total number of passes;
+ */
+
+#define GERBER_PROGRESS(_pass, _prog) \
+  (((gfloat_t)_pass + _prog) / (gfloat_t)GERBER_PASSES)
+
 /**
  * Assuming 'x' is the point closest to point '_p3' on the line given by points
  * '_p1' and '_p2', find the ratio '_u' between the lengths of the segment '_p1'
@@ -73,25 +90,25 @@ qsort_compare (const void *a, const void *b)
  */
 
 static void
-insert_trace_elbow (int *trace_elbow_num, gcode_vec3d_t **trace_elbow, uint8_t aperture_ind, gcode_gerber_aperture_t *aperture_set, gcode_vec2d_t pos)
+insert_trace_elbow (int *trace_elbow_count, gcode_vec3d_t **trace_elbow_set, uint8_t aperture_ind, gcode_gerber_aperture_t *aperture_set, gcode_vec2d_t pos)
 {
   int i;
   uint8_t trace_elbow_match;
 
   trace_elbow_match = 0;
 
-  for (i = 0; i < *trace_elbow_num; i++)
-    if (GCODE_MATH_IS_EQUAL ((*trace_elbow)[i][2], aperture_set[aperture_ind].v[0]))
-      if (GCODE_MATH_2D_DISTANCE ((*trace_elbow)[i], pos) < GCODE_PRECISION)
+  for (i = 0; i < *trace_elbow_count; i++)
+    if (GCODE_MATH_IS_EQUAL ((*trace_elbow_set)[i][2], aperture_set[aperture_ind].v[0]))
+      if (GCODE_MATH_2D_DISTANCE ((*trace_elbow_set)[i], pos) < GCODE_PRECISION)
         trace_elbow_match = 1;
 
   if (!trace_elbow_match)
   {
-    *trace_elbow = realloc (*trace_elbow, (*trace_elbow_num + 1) * sizeof (gcode_vec3d_t));
-    (*trace_elbow)[*trace_elbow_num][0] = pos[0];
-    (*trace_elbow)[*trace_elbow_num][1] = pos[1];
-    (*trace_elbow)[*trace_elbow_num][2] = aperture_set[aperture_ind].v[0];
-    (*trace_elbow_num)++;
+    *trace_elbow_set = realloc (*trace_elbow_set, (*trace_elbow_count + 1) * sizeof (gcode_vec3d_t));
+    (*trace_elbow_set)[*trace_elbow_count][0] = pos[0];
+    (*trace_elbow_set)[*trace_elbow_count][1] = pos[1];
+    (*trace_elbow_set)[*trace_elbow_count][2] = aperture_set[aperture_ind].v[0];
+    (*trace_elbow_count)++;
   }
 }
 
@@ -186,12 +203,14 @@ point_inside_obround (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t width,
  */
 
 static int
-gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode_gerber_trace_t **trace_array, int *trace_elbow_num,
-                    gcode_vec3d_t **trace_elbow, int *exposure_num, gcode_gerber_exposure_t **exposure_array, gfloat_t offset)
+gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gcode_gerber_trace_t **trace_array, int *trace_elbow_count,
+                    gcode_vec3d_t **trace_elbow_array, int *exposure_count, gcode_gerber_exposure_t **exposure_array, gfloat_t offset)
 {
+  gcode_t *gcode;
   gcode_sketch_t *sketch;
   char buf[10], *buffer = NULL;
   long int length, nomore, index;
+  gfloat_t observed_progress, reported_progress;
   int i, j, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
   uint8_t aperture_ind, aperture_closed, trace_elbow_match;
   gcode_gerber_aperture_t *aperture_set;
@@ -209,6 +228,8 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
   unit_scale = 1.0;                                                             // Scale factor for cross-unit import (inches <-> mm)
   arc_dir = GCODE_GERBER_ARC_CW;
 
+  gcode = (gcode_t *)sketch_block->gcode;
+
   sketch = (gcode_sketch_t *)sketch_block->pdata;
 
   fseek (fh, 0, SEEK_END);
@@ -217,10 +238,24 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
   buffer = (char *)malloc (length);
   nomore = fread (buffer, 1, length, fh);
 
+  reported_progress = 0.0;
+
   index = 0;
 
   while (index < nomore)
   {
+    if (gcode->progress_callback)
+    {
+      observed_progress = (gfloat_t)index / (gfloat_t)nomore;
+
+      if (observed_progress >= reported_progress + 0.01)
+      {
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_1, observed_progress));
+
+        reported_progress = observed_progress;
+      }
+    }
+
     if (buffer[index] == '%')
     {
       index++;
@@ -667,7 +702,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
           arc->start_angle = start_angle;
           arc->sweep_angle = sweep_angle;
 
-          insert_trace_elbow (trace_elbow_num, trace_elbow, aperture_ind, aperture_set, pos);
+          insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, pos);
         }
         else if (xy_mask)                                                       /* And X or Y has occured - Uses previous aperture_cmd if a new one isn't present. */
         {
@@ -681,7 +716,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
             /* Store the Trace - Check for Duplicates before storing */
             duplicate_trace = 0;
 
-            for (i = 0; i < *trace_num; i++)
+            for (i = 0; i < *trace_count; i++)
             {
               dist0 = GCODE_MATH_2D_DISTANCE ((*trace_array)[i].p0, cur_pos);
               dist1 = GCODE_MATH_2D_DISTANCE ((*trace_array)[i].p1, pos);
@@ -704,13 +739,13 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
 
             if (!duplicate_trace)
             {
-              *trace_array = realloc (*trace_array, (*trace_num + 1) * sizeof (gcode_gerber_trace_t));
-              (*trace_array)[*trace_num].p0[0] = cur_pos[0];
-              (*trace_array)[*trace_num].p0[1] = cur_pos[1];
-              (*trace_array)[*trace_num].p1[0] = pos[0];
-              (*trace_array)[*trace_num].p1[1] = pos[1];
-              (*trace_array)[*trace_num].radius = 0.5 * aperture_set[aperture_ind].v[0];
-              (*trace_num)++;
+              *trace_array = realloc (*trace_array, (*trace_count + 1) * sizeof (gcode_gerber_trace_t));
+              (*trace_array)[*trace_count].p0[0] = cur_pos[0];
+              (*trace_array)[*trace_count].p0[1] = cur_pos[1];
+              (*trace_array)[*trace_count].p1[0] = pos[0];
+              (*trace_array)[*trace_count].p1[1] = pos[1];
+              (*trace_array)[*trace_count].radius = 0.5 * aperture_set[aperture_ind].v[0];
+              (*trace_count)++;
 
               /* Line 1 */
               gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
@@ -737,13 +772,13 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
               /* If the aperture was previously closed insert an elbow - check both position and diameter for duplicity */
               if (aperture_closed)
               {
-                insert_trace_elbow (trace_elbow_num, trace_elbow, aperture_ind, aperture_set, cur_pos);
+                insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, cur_pos);
 
                 aperture_closed = 0;
               }
 
               /* Insert an elbow at the end of this trace segment - check both position and diameter for duplicity */
-              insert_trace_elbow (trace_elbow_num, trace_elbow, aperture_ind, aperture_set, pos);
+              insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, pos);
             }
           }
           else if (aperture_cmd == 2)                                           /* Aperture Closed */
@@ -770,12 +805,12 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
               arc->start_angle = 90.0;
               arc->sweep_angle = -360.0;
 
-              *exposure_array = realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
-              (*exposure_array)[*exposure_num].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
-              (*exposure_array)[*exposure_num].pos[0] = pos[0];
-              (*exposure_array)[*exposure_num].pos[1] = pos[1];
-              (*exposure_array)[*exposure_num].v[0] = aperture_set[aperture_ind].v[0];
-              (*exposure_num)++;
+              *exposure_array = realloc (*exposure_array, (*exposure_count + 1) * sizeof (gcode_gerber_exposure_t));
+              (*exposure_array)[*exposure_count].type = GCODE_GERBER_APERTURE_TYPE_CIRCLE;
+              (*exposure_array)[*exposure_count].pos[0] = pos[0];
+              (*exposure_array)[*exposure_count].pos[1] = pos[1];
+              (*exposure_array)[*exposure_count].v[0] = aperture_set[aperture_ind].v[0];
+              (*exposure_count)++;
             }
             else if (aperture_set[aperture_ind].type == GCODE_GERBER_APERTURE_TYPE_RECTANGLE)
             {
@@ -826,13 +861,13 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
               line->p1[0] = pos[0] - 0.5 * aperture_set[aperture_ind].v[0];
               line->p1[1] = pos[1] + 0.5 * aperture_set[aperture_ind].v[1];
 
-              *exposure_array = realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
-              (*exposure_array)[*exposure_num].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
-              (*exposure_array)[*exposure_num].pos[0] = pos[0];
-              (*exposure_array)[*exposure_num].pos[1] = pos[1];
-              (*exposure_array)[*exposure_num].v[0] = aperture_set[aperture_ind].v[0];
-              (*exposure_array)[*exposure_num].v[1] = aperture_set[aperture_ind].v[1];
-              (*exposure_num)++;
+              *exposure_array = realloc (*exposure_array, (*exposure_count + 1) * sizeof (gcode_gerber_exposure_t));
+              (*exposure_array)[*exposure_count].type = GCODE_GERBER_APERTURE_TYPE_RECTANGLE;
+              (*exposure_array)[*exposure_count].pos[0] = pos[0];
+              (*exposure_array)[*exposure_count].pos[1] = pos[1];
+              (*exposure_array)[*exposure_count].v[0] = aperture_set[aperture_ind].v[0];
+              (*exposure_array)[*exposure_count].v[1] = aperture_set[aperture_ind].v[1];
+              (*exposure_count)++;
             }
             else if (aperture_set[aperture_ind].type == GCODE_GERBER_APERTURE_TYPE_OBROUND)
             {
@@ -922,13 +957,13 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
                 line2->p1[1] = pos[1] - 0.5 * (height - width);
               }
 
-              *exposure_array = realloc (*exposure_array, (*exposure_num + 1) * sizeof (gcode_gerber_exposure_t));
-              (*exposure_array)[*exposure_num].type = GCODE_GERBER_APERTURE_TYPE_OBROUND;
-              (*exposure_array)[*exposure_num].pos[0] = pos[0];
-              (*exposure_array)[*exposure_num].pos[1] = pos[1];
-              (*exposure_array)[*exposure_num].v[0] = aperture_set[aperture_ind].v[0];
-              (*exposure_array)[*exposure_num].v[1] = aperture_set[aperture_ind].v[1];
-              (*exposure_num)++;
+              *exposure_array = realloc (*exposure_array, (*exposure_count + 1) * sizeof (gcode_gerber_exposure_t));
+              (*exposure_array)[*exposure_count].type = GCODE_GERBER_APERTURE_TYPE_OBROUND;
+              (*exposure_array)[*exposure_count].pos[0] = pos[0];
+              (*exposure_array)[*exposure_count].pos[1] = pos[1];
+              (*exposure_array)[*exposure_count].v[0] = aperture_set[aperture_ind].v[0];
+              (*exposure_array)[*exposure_count].v[1] = aperture_set[aperture_ind].v[1];
+              (*exposure_count)++;
             }
           }
         }
@@ -1018,17 +1053,31 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_num, gcode
  */
 
 static void
-gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_num, gcode_vec3d_t *trace_elbow)
+gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_vec3d_t *trace_elbow)
 {
+  gcode_t *gcode;
   gcode_block_t *arc_block;
-  gcode_sketch_t *sketch;
   gcode_arc_t *arc;
-  int i;
+  gfloat_t observed_progress, reported_progress;
 
-  sketch = (gcode_sketch_t *)sketch_block->pdata;
+  gcode = (gcode_t *)sketch_block->gcode;
 
-  for (i = 0; i < trace_elbow_num; i++)
+  reported_progress = 0.0;
+
+  for (int i = 0; i < trace_elbow_count; i++)
   {
+    if (gcode->progress_callback)
+    {
+      observed_progress = (gfloat_t)i / (gfloat_t)trace_elbow_count;
+
+      if (observed_progress >= reported_progress + 0.01)
+      {
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_2, observed_progress));
+
+        reported_progress = observed_progress;
+      }
+    }
+
     gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
 
     gcode_append_as_listtail (sketch_block, arc_block);
@@ -1053,22 +1102,54 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_num, gcode_vec3
 static void
 gcode_gerber_pass3 (gcode_block_t *sketch_block)
 {
+  gcode_t *gcode;
   gcode_block_t *index1_block, *index2_block;
   gcode_block_t *original_listhead;
   gcode_vec2d_t p0, p1;
   gcode_vec2d_t ip_array[2];
   gcode_vec2d_t full_ip_array[256];
   gcode_vec3d_t full_ip_sorted_array[256];
-  int i, j, ip_count, full_ip_count, full_ip_sorted_count;
+  gfloat_t observed_progress, reported_progress;
+  int block_count, block_index;
+  int ip_count, full_ip_count, full_ip_sorted_count;
+
+  gcode = (gcode_t *)sketch_block->gcode;
 
   original_listhead = sketch_block->listhead;                                   // Save a reference to the current (original) list of 'sketch_block';
 
   sketch_block->listhead = NULL;                                                // Detach it from 'sketch_block' so a new list can be built in its place;
 
+  block_count = 0;
+
   index1_block = original_listhead;                                             // Start with the first block on the original list of 'sketch_block';
 
-  while (index1_block)                                                          // Take every single block and intersect it with ever other block;
+  while (index1_block)                                                          // Crawl along the list and count the blocks;
   {
+    block_count++;                                                              // This may sound like a waste of time, but the progress update needs it;
+
+    index1_block = index1_block->next;                                          // It's a small price to pay for having some feedback that GCAM didn't crash.
+  }
+
+  block_index = 0;
+
+  reported_progress = 0.0;
+
+  index1_block = original_listhead;                                             // Start with the first block on the original list of 'sketch_block';
+
+  while (index1_block)                                                          // Take every single block and intersect it with every other block;
+  {
+    if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
+    {
+      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+
+      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
+      {
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_3, observed_progress));
+
+        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
+      }
+    }
+
     full_ip_count = 0;                                                          // The total number of intersections 'index1_block' has with anything else;
     full_ip_sorted_count = 0;                                                   // The total number of UNIQUE intersections 'index1_block' has;
 
@@ -1082,7 +1163,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
       {
         if (!gcode_util_intersect (index1_block, index2_block, ip_array, &ip_count))
         {
-          for (i = 0; i < ip_count; i++)                                        // Examine every intersection point returned (if any):
+          for (int i = 0; i < ip_count; i++)                                    // Examine every intersection point returned (if any):
           {
             if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)     // Something touching one of the endpoints of 'index1_block', while technically
               continue;                                                         // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
@@ -1110,6 +1191,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 
       if (full_ip_count)                                                        // There were intersections...
       {
+        int i, j;
+
         for (i = 0; i < full_ip_count; i++)                                     // Loop through each intersection point,
         {
           distance = GCODE_MATH_2D_DISTANCE (p0, full_ip_array[i]);             // and find out how far is is from p0 (the first endpoint of the line);
@@ -1138,7 +1221,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 
         qsort (full_ip_sorted_array, full_ip_sorted_count, sizeof (gcode_vec3d_t), qsort_compare);
 
-        for (i = 0; i < full_ip_sorted_count - 1; i++)                          // Create connecting lines between each intersection point and the next one;
+        for (int i = 0; i < full_ip_sorted_count - 1; i++)                      // Create connecting lines between each intersection point and the next one;
         {
           gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
 
@@ -1174,6 +1257,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 
       if (full_ip_count)                                                        // There were intersections...
       {
+        int i, j;
+
         gcode_arc_center (index1_block, center, GCODE_GET);                     // We'll need the position of the center of this arc, so find it;
 
         for (i = 0; i < full_ip_count; i++)                                     // Loop through each intersection point,
@@ -1254,6 +1339,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
       }
     }
 
+    block_index++;                                                              // Count the processed blocks for the progress update;
+
     index1_block = index1_block->next;                                          // Move on to the next block in the original list of 'sketch_block';
   }
 
@@ -1263,229 +1350,105 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 /**
  * PASS 4 - Eliminate internal intersections: out of all those partial segments
  * created in pass 3, remove all that fall within a trace or a within a pad;
- * 
  */
 
 static void
-gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_trace_t *trace_array, int exposure_num, gcode_gerber_exposure_t *exposure_array)
+gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_trace_t *trace_array, int exposure_count, gcode_gerber_exposure_t *exposure_array)
 {
+  gcode_t *gcode;
   gcode_block_t *line_block, *index1_block, *index2_block;
-  gcode_sketch_t *sketch;
   gcode_line_t *line;
   gcode_arc_t *arc;
-  gcode_vec2d_t ip_array[2], pos[2], dpos, center;
-  int i, ip_num, remove;
-  gfloat_t dist, u;
+  int block_count, block_index, remove_block;
+  gfloat_t observed_progress, reported_progress;
 
-  sketch = (gcode_sketch_t *)sketch_block->pdata;
+  gcode = (gcode_t *)sketch_block->gcode;
 
-  gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+  gcode_line_init (&line_block, gcode, NULL);
 
   line = (gcode_line_t *)line_block->pdata;
 
-  /**
-   * Arguably, one could do _a single outside loop_ by 'index_block' inside
-   * which all the secondary loops for trace and pad intersections are done
-   * saving some redundant stuff (currently calculated twice) in the process
-   * but since it doesn't seem to cause a significant performance issue for
-   * the moment I really don't feel like messing with that too right now.
-   */
+  block_count = 0;
 
-  /**
-   * Trace Intersection Check
-   * Intersect the original trace with every block.
-   * The key here is that the original trace runs down the center.
-   */
+  index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
 
-  for (i = 0; i < trace_num; i++)
+  while (index1_block)                                                          // Crawl along the list and count the blocks;
   {
-    line->p0[0] = trace_array[i].p0[0];
-    line->p0[1] = trace_array[i].p0[1];
-    line->p1[0] = trace_array[i].p1[0];
-    line->p1[1] = trace_array[i].p1[1];
+    block_count++;                                                              // This may sound like a waste of time, but the progress update needs it;
 
-    index1_block = sketch_block->listhead;
-
-    while (index1_block)
-    {
-      if (gcode_util_intersect (line_block, index1_block, ip_array, &ip_num) == 0)
-      {
-        /* Remove block */
-        index2_block = index1_block;
-        index1_block = index1_block->next;
-        gcode_remove_and_destroy (index2_block);
-      }
-      else
-      {
-        index1_block = index1_block->next;
-      }
-    }
+    index1_block = index1_block->next;                                          // It's a small price to pay for having some feedback that GCAM didn't crash.
   }
 
-  /* Inside Exposure (PAD) Check */
-  for (i = 0; i < exposure_num; i++)
+  block_index = 0;
+
+  reported_progress = 0.0;
+
+  index1_block = sketch_block->listhead;
+
+  while (index1_block)
   {
-    index1_block = sketch_block->listhead;
+    gcode_vec2d_t p0, p1, midp;
 
-    while (index1_block)
+    if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
     {
-      gcode_vec2d_t p0, p1, midp;
+      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
 
-      remove = 0;
-
-      index1_block->ends (index1_block, p0, p1, GCODE_GET);
-
-      switch (index1_block->type)
+      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
       {
-        case GCODE_TYPE_LINE:
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_4, observed_progress));
 
-          midp[0] = 0.5 * (p0[0] + p1[0]);
-          midp[1] = 0.5 * (p0[1] + p1[1]);
-
-          break;
-
-        case GCODE_TYPE_ARC:
-        {
-          gcode_vec2d_t center;
-
-          arc = (gcode_arc_t *)index1_block->pdata;
-
-          gcode_arc_center (index1_block, center, GCODE_GET);
-
-          midp[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
-          midp[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
-
-          break;
-        }
-      }
-
-      switch (exposure_array[i].type)
-      {
-        case GCODE_GERBER_APERTURE_TYPE_CIRCLE:
-        {
-          gcode_vec2d_t center;
-          gfloat_t diameter;
-
-          center[0] = exposure_array[i].pos[0];
-          center[1] = exposure_array[i].pos[1];
-
-          diameter = exposure_array[i].v[0];
-
-          if (point_inside_circle (p0, center, diameter))
-            remove = 1;
-
-          if (point_inside_circle (p1, center, diameter))
-            remove = 1;
-
-          if (point_inside_circle (midp, center, diameter))
-            remove = 1;
-
-          break;
-        }
-
-        case GCODE_GERBER_APERTURE_TYPE_RECTANGLE:
-        {
-          gcode_vec2d_t center;
-          gfloat_t width, height;
-
-          center[0] = exposure_array[i].pos[0];
-          center[1] = exposure_array[i].pos[1];
-
-          width = exposure_array[i].v[0];
-          height = exposure_array[i].v[1];
-
-          if (point_inside_rectangle (p0, center, width, height))
-            remove = 1;
-
-          if (point_inside_rectangle (p1, center, width, height))
-            remove = 1;
-
-          if (point_inside_rectangle (midp, center, width, height))
-            remove = 1;
-
-          break;
-        }
-
-        case GCODE_GERBER_APERTURE_TYPE_OBROUND:
-        {
-          gcode_vec2d_t center;
-          gfloat_t width, height;
-
-          center[0] = exposure_array[i].pos[0];
-          center[1] = exposure_array[i].pos[1];
-
-          width = exposure_array[i].v[0];
-          height = exposure_array[i].v[1];
-
-          if (point_inside_obround (p0, center, width, height))
-            remove = 1;
-
-          if (point_inside_obround (p1, center, width, height))
-            remove = 1;
-
-          if (point_inside_obround (midp, center, width, height))
-            remove = 1;
-
-          break;
-        }
-      }
-
-      if (remove)
-      {
-        index2_block = index1_block;
-        index1_block = index1_block->next;
-        gcode_remove_and_destroy (index2_block);
-      }
-      else
-      {
-        index1_block = index1_block->next;
+        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
       }
     }
-  }
 
-  /* Distance from Trace Check */
-  for (i = 0; i < trace_num; i++)
-  {
-    line->p0[0] = trace_array[i].p0[0];
-    line->p0[1] = trace_array[i].p0[1];
-    line->p1[0] = trace_array[i].p1[0];
-    line->p1[1] = trace_array[i].p1[1];
+    index1_block->ends (index1_block, p0, p1, GCODE_GET);
 
-    index1_block = sketch_block->listhead;
-
-    while (index1_block)
+    switch (index1_block->type)
     {
-      gcode_vec2d_t p0, p1, midp;
+      case GCODE_TYPE_LINE:
 
-      remove = 0;
+        midp[0] = 0.5 * (p0[0] + p1[0]);
+        midp[1] = 0.5 * (p0[1] + p1[1]);
 
-      index1_block->ends (index1_block, p0, p1, GCODE_GET);
+        break;
 
-      switch (index1_block->type)
+      case GCODE_TYPE_ARC:
       {
-        case GCODE_TYPE_LINE:
+        gcode_vec2d_t center;
 
-          midp[0] = 0.5 * (p0[0] + p1[0]);
-          midp[1] = 0.5 * (p0[1] + p1[1]);
+        arc = (gcode_arc_t *)index1_block->pdata;
 
-          break;
+        gcode_arc_center (index1_block, center, GCODE_GET);
 
-        case GCODE_TYPE_ARC:
-        {
-          gcode_vec2d_t center;
+        midp[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
+        midp[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
 
-          arc = (gcode_arc_t *)index1_block->pdata;
-
-          gcode_arc_center (index1_block, center, GCODE_GET);
-
-          midp[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
-          midp[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
-
-          break;
-        }
+        break;
       }
+    }
+
+    remove_block = 0;
+
+    /**
+     * Trace Interference Check
+     */
+
+    for (int i = 0; i < trace_count && !remove_block; i++)
+    {
+      gcode_vec2d_t ip_array[2], dpos;
+      gfloat_t dist, u;
+      int ip_count;
+
+      GCODE_MATH_VEC2D_COPY (line->p0, trace_array[i].p0);
+      GCODE_MATH_VEC2D_COPY (line->p1, trace_array[i].p1);
+
+      /* Intersect Test 0 - does this block explicitly intersect the trace */
+
+      if (gcode_util_intersect (line_block, index1_block, ip_array, &ip_count) == 0)
+        remove_block = 1;
 
       /* Intersect Test 1 - does end pt fall within trace domain and is it less than aperture radius. */
+
       SOLVE_U (line->p0, line->p1, p0, u);                                      // Find the ratio 'u' yielding the projection of 'p0' onto 'line';
 
       if (u < 0.0)                                                              // If the projection would fall outside the segment [p0, p1], clamp 'u';
@@ -1500,9 +1463,10 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
       dist = GCODE_MATH_2D_DISTANCE (dpos, p0);                                 // See how far the endpoint 'p0' of the block is from 'dpos';
 
       if (dist < trace_array[i].radius - GCODE_PRECISION)                       // If it's closer than the trace radius, intruder alert...!
-        remove = 1;
+        remove_block = 1;
 
       /* Intersect Test 2 - does end pt fall within trace domain and is it less than aperture radius. */
+
       SOLVE_U (line->p0, line->p1, p1, u);                                      // Find the ratio 'u' yielding the projection of 'p1' onto 'line';
 
       if (u < 0.0)                                                              // If the projection would fall outside the segment [p0, p1], clamp 'u';
@@ -1517,34 +1481,37 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
       dist = GCODE_MATH_2D_DISTANCE (dpos, p1);                                 // See how far the endpoint 'p1' of the block is from 'dpos';
 
       if (dist < trace_array[i].radius - GCODE_PRECISION)                       // If it's closer than the trace radius, intruder alert...!
-        remove = 1;
+        remove_block = 1;
 
       /* Intersect Test 3 - Check End Points to see if they fall within the trace end radius */
       /* Arguably, this shouldn't be here at all anymore - the previous step covers this now */
+
       if (GCODE_MATH_2D_DISTANCE (line->p0, p0) < trace_array[i].radius - GCODE_PRECISION)
-        remove = 1;
+        remove_block = 1;
 
       if (GCODE_MATH_2D_DISTANCE (line->p0, p1) < trace_array[i].radius - GCODE_PRECISION)
-        remove = 1;
+        remove_block = 1;
 
       if (GCODE_MATH_2D_DISTANCE (line->p1, p0) < trace_array[i].radius - GCODE_PRECISION)
-        remove = 1;
+        remove_block = 1;
 
       if (GCODE_MATH_2D_DISTANCE (line->p1, p1) < trace_array[i].radius - GCODE_PRECISION)
-        remove = 1;
+        remove_block = 1;
 
       /* Intersect Test 4 - Lines only - Check if lines pass through the trace end radius */
       /* Arguably, this should do exactly the same as arcs below (no need to distinguish) */
+
       if (index1_block->type == GCODE_TYPE_LINE)
       {
         if (GCODE_MATH_2D_DISTANCE (line->p0, midp) < trace_array[i].radius - GCODE_PRECISION)
-          remove = 1;
+          remove_block = 1;
 
         if (GCODE_MATH_2D_DISTANCE (line->p1, midp) < trace_array[i].radius - GCODE_PRECISION)
-          remove = 1;
+          remove_block = 1;
       }
 
       /* Intersect Test 5 - Arcs only - Check if arcs pass through the trace */
+
       if (index1_block->type == GCODE_TYPE_ARC)
       {
         SOLVE_U (line->p0, line->p1, midp, u);                                  // Find the ratio 'u' yielding the projection of 'midp' onto 'line';
@@ -1561,19 +1528,99 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
         dist = GCODE_MATH_2D_DISTANCE (dpos, midp);                             // See how far the midpoint 'midp' of the arc is from 'dpos';
 
         if (dist < trace_array[i].radius - GCODE_PRECISION)                     // If it's closer than the trace radius, intruder alert...!
-          remove = 1;
+          remove_block = 1;
       }
+    }
 
-      if (remove)
+    /**
+     * Exposure (Pad) Interference Check
+     */
+
+    for (int i = 0; i < exposure_count && !remove_block; i++)
+    {
+      switch (exposure_array[i].type)
       {
-        index2_block = index1_block;
-        index1_block = index1_block->next;
-        gcode_remove_and_destroy (index2_block);
+        case GCODE_GERBER_APERTURE_TYPE_CIRCLE:
+        {
+          gcode_vec2d_t center;
+          gfloat_t diameter;
+
+          center[0] = exposure_array[i].pos[0];
+          center[1] = exposure_array[i].pos[1];
+
+          diameter = exposure_array[i].v[0];
+
+          if (point_inside_circle (p0, center, diameter))
+            remove_block = 1;
+
+          if (point_inside_circle (p1, center, diameter))
+            remove_block = 1;
+
+          if (point_inside_circle (midp, center, diameter))
+            remove_block = 1;
+
+          break;
+        }
+
+        case GCODE_GERBER_APERTURE_TYPE_RECTANGLE:
+        {
+          gcode_vec2d_t center;
+          gfloat_t width, height;
+
+          center[0] = exposure_array[i].pos[0];
+          center[1] = exposure_array[i].pos[1];
+
+          width = exposure_array[i].v[0];
+          height = exposure_array[i].v[1];
+
+          if (point_inside_rectangle (p0, center, width, height))
+            remove_block = 1;
+
+          if (point_inside_rectangle (p1, center, width, height))
+            remove_block = 1;
+
+          if (point_inside_rectangle (midp, center, width, height))
+            remove_block = 1;
+
+          break;
+        }
+
+        case GCODE_GERBER_APERTURE_TYPE_OBROUND:
+        {
+          gcode_vec2d_t center;
+          gfloat_t width, height;
+
+          center[0] = exposure_array[i].pos[0];
+          center[1] = exposure_array[i].pos[1];
+
+          width = exposure_array[i].v[0];
+          height = exposure_array[i].v[1];
+
+          if (point_inside_obround (p0, center, width, height))
+            remove_block = 1;
+
+          if (point_inside_obround (p1, center, width, height))
+            remove_block = 1;
+
+          if (point_inside_obround (midp, center, width, height))
+            remove_block = 1;
+
+          break;
+        }
       }
-      else
-      {
-        index1_block = index1_block->next;
-      }
+    }
+
+    block_index++;
+
+    if (remove_block)
+    {
+      index2_block = index1_block;
+      index1_block = index1_block->next;
+      gcode_remove_and_destroy (index2_block);
+    }
+    else
+    {
+      index1_block = index1_block->next;
     }
   }
 
@@ -1589,16 +1636,48 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_num, gcode_gerber_tra
 static void
 gcode_gerber_pass5 (gcode_block_t *sketch_block)
 {
+  gcode_t *gcode;
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t e0[2], e1[2];
   gfloat_t dist0, dist1;
-  int match;
+  gfloat_t observed_progress, reported_progress;
+  int block_count, block_index, match;
 
-  index1_block = sketch_block->listhead;
+  gcode = (gcode_t *)sketch_block->gcode;
 
-  while (index1_block)
+  block_count = 0;
+
+  index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
+
+  while (index1_block)                                                          // Crawl along the list and count the blocks;
   {
+    block_count++;                                                              // This may sound like a waste of time, but the progress update needs it;
+
+    index1_block = index1_block->next;                                          // It's a small price to pay for having some feedback that GCAM didn't crash.
+  }
+
+  block_index = 0;
+
+  reported_progress = 0.0;
+
+  index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
+
+  while (index1_block)                                                          // Take every single block and compare it with every other block;
+  {
+    if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
+    {
+      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+
+      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
+      {
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_5, observed_progress));
+
+        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
+      }
+    }
+
     index1_block->ends (index1_block, e0[0], e0[1], GCODE_GET);
+
     match = 0;
 
     index2_block = index1_block->next;
@@ -1629,6 +1708,9 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
         index2_block = index2_block->next;
       }
     }
+
+    block_index++;
+
     index1_block = index1_block->next;
   }
 }
@@ -1640,7 +1722,18 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
 static void
 gcode_gerber_pass6 (gcode_block_t *sketch_block)
 {
+  gcode_t *gcode;
+  gfloat_t progress;
+
+  gcode = (gcode_t *)sketch_block->gcode;
+
   gcode_util_merge_list_fragments (&sketch_block->listhead);
+
+  /* Cheating like crazy, but 'merge' doesn't have progress feedback... */
+
+  if (gcode->progress_callback)
+    for (progress = 0.0; progress < 1.0; progress += 0.01)
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_6, progress));
 }
 
 /**
@@ -1650,21 +1743,53 @@ gcode_gerber_pass6 (gcode_block_t *sketch_block)
 static void
 gcode_gerber_pass7 (gcode_block_t *sketch_block)
 {
+  gcode_t *gcode;
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t v0, v1, e0[2], e1[2];
-  int merge;
+  gfloat_t observed_progress, reported_progress;
+  int block_count, block_index, merge_block;
+
+  gcode = (gcode_t *)sketch_block->gcode;
 
   if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
     return;
+
+  block_count = 0;
+
+  index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
+
+  while (index1_block)                                                          // Crawl along the list and count the blocks;
+  {
+    block_count++;                                                              // This may sound like a waste of time, but the progress update needs it;
+
+    index1_block = index1_block->next;                                          // It's a small price to pay for having some feedback that GCAM didn't crash.
+  }
+
+  block_index = 0;
+
+  reported_progress = 0.0;
 
   index1_block = sketch_block->listhead;                                        // Start with the first and the second block in the list;
   index2_block = index1_block->next;
 
   while (index1_block && index2_block)                                          // As long as both blocks exist, keep looping;
   {
-    merge = 0;                                                                  // Clear the merge flag for a new round;
+    if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
+    {
+      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+
+      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
+      {
+        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_7, observed_progress));
+
+        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
+      }
+    }
+
+    merge_block = 0;                                                            // Clear the merge flag for a new round;
 
     /* Check that both blocks are actually lines */
+
     if ((index1_block->type == GCODE_TYPE_LINE) && (index2_block->type == GCODE_TYPE_LINE))
     {
       index1_block->ends (index1_block, e0[0], e0[1], GCODE_GET);               // Get the endpoints of line 1, then their difference (the slope of line 1)
@@ -1674,45 +1799,52 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
       GCODE_MATH_VEC2D_SUB (v1, e1[1], e1[0]);
 
       /* Make sure the points are connected */
+
       if (GCODE_MATH_IS_EQUAL (e0[1][0], e1[0][0]) && GCODE_MATH_IS_EQUAL (e0[1][1], e1[0][1]))
       {
         /* Check for matching slopes */
+
         if ((fabs (v0[1]) < GCODE_PRECISION) && (fabs (v1[1]) < GCODE_PRECISION))
         {
-          merge = 1;                                                            // Both lines are horizontal -> merge;
+          merge_block = 1;                                                      // Both lines are horizontal -> merge;
         }
         else if ((fabs (v0[0]) < GCODE_PRECISION) && (fabs (v1[0]) < GCODE_PRECISION))
         {
-          merge = 1;                                                            // Both lines are vertical -> merge;
+          merge_block = 1;                                                      // Both lines are vertical -> merge;
         }
         else if ((fabs (v0[0]) < GCODE_PRECISION) || (fabs (v1[0]) < GCODE_PRECISION))
         {
-          merge = 0;                                                            // Not a match, but we really should avoid DIVIDING BY ZERO;
+          merge_block = 0;                                                      // Not a match, but we really should avoid DIVIDING BY ZERO;
         }
         else if (fabs (v0[1] / v0[0] - v1[1] / v1[0]) < GCODE_PRECISION)
         {
-          merge = 1;                                                            // Both lines have the same slope -> merge;
+          merge_block = 1;                                                      // Both lines have the same slope -> merge;
         }
 
-        if (merge)                                                              // Merging just means the end of line 1 changes to the end of line 2;
+        if (merge_block)                                                        // Merging just means the end of line 1 changes to the end of line 2;
         {
           gcode_line_t *line;
 
           line = (gcode_line_t *)index1_block->pdata;
 
-          line->p1[0] = e1[1][0];
-          line->p1[1] = e1[1][1];
+          GCODE_MATH_VEC2D_COPY (line->p1, e1[1]);
         }
       }
     }
 
-    if (merge)                                                                  // If we merged, get rid of block 2 and restart at the beginning of the list;
+    if (merge_block)                                                            // If we merged, get rid of block 2 and restart at the beginning of the list;
     {
       gcode_remove_and_destroy (index2_block);
+
+      block_count--;
+      block_index = 0;
+
       index1_block = sketch_block->listhead;
     }
     else                                                                        // Otherwise just crawl along the list by one block;
     {
+      block_index++;
+
       index1_block = index2_block;
     }
 
@@ -1737,10 +1869,11 @@ int
 gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth, gfloat_t offset)
 {
   FILE *fh;
-  int trace_elbow_num, trace_num, exposure_num, error;
+  gcode_t *gcode;
+  int trace_elbow_count, trace_count, exposure_count, error;
   gcode_extrusion_t *extrusion;
   gcode_line_t *line;
-  gcode_vec3d_t *trace_elbow = NULL;
+  gcode_vec3d_t *trace_elbow_array = NULL;
   gcode_gerber_trace_t *trace_array = NULL;
   gcode_gerber_exposure_t *exposure_array = NULL;
 
@@ -1748,6 +1881,8 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
 
   if (!fh)
     return (1);
+
+  gcode = (gcode_t *)sketch_block->gcode;
 
   extrusion = (gcode_extrusion_t *)sketch_block->extruder->pdata;
 
@@ -1757,30 +1892,37 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
 
   line->p1[1] = -depth;
 
-  /* Set the comment as the file being opened */
-  sprintf (sketch_block->comment, "Pass offset: %.4f", offset);
+  sprintf (sketch_block->comment, "Pass offset: %.4f", offset);                 // Note the offset for this pass in the sketch comment;
 
   extrusion->cut_side = GCODE_EXTRUSION_ALONG;
 
-  trace_elbow_num = 0;
-  trace_num = 0;
-  exposure_num = 0;
+  trace_elbow_count = 0;
+  trace_count = 0;
+  exposure_count = 0;
 
-  error = gcode_gerber_pass1 (sketch_block, fh, &trace_num, &trace_array, &trace_elbow_num, &trace_elbow, &exposure_num, &exposure_array, offset);
+  if (gcode->progress_callback)                                                 // Clean up the progress bar before we begin;
+    gcode->progress_callback (gcode->gui, 0);
 
-  if (error)
-    return (1);
-
-  gcode_gerber_pass2 (sketch_block, trace_elbow_num, trace_elbow);
-  gcode_gerber_pass3 (sketch_block);
-  gcode_gerber_pass4 (sketch_block, trace_num, trace_array, exposure_num, exposure_array);
-  gcode_gerber_pass5 (sketch_block);
-  gcode_gerber_pass6 (sketch_block);
-  gcode_gerber_pass7 (sketch_block);
-
-  free (trace_array);
-  free (exposure_array);
+  error = gcode_gerber_pass1 (sketch_block, fh, &trace_count, &trace_array, &trace_elbow_count, &trace_elbow_array, &exposure_count, &exposure_array, offset);
 
   fclose (fh);
-  return (0);
+
+  if (!error)                                                                   // Only execute further passes if there was no error during the first;
+  {
+    gcode_gerber_pass2 (sketch_block, trace_elbow_count, trace_elbow_array);
+    gcode_gerber_pass3 (sketch_block);
+    gcode_gerber_pass4 (sketch_block, trace_count, trace_array, exposure_count, exposure_array);
+    gcode_gerber_pass5 (sketch_block);
+    gcode_gerber_pass6 (sketch_block);
+    gcode_gerber_pass7 (sketch_block);
+  }
+
+  free (trace_array);
+  free (trace_elbow_array);
+  free (exposure_array);
+
+  if (gcode->progress_callback)                                                 // Clean up the progress bar before we leave;
+    gcode->progress_callback (gcode->gui, 0);
+
+  return (error);
 }
