@@ -1326,30 +1326,24 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   gui_t *gui;
   GtkWidget **wlist;
   GtkTreeModel *model;
-  GtkTreeIter template_iter, parent_iter, selected_iter;
+  GtkTreeIter parent_iter, selected_iter;
   gcode_block_t *template_block, *tool_block, *sketch_block, *selected_block;
   gcode_tool_t *tool;
   gui_endmill_t *endmill;
-  gfloat_t depth, offset, tool_diameter, number_passes, pass_overlap;
+  gfloat_t tool_diameter, pass_count, pass_overlap, pass_depth, pass_offset;
   uint8_t tool_number;
   gcode_vec2d_t aabb_min, aabb_max;
   char *text_field, tool_name[32], filename[256];
+  int import_failed;
 
   wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
 
   gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
 
+  gtk_widget_hide (assistant);                                                  // Ask GTK to hide the assistant;
+  gtk_main_iteration ();                                                        // Let GTK actually execute that;
+
   strcpy (filename, gtk_entry_get_text (GTK_ENTRY (wlist[1])));
-
-  /* Perform a Test Run to see if File passes without errors */
-  gcode_sketch_init (&sketch_block, &gui->gcode, NULL);
-
-  if (gcode_gerber_import (sketch_block, filename, 0, 0) != 0)
-  {
-    generic_error (gui, "\nSomething went wrong - failed to import the file\n");
-    sketch_block->free (&sketch_block);
-    return;
-  }
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
   strcpy (tool_name, &text_field[6]);
@@ -1362,13 +1356,48 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   gcode_template_init (&template_block, &gui->gcode, NULL);                     // Create a new template block to import things into;
 
-  sprintf (template_block->comment, "Gerber layer from '%s'", basename ((char *)filename));     // Create a block comment that mentions the filename;
+  sprintf (template_block->comment, "Gerber layer from '%s'", basename ((char *)filename));
+
+  gcode_tool_init (&tool_block, &gui->gcode, template_block);                   // Create a new tool to perform the etching with,
+
+  gcode_insert_as_listhead (template_block, tool_block);                        // and add the tool to the list of the template;
+
+  tool = (gcode_tool_t *)tool_block->pdata;
+
+  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+  tool->diameter = tool_diameter;
+  tool->number = tool_number;
+  strcpy (tool->label, tool_name);
+
+  pass_depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
+  pass_count = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+  pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
+
+  pass_offset = tool_diameter / 2;
+
+  import_failed = 0;
+
+  for (int i = 0; i < pass_count && !import_failed; i++)                        // For each isolation pass (unless any one of them fails),
+  {
+    gcode_sketch_init (&sketch_block, &gui->gcode, template_block);             // create a new sketch to import that pass into,
+
+    gcode_append_as_listtail (template_block, sketch_block);                    // and add the sketch to the list of the template;
+
+    import_failed = gcode_gerber_import (sketch_block, filename, pass_depth, pass_offset);
+
+    pass_offset += (1 - pass_overlap) * tool_diameter;
+  }
+
+  if (import_failed)                                                            // In case of failure, undo everything (free the template recursively);
+  {
+    generic_error (gui, "\nSomething went wrong - failed to import the file\n");
+    template_block->free (&template_block);
+    return;
+  }
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));  // Retrieve a reference to the model of the main GUI tree view;
 
   get_selected_block (gui, &selected_block, &selected_iter);                    // Get the currently selected block and iter in the main GUI tree view;
-
-  /* This would not be so elaborate with a more context-aware "File" menu */
 
   while (selected_block)                                                        // Must back up the tree if the new block is not valid after the selected one;
   {
@@ -1376,7 +1405,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
     {
       if (GCODE_IS_VALID_PARENT_CHILD[selected_block->parent->type][template_block->type])      // If it has one, check validity of the template block under it;
       {
-        template_iter = insert_primitive (gui, template_block, selected_block, &selected_iter, GUI_INSERT_AFTER);       // If valid, insert it and leave;
+        insert_primitive (gui, template_block, selected_block, &selected_iter, GUI_INSERT_AFTER);       // If valid, insert it and leave;
         break;
       }
     }
@@ -1384,7 +1413,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
     {
       if (GCODE_IS_VALID_IF_NO_PARENT[template_block->type])                    // If no parent, check validity of the template block as a top level block;
       {
-        template_iter = insert_primitive (gui, template_block, selected_block, &selected_iter, GUI_INSERT_AFTER);       // If valid, insert it and leave;
+        insert_primitive (gui, template_block, selected_block, &selected_iter, GUI_INSERT_AFTER);       // If valid, insert it and leave;
         break;
       }
     }
@@ -1395,33 +1424,8 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
     selected_iter = parent_iter;                                                // Move 'selected_iter' one level up the tree (replace with parent);
   }
 
-  gcode_tool_init (&tool_block, &gui->gcode, template_block);
-
-  insert_primitive (gui, tool_block, template_block, &template_iter, GUI_INSERT_UNDER);
-
-  tool = (gcode_tool_t *)tool_block->pdata;
-  tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
-  tool->diameter = tool_diameter;
-  tool->number = tool_number;
-  strcpy (tool->label, tool_name);
-
-  depth = -gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[4]));
-  number_passes = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
-  pass_overlap = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
-
-  offset = tool_diameter / 2;
-
-  for (int i = 0; i < number_passes; i++)
-  {
-    gcode_sketch_init (&sketch_block, &gui->gcode, template_block);
-    gcode_gerber_import (sketch_block, filename, depth, offset);
-    insert_primitive (gui, sketch_block, template_block, &template_iter, GUI_APPEND_UNDER);
-
-    offset += (1 - pass_overlap) * tool_diameter;
-  }
-
-  /* Get the bounding box for the sketch */
-  sketch_block->aabb (sketch_block, aabb_min, aabb_max);
+  /* Get the bounding box for the template */
+  template_block->aabb (template_block, aabb_min, aabb_max);
 
   /* Extend material size and/or move origin if anything spills over */
   if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
