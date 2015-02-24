@@ -107,7 +107,11 @@ void
 update_progress (void *gui, gfloat_t progress)
 {
   gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (((gui_t *)gui)->progress_bar), progress);
-  gtk_main_iteration ();
+
+  /* One iteration (or even several more) are not enough for reliable updates */
+
+  while (gtk_events_pending ())
+    gtk_main_iteration ();
 }
 
 /**
