@@ -1312,12 +1312,18 @@ gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
   while (index_block)
   {
     if (!index_block->aabb)                                                     // If the block has no bounds function, don't try to call it;
+    {
+      index_block = index_block->next;
       continue;
+    }
 
     index_block->aabb (index_block, tmin, tmax);
 
     if ((tmin[0] > tmax[0]) || (tmin[1] > tmax[1]))                             // If the block returned an inside-out box, discard the box;
+    {
+      index_block = index_block->next;
       continue;
+    }
 
     if ((min[0] > max[0]) || (min[1] > max[1]))                                 // If bounds were inside-out (unset), accept the box directly;
     {
