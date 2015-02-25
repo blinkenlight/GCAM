@@ -1044,24 +1044,28 @@ gui_init (char *filename)
 
     /* STATUS COLUMN */
     renderer = gtk_cell_renderer_text_new ();
+    gtk_cell_renderer_set_alignment (renderer, 0.5, 0.5);
     column = gtk_tree_view_column_new_with_attributes ("Status", renderer, "text", 2, NULL);
+    gtk_tree_view_column_set_alignment (column, 0.5);
     gtk_tree_view_append_column (GTK_TREE_VIEW (gui.gcode_block_treeview), column);
 
     /* SUPPRESS COLUMN */
     renderer = gtk_cell_renderer_toggle_new ();
+    gtk_cell_renderer_set_alignment (renderer, 0.5, 0.5);
     g_object_set_data (G_OBJECT (renderer), "column", (gint *) 3);
     column = gtk_tree_view_column_new_with_attributes ("Suppress", renderer, "active", 3, NULL);
+    gtk_tree_view_column_set_alignment (column, 0.5);
     gtk_tree_view_append_column (GTK_TREE_VIEW (gui.gcode_block_treeview), column);
     g_signal_connect (renderer, "toggled", G_CALLBACK (suppress_toggled), tree);
 
     /* COMMENT COLUMN */
     renderer = gtk_cell_renderer_text_new ();
     gui.comment_cell = renderer;
-    column = gtk_tree_view_column_new_with_attributes ("Comment", renderer, "text", 4, NULL);
     g_object_set (renderer, "editable", TRUE, NULL);
-    g_signal_connect (renderer, "edited", G_CALLBACK (comment_cell_edited), tree);
     g_object_set_data (G_OBJECT (renderer), "column", GINT_TO_POINTER (4));
+    column = gtk_tree_view_column_new_with_attributes ("Comment", renderer, "text", 4, NULL);
     gtk_tree_view_append_column (GTK_TREE_VIEW (gui.gcode_block_treeview), column);
+    g_signal_connect (renderer, "edited", G_CALLBACK (comment_cell_edited), tree);
 
     /* Clear drag-and-drop data */
     gui.row_drop_path = NULL;
