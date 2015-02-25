@@ -4,6 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,6 +24,13 @@
 #define _GUI_MENU_FILE_H
 
 #include <gtk/gtk.h>
+
+static const char *GCAM_TTIP_IMPORT_GERBER_FEED = "Feed velocity of the toolbit over the circuit board, expressed in project units per minute";
+static const char *GCAM_TTIP_IMPORT_GERBER_DEPTH =
+  "Depth of the isolation groove, expressed in project units (note that GCAM does not compensate for the depth-induced widening caused by a \"V\"-tip)";
+static const char *GCAM_TTIP_IMPORT_GERBER_PASSES = "Number of isolation contours to carve (each slightly larger then the previous)";
+static const char *GCAM_TTIP_IMPORT_GERBER_OVERLAP = "Amount of overlap between consecutive passes, expressed as a fraction (0.0 ... 1.0)";
+static const char *GCAM_TTIP_IMPORT_GERBER_WIDTH = "Total isolation gap width after all passes are completed, expressed in project units";
 
 void gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_file_load_project_menuitem_callback (GtkWidget *widget, gpointer data);

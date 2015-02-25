@@ -1755,6 +1755,8 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (feed_spin), SCALED_INCHES (10.0));
   gtk_box_pack_start (GTK_BOX (hbox2), feed_spin, TRUE, TRUE, 0);               // 'hbox2' cell 2 <- spin 'feed_spin'
 
+  gtk_widget_set_tooltip_text (feed_spin, GCAM_TTIP_IMPORT_GERBER_FEED);
+
   g_signal_connect_swapped (feed_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Cutting Depth");
@@ -1764,6 +1766,8 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (depth_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (depth_spin), SCALED_INCHES (-0.0024));
   gtk_box_pack_start (GTK_BOX (hbox3), depth_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'depth_spin'
+
+  gtk_widget_set_tooltip_text (depth_spin, GCAM_TTIP_IMPORT_GERBER_DEPTH);
 
   g_signal_connect_swapped (depth_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
@@ -1854,6 +1858,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (passes_spin), 1.0);
   gtk_box_pack_start (GTK_BOX (hbox1), passes_spin, TRUE, TRUE, 0);             // 'hbox1' cell 2 <- spin 'passes_spin'
 
+  gtk_widget_set_tooltip_text (passes_spin, GCAM_TTIP_IMPORT_GERBER_PASSES);
+
   g_signal_connect (passes_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
   g_signal_connect_swapped (passes_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
@@ -1864,6 +1870,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (overlap_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (overlap_spin), 0.5);
   gtk_box_pack_start (GTK_BOX (hbox2), overlap_spin, TRUE, TRUE, 0);            // 'hbox2' cell 2 <- spin 'overlap_spin'
+
+  gtk_widget_set_tooltip_text (overlap_spin, GCAM_TTIP_IMPORT_GERBER_OVERLAP);
 
   g_signal_connect (overlap_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
   g_signal_connect_swapped (overlap_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1877,6 +1885,8 @@ gerber_create_page3 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (width_spin), MANTISSA);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (width_spin), tool_diameter);
   gtk_box_pack_start (GTK_BOX (hbox3), width_spin, TRUE, TRUE, 0);              // 'hbox3' cell 2 <- spin 'width_spin'
+
+  gtk_widget_set_tooltip_text (width_spin, GCAM_TTIP_IMPORT_GERBER_WIDTH);
 
   g_signal_connect (width_spin, "value-changed", G_CALLBACK (gerber_on_spin_changed), wlist);
   g_signal_connect_swapped (width_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
