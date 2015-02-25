@@ -170,7 +170,7 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
 
-  label = gtk_label_new ("Translate(X)");
+  label = gtk_label_new ("Translate (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
 
   translatex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -180,7 +180,7 @@ move_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (translatex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Translate(Y)");
+  label = gtk_label_new ("Translate (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
   translatey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -321,7 +321,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
 
-  label = gtk_label_new ("Rotate About(X)");
+  label = gtk_label_new ("Rotate About (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
 
   rotate_aboutx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -331,7 +331,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (rotate_aboutx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Rotate About(Y)");
+  label = gtk_label_new ("Rotate About (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
   rotate_abouty_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -957,7 +957,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (iterations_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Translate(X)");
+  label = gtk_label_new ("Translate (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 1, 2);
 
   translatex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -967,7 +967,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (translatex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Translate(Y)");
+  label = gtk_label_new ("Translate (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
 
   translatey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -977,7 +977,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (translatey_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Rotate About(X)");
+  label = gtk_label_new ("Rotate About (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
 
   rotate_aboutx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -987,7 +987,7 @@ pattern_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (rotate_aboutx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Rotate About(Y)");
+  label = gtk_label_new ("Rotate About (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
 
   rotate_abouty_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1279,7 +1279,7 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_combo_box_set_active (GTK_COMBO_BOX (material_type_combo), gui->gcode.material_type);
   gtk_table_attach (GTK_TABLE (table), material_type_combo, 1, 4, 2, 3, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
-  label = gtk_label_new ("Material Size (XYZ)");
+  label = gtk_label_new ("Material Size (X/Y/Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
 
   material_sizex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.01), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1303,7 +1303,7 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Material Origin (XYZ)");
+  label = gtk_label_new ("Material Origin (X/Y/Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
 
   material_originx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1327,7 +1327,7 @@ update_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (material_originz_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Traverse(Z)");
+  label = gtk_label_new ("Traverse Height (Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
 
   ztraverse_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (MAX_CLR_Z), SCALED_INCHES (0.01));

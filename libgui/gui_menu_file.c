@@ -269,7 +269,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_combo_box_set_active (GTK_COMBO_BOX (material_type_combo), 0);
   gtk_table_attach (GTK_TABLE (table), material_type_combo, 1, 4, 2, 3, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
-  label = gtk_label_new ("Material Size (XYZ)");
+  label = gtk_label_new ("Material Size (X/Y/Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
 
   material_sizex_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_X), DEFVAL_INCHES (0.01));
@@ -293,7 +293,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Material Origin (XYZ)");
+  label = gtk_label_new ("Material Origin (X/Y/Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 4, 5);
 
   material_originx_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_DIM_X), DEFVAL_INCHES (0.01));
@@ -317,7 +317,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (material_originz_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
-  label = gtk_label_new ("Traverse(Z)");
+  label = gtk_label_new ("Traverse Height (Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 5, 6);
 
   ztraverse_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_CLR_Z), DEFVAL_INCHES (0.01));

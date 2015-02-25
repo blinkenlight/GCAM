@@ -215,7 +215,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (end_table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), end_table);
 
-  label = gtk_label_new ("Retract(X)");
+  label = gtk_label_new ("Retract To (X)");
 
   posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (20.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posx_spin), 3);
@@ -229,7 +229,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  label = gtk_label_new ("Retract(Y)");
+  label = gtk_label_new ("Retract To (Y)");
 
   posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (20.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posy_spin), 3);
@@ -243,7 +243,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  label = gtk_label_new ("Retract(Z)");
+  label = gtk_label_new ("Retract To (Z)");
 
   posz_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (3.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (posz_spin), 3);
@@ -438,7 +438,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
   if (block->parent->type == GCODE_TYPE_EXTRUSION)
   {
-    label = gtk_label_new ("P0(X)");
+    label = gtk_label_new ("Start Position (X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p0x_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -448,7 +448,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0x_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P0(Y)");
+    label = gtk_label_new ("Start Position (Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p0y_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Z), SCALED_INCHES (MAX_DIM_Z), SCALED_INCHES (0.01));
@@ -458,7 +458,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0y_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P1(X)");
+    label = gtk_label_new ("End Position (X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p1x_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -468,7 +468,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1x_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P1(Y)");
+    label = gtk_label_new ("End Position (Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p1y_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Z), SCALED_INCHES (MAX_DIM_Z), SCALED_INCHES (0.01));
@@ -504,7 +504,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
   }
   else
   {
-    label = gtk_label_new ("P0(X)");
+    label = gtk_label_new ("Start Position (X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p0x_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -514,7 +514,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0x_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P0(Y)");
+    label = gtk_label_new ("Start Position (Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p0y_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -524,7 +524,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p0y_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P1(X)");
+    label = gtk_label_new ("End Position (X)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p1x_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -534,7 +534,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
     gtk_table_attach_defaults (GTK_TABLE (line_table), p1x_spin, 1, 2, row, row + 1);
     row++;
 
-    label = gtk_label_new ("P1(Y)");
+    label = gtk_label_new ("End Position (Y)");
     gtk_table_attach_defaults (GTK_TABLE (line_table), label, 0, 1, row, row + 1);
 
     p1y_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -874,7 +874,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
    */
 
   row = 0;
-  label = gtk_label_new ("Start Pos(X)");
+  label = gtk_label_new ("Start Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
 
   sweep_start_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -884,7 +884,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), sweep_start_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Start Pos(Y)");
+  label = gtk_label_new ("Start Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_sweep_table), label, 0, 1, row, row + 1);
 
   sweep_start_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -970,7 +970,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_magnitude_combo, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Start Pos(X)");
+  label = gtk_label_new ("Start Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
 
   radius_start_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -979,7 +979,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_start_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Start Pos(Y)");
+  label = gtk_label_new ("Start Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
 
   radius_start_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -988,7 +988,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_start_posy_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("End Pos(X)");
+  label = gtk_label_new ("End Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
 
   radius_end_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -997,7 +997,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), radius_end_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("End Pos(Y)");
+  label = gtk_label_new ("End Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_radius_table), label, 0, 1, row, row + 1);
 
   radius_end_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1042,7 +1042,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_direction_combo, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Start Pos(X)");
+  label = gtk_label_new ("Start Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_start_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1051,7 +1051,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_start_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Start Pos(Y)");
+  label = gtk_label_new ("Start Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_start_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1060,7 +1060,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_start_posy_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("End Pos(X)");
+  label = gtk_label_new ("End Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_end_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1069,7 +1069,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_end_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("End Pos(Y)");
+  label = gtk_label_new ("End Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_end_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1078,7 +1078,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_end_posy_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Center Pos(X)");
+  label = gtk_label_new ("Center Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_center_posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1087,7 +1087,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), center_center_posx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Center Pos(Y)");
+  label = gtk_label_new ("Center Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (arc_center_table), label, 0, 1, row, row + 1);
 
   center_center_posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1152,12 +1152,12 @@ bolt_holes_update_callback (GtkWidget *widget, gpointer data)
     bolt_holes->type = GCODE_BOLT_HOLES_TYPE_MATRIX;
 
     /* Update the labels and spin buttons */
-    gtk_label_set_text (GTK_LABEL (wlist[7]), "Hole Num(X)");
+    gtk_label_set_text (GTK_LABEL (wlist[7]), "Hole Number (X)");
     gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[8]), 1, 100);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[8]), 0);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), bolt_holes->number[0]);
 
-    gtk_label_set_text (GTK_LABEL (wlist[9]), "Hole Num(Y)");
+    gtk_label_set_text (GTK_LABEL (wlist[9]), "Hole Number (Y)");
     gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[10]), 1, 100);
     gtk_spin_button_set_digits (GTK_SPIN_BUTTON (wlist[10]), 0);
     gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), bolt_holes->number[1]);
@@ -1231,7 +1231,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (bolt_holes_table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), bolt_holes_table);
 
-  label = gtk_label_new ("Pos(X)");
+  label = gtk_label_new ("Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 0, 1);
 
   posx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1240,7 +1240,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
   g_signal_connect (posx_spin, "value-changed", G_CALLBACK (bolt_holes_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), posx_spin, 1, 2, 0, 1);
 
-  label = gtk_label_new ("Pos(Y)");
+  label = gtk_label_new ("Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 1, 2);
 
   posy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1311,7 +1311,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
   }
   else if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)
   {
-    label = gtk_label_new ("Hole Num(X)");
+    label = gtk_label_new ("Hole Number (X)");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 5, 6);
 
     generic_spin[0] = gtk_spin_button_new_with_range (1, 100, 1);
@@ -1322,7 +1322,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
     wlist[7] = label;
     wlist[8] = generic_spin[0];
 
-    label = gtk_label_new ("Hole Num(Y)");
+    label = gtk_label_new ("Hole Number (Y)");
     gtk_table_attach_defaults (GTK_TABLE (bolt_holes_table), label, 0, 1, 6, 7);
 
     generic_spin[1] = gtk_spin_button_new_with_range (1, 100, 1);
@@ -1502,7 +1502,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), table);
 
-  label = gtk_label_new ("Pos(X)");
+  label = gtk_label_new ("Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
 
   px_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1512,7 +1512,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), px_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Pos(Y)");
+  label = gtk_label_new ("Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
 
   py_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1595,7 +1595,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (template_table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), template_table);
 
-  label = gtk_label_new ("Position(X)");
+  label = gtk_label_new ("Position (X)");
   gtk_table_attach_defaults (GTK_TABLE (template_table), label, 0, 1, row, row + 1);
 
   positionx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -1605,7 +1605,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (template_table), positionx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Position(Y)");
+  label = gtk_label_new ("Position (Y)");
   gtk_table_attach_defaults (GTK_TABLE (template_table), label, 0, 1, row, row + 1);
 
   positiony_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -1729,7 +1729,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (sketch_table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), sketch_table);
 
-  label = gtk_label_new ("Taper Offset(X)");
+  label = gtk_label_new ("Taper Offset (X)");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
 
   taper_offsetx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-1.0), SCALED_INCHES (1.0), SCALED_INCHES (0.1));
@@ -1739,7 +1739,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), taper_offsetx_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Taper Offset(Y)");
+  label = gtk_label_new ("Taper Offset (Y)");
   gtk_table_attach_defaults (GTK_TABLE (sketch_table), label, 0, 1, row, row + 1);
 
   taper_offsety_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-1.0), SCALED_INCHES (1.0), SCALED_INCHES (0.1));
@@ -2093,7 +2093,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (tool_table), prompt_combo, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Change(X)");
+  label = gtk_label_new ("Change At (X)");
 
   changex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (20.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changex_spin), 1);
@@ -2107,7 +2107,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  label = gtk_label_new ("Change(Y)");
+  label = gtk_label_new ("Change At (Y)");
 
   changey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (20.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changey_spin), 1);
@@ -2121,7 +2121,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
     row++;
   }
 
-  label = gtk_label_new ("Change(Z)");
+  label = gtk_label_new ("Change At (Z)");
 
   changez_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (3.0), SCALED_INCHES (0.1));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (changez_spin), 1);
@@ -2271,7 +2271,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), table);
 
-  label = gtk_label_new ("Size(X)");
+  label = gtk_label_new ("Size (X)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
 
   sizex_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
@@ -2281,7 +2281,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), sizex_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Size(Y)");
+  label = gtk_label_new ("Size (Y)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
 
   sizey_spin = gtk_spin_button_new_with_range (SCALED_INCHES (0.0), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
@@ -2291,7 +2291,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
   gtk_table_attach_defaults (GTK_TABLE (table), sizey_spin, 1, 2, row, row + 1);
   row++;
 
-  label = gtk_label_new ("Depth(Z)");
+  label = gtk_label_new ("Depth (Z)");
   gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, row, row + 1);
 
   depthz_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Z), SCALED_INCHES (0.0), SCALED_INCHES (0.01));
