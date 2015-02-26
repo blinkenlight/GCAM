@@ -210,7 +210,6 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
   gcode_sketch_t *sketch;
   char buf[10], *buffer = NULL;
   long int length, nomore, index;
-  gfloat_t observed_progress, reported_progress;
   int i, j, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
   uint8_t aperture_ind, aperture_closed, trace_elbow_match;
   gcode_gerber_aperture_t *aperture_set;
@@ -218,6 +217,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
   gcode_vec2d_t cur_ij = { 0.0, 0.0 };
   gcode_vec2d_t normal = { 0.0, 0.0 };
   gfloat_t digit_scale, unit_scale;
+  gfloat_t progress;
 
   aperture_ind = 0;
   aperture_num = 0;
@@ -238,22 +238,15 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
   buffer = (char *)malloc (length);
   nomore = fread (buffer, 1, length, fh);
 
-  reported_progress = 0.0;
-
   index = 0;
 
   while (index < nomore)
   {
     if (gcode->progress_callback)
     {
-      observed_progress = (gfloat_t)index / (gfloat_t)nomore;
+      progress = (gfloat_t)index / (gfloat_t)nomore;
 
-      if (observed_progress >= reported_progress + 0.01)
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_1, observed_progress));
-
-        reported_progress = observed_progress;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_1, progress));
     }
 
     if (buffer[index] == '%')
@@ -1058,24 +1051,17 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_ve
   gcode_t *gcode;
   gcode_block_t *arc_block;
   gcode_arc_t *arc;
-  gfloat_t observed_progress, reported_progress;
+  gfloat_t progress;
 
   gcode = (gcode_t *)sketch_block->gcode;
-
-  reported_progress = 0.0;
 
   for (int i = 0; i < trace_elbow_count; i++)
   {
     if (gcode->progress_callback)
     {
-      observed_progress = (gfloat_t)i / (gfloat_t)trace_elbow_count;
+      progress = (gfloat_t)i / (gfloat_t)trace_elbow_count;
 
-      if (observed_progress >= reported_progress + 0.01)
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_2, observed_progress));
-
-        reported_progress = observed_progress;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_2, progress));
     }
 
     gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
@@ -1109,9 +1095,9 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   gcode_vec2d_t ip_array[2];
   gcode_vec2d_t full_ip_array[256];
   gcode_vec3d_t full_ip_sorted_array[256];
-  gfloat_t observed_progress, reported_progress;
-  int block_count, block_index;
   int ip_count, full_ip_count, full_ip_sorted_count;
+  int block_count, block_index;
+  gfloat_t progress;
 
   gcode = (gcode_t *)sketch_block->gcode;
 
@@ -1132,22 +1118,15 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 
   block_index = 0;
 
-  reported_progress = 0.0;
-
   index1_block = original_listhead;                                             // Start with the first block on the original list of 'sketch_block';
 
   while (index1_block)                                                          // Take every single block and intersect it with every other block;
   {
     if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
     {
-      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+      progress = (gfloat_t)block_index / (gfloat_t)block_count;                 // Calculate the current local progress fraction;
 
-      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_3, observed_progress));
-
-        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_3, progress));
     }
 
     full_ip_count = 0;                                                          // The total number of intersections 'index1_block' has with anything else;
@@ -1360,7 +1339,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
   gcode_line_t *line;
   gcode_arc_t *arc;
   int block_count, block_index, remove_block;
-  gfloat_t observed_progress, reported_progress;
+  gfloat_t progress;
 
   gcode = (gcode_t *)sketch_block->gcode;
 
@@ -1381,8 +1360,6 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
   block_index = 0;
 
-  reported_progress = 0.0;
-
   index1_block = sketch_block->listhead;
 
   while (index1_block)
@@ -1391,14 +1368,9 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
     if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
     {
-      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+      progress = (gfloat_t)block_index / (gfloat_t)block_count;                 // Calculate the current local progress fraction;
 
-      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_4, observed_progress));
-
-        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_4, progress));
     }
 
     index1_block->ends (index1_block, p0, p1, GCODE_GET);
@@ -1640,8 +1612,8 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t e0[2], e1[2];
   gfloat_t dist0, dist1;
-  gfloat_t observed_progress, reported_progress;
   int block_count, block_index, match;
+  gfloat_t progress;
 
   gcode = (gcode_t *)sketch_block->gcode;
 
@@ -1658,22 +1630,15 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
 
   block_index = 0;
 
-  reported_progress = 0.0;
-
   index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
 
   while (index1_block)                                                          // Take every single block and compare it with every other block;
   {
     if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
     {
-      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+      progress = (gfloat_t)block_index / (gfloat_t)block_count;                 // Calculate the current local progress fraction;
 
-      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_5, observed_progress));
-
-        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_5, progress));
     }
 
     index1_block->ends (index1_block, e0[0], e0[1], GCODE_GET);
@@ -1746,8 +1711,8 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
   gcode_t *gcode;
   gcode_block_t *index1_block, *index2_block;
   gcode_vec2d_t v0, v1, e0[2], e1[2];
-  gfloat_t observed_progress, reported_progress;
   int block_count, block_index, merge_block;
+  gfloat_t progress;
 
   gcode = (gcode_t *)sketch_block->gcode;
 
@@ -1767,8 +1732,6 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
 
   block_index = 0;
 
-  reported_progress = 0.0;
-
   index1_block = sketch_block->listhead;                                        // Start with the first and the second block in the list;
   index2_block = index1_block->next;
 
@@ -1776,14 +1739,9 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
   {
     if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
     {
-      observed_progress = (gfloat_t)block_index / (gfloat_t)block_count;        // Calculate the current local progress fraction;
+      progress = (gfloat_t)block_index / (gfloat_t)block_count;                 // Calculate the current local progress fraction;
 
-      if (observed_progress >= reported_progress + 0.01)                        // WE CAN'T JUST KEEP CALLING THIS - IT'S SLOOOOW!
-      {
-        gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_7, observed_progress));
-
-        reported_progress = observed_progress;                                  // Update the treshold for the next progress call;
-      }
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_7, progress));
     }
 
     merge_block = 0;                                                            // Clear the merge flag for a new round;
@@ -1901,7 +1859,7 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
   exposure_count = 0;
 
   if (gcode->progress_callback)                                                 // Clean up the progress bar before we begin;
-    gcode->progress_callback (gcode->gui, 0);
+    gcode->progress_callback (gcode->gui, 0.0);
 
   error = gcode_gerber_pass1 (sketch_block, fh, &trace_count, &trace_array, &trace_elbow_count, &trace_elbow_array, &exposure_count, &exposure_array, offset);
 
@@ -1922,7 +1880,7 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
   free (exposure_array);
 
   if (gcode->progress_callback)                                                 // Clean up the progress bar before we leave;
-    gcode->progress_callback (gcode->gui, 0);
+    gcode->progress_callback (gcode->gui, 0.0);
 
   return (error);
 }

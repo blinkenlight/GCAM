@@ -23,6 +23,7 @@
 #include "gui_menu_util.h"
 #include "gui_define.h"
 #include "gui_tab.h"
+#include <time.h>
 
 #define GUI_TREE_ROOT NULL
 
@@ -106,12 +107,37 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
 void
 update_progress (void *gui, gfloat_t progress)
 {
-  gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (((gui_t *)gui)->progress_bar), progress);
+  static gfloat_t old_value = 0;
+  static clock_t old_clock = 0;
+  clock_t now_clock;
+  uint8_t update;
 
-  /* One iteration (or even several more) are not enough for reliable updates */
+  update = 0;
 
-  while (gtk_events_pending ())
-    gtk_main_iteration ();
+  now_clock = clock ();
+
+  if ((progress == 0.0) || (progress == 1.0))                                   // End of scale values are always updated unconditionally;
+    update = 1;
+
+  if (progress > old_value)                                                     // Everything else has to be larger than current: "regressing" not allowed;
+  {
+    if (progress - old_value > 0.01)                                            // If progress is "large enough", show it even if the update is too early;
+      update = 1;
+
+    if (now_clock - old_clock > CLOCKS_PER_SEC / 25)                            // Smaller progress gets shown not more often than 25 times a second:
+      update = 1;                                                               // thousands of tiny updates would really slow things down otherwise;
+  }
+
+  if (update)
+  {
+    gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (((gui_t *)gui)->progress_bar), progress);
+
+    while (gtk_events_pending ())                                               // One iteration (or even several more) are not enough for reliable updates;
+      gtk_main_iteration ();                                                    // By flushing the queue, updates are shown even if we're hammering the CPU.
+
+    old_clock = now_clock;
+    old_value = progress;
+  }
 }
 
 /**

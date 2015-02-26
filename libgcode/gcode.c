@@ -337,14 +337,15 @@ void
 gcode_list_make (gcode_t *gcode)
 {
   gcode_block_t *index_block;
-  int i, num;
+  int block_count, block_index;
 
-  num = 0;
+  block_count = 0;
+
   index_block = gcode->listhead;
 
   while (index_block)
   {
-    num++;
+    block_count++;
 
     index_block = index_block->next;
   }
@@ -358,24 +359,25 @@ gcode_list_make (gcode_t *gcode)
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;
 
-  i = 0;
+  block_index = 0;
+
   index_block = gcode->listhead;
 
   while (index_block)
   {
+    if (gcode->progress_callback)
+      gcode->progress_callback (gcode->gui, (gfloat_t)block_index / (gfloat_t)block_count);
+
     /* Make the G-Code */
     index_block->make (index_block);
 
-    if (gcode->progress_callback)
-      gcode->progress_callback (gcode->gui, (gfloat_t)i / (gfloat_t)num);
-
-    i++;
+    block_index++;
 
     index_block = index_block->next;
   }
 
-  if (gcode->progress_callback)
-    gcode->progress_callback (gcode->gui, 1.0);
+  if (gcode->progress_callback)                                                 // Clean up the progress bar before we leave;
+    gcode->progress_callback (gcode->gui, 0.0);
 }
 
 void
@@ -1499,6 +1501,7 @@ gcode_export (gcode_t *gcode, const char *filename)
    * Check whether this is a windows machine or not by checking whether
    * writing \n results in \r\n in the file (2 bytes).
    */
+
   fprintf (fh, "\n");
   fseek (fh, 0, SEEK_END);
   size = ftell (fh);
@@ -1548,7 +1551,7 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
   char *source, line[256], *sp, *tsp, *gv;
   gcode_block_t *index_block;
   gcode_sim_t sim;
-  uint32_t size, line_num, line_ind, mode = 0;
+  uint32_t size, line_count, line_index, mode = 0;
   gfloat_t G83_depth = 0.0, G83_retract = 0.0;
 
   /* Make all */
@@ -1556,7 +1559,9 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
 
   gcode_sim_init (&sim, gcode);
 
-  GCODE_MATH_VEC3D_SET (sim.vn_inv, 1.0 / (gfloat_t)gcode->voxel_number[0], 1.0 / (gfloat_t)gcode->voxel_number[1], 1.0 / (gfloat_t)gcode->voxel_number[2]);
+  sim.vn_inv[0] = 1.0 / (gfloat_t)gcode->voxel_number[0];
+  sim.vn_inv[1] = 1.0 / (gfloat_t)gcode->voxel_number[1];
+  sim.vn_inv[2] = 1.0 / (gfloat_t)gcode->voxel_number[2];
 
   /* Turn all the voxels back on */
   size = gcode->voxel_number[0] * gcode->voxel_number[1] * gcode->voxel_number[2];
@@ -1576,17 +1581,17 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
   }
 
   /* Count the number of lines */
-  line_num = 0;
+  line_count = 0;
   sp = source;
 
   while ((tsp = strchr (sp, '\n')))
   {
     sp = tsp + 1;
-    line_num++;
+    line_count++;
   }
 
   /* Isolate each line */
-  line_ind = 0;
+  line_index = 0;
   sp = source;
 
   while ((tsp = strchr (sp, '\n')))
@@ -1594,7 +1599,7 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
     uint8_t sind;
 
     if (gcode->progress_callback)
-      gcode->progress_callback (gcode->gui, (gfloat_t)line_ind++ / (gfloat_t)line_num);
+      gcode->progress_callback (gcode->gui, (gfloat_t)line_index / (gfloat_t)line_count);
 
     memset (line, 0, 256);
     memcpy (line, sp, tsp - sp);
@@ -1748,6 +1753,8 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
       default:
         break;
     }
+
+    line_index++;
   }
 
   free (source);
