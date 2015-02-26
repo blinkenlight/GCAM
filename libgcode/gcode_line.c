@@ -381,13 +381,13 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
 
     case GCODE_GET_TANGENT:
 
-      p0[0] = line->p0[0] - line->p1[0];
-      p0[1] = line->p0[1] - line->p1[1];
+      p0[0] = line->p1[0] - line->p0[0];
+      p0[1] = line->p1[1] - line->p0[1];
+
       GCODE_MATH_VEC2D_UNITIZE (p0);
 
-      p1[0] = line->p1[0] - line->p0[0];
-      p1[1] = line->p1[1] - line->p0[1];
-      GCODE_MATH_VEC2D_UNITIZE (p1);
+      p1[0] = p0[0];
+      p1[1] = p0[1];
 
       break;
 
