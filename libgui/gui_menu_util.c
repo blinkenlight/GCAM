@@ -216,37 +216,33 @@ generic_fatal (void *gui, char *message)
 }
 
 /**
- * Here be dragons - not sure this really works...
+ * Roto-translate 'block' into tangential continuity with its previous peer
  */
 
 static void
 set_tangent_to_previous (gcode_block_t *block)
 {
-  gfloat_t p0[2], p1[2], t0[2], t1[2];
+  gcode_vec2d_t p0, p1, p;
+  gcode_vec2d_t t0, t1, t;
+  gcode_vec2d_t delta;
+  gfloat_t angle;
 
-  /* Auto tangency to previous on insert */
   if (block->prev)
   {
-    gcode_vec2d_t tan0, tan1;
+    block->ends (block, p0, p, GCODE_GET);
+    block->ends (block, t0, t, GCODE_GET_TANGENT);
 
-    block->ends (block, p0, p1, GCODE_GET);
-    block->prev->ends (block->prev, tan0, tan1, GCODE_GET_TANGENT);
-    block->prev->ends (block->prev, t0, t1, GCODE_GET);
+    block->prev->ends (block->prev, p, p1, GCODE_GET);
+    block->prev->ends (block->prev, t, t1, GCODE_GET_TANGENT);
 
-    if (block->type == GCODE_TYPE_LINE)
-    {
-      gfloat_t dist;
+    GCODE_MATH_VEC2D_SUB (delta, p1, p0);
 
-      GCODE_MATH_VEC2D_DIST (dist, p1, p0);
-      GCODE_MATH_VEC2D_SCALE (tan1, dist);
-      GCODE_MATH_VEC2D_ADD (p1, t1, tan1);
+    angle = GCODE_RAD2DEG * (atan2 (t1[1], t1[0]) - atan2 (t0[1], t0[0]));
 
-      block->ends (block, t1, p1, GCODE_SET);
-    }
-    else if (block->type == GCODE_TYPE_ARC)
-    {
-      block->ends (block, t1, p1, GCODE_SET);
-    }
+    GCODE_MATH_WRAP_TO_360_DEGREES (angle);
+
+    block->spin (block, p0, angle);
+    block->move (block, delta);
   }
 }
 
