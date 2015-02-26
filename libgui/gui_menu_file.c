@@ -1511,9 +1511,11 @@ gerber_browse_file_callback (GtkWidget *widget, gpointer data)
                                         NULL);
 
   filter = gtk_file_filter_new ();
-  gtk_file_filter_set_name (filter, "RS274X (*.gbr,*.gbx,*.art,*.pho)");
+  gtk_file_filter_set_name (filter, "RS274X (*.gbr,*.gbx,*.gtl,*.gbl,*.art,*.pho)");
   gtk_file_filter_add_pattern (filter, "*.gbr");
   gtk_file_filter_add_pattern (filter, "*.gbx");
+  gtk_file_filter_add_pattern (filter, "*.gtl");
+  gtk_file_filter_add_pattern (filter, "*.gbl");
   gtk_file_filter_add_pattern (filter, "*.art");
   gtk_file_filter_add_pattern (filter, "*.pho");
   gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (dialog), filter);
