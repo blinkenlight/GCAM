@@ -1187,8 +1187,9 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
           distance = GCODE_MATH_2D_DISTANCE (p0, full_ip_array[i]);             // and find out how far is is from p0 (the first endpoint of the line);
 
           for (j = 0; j < full_ip_sorted_count; j++)                            // Now loop through each of the ALREADY COPIED intersection points,
-            if (GCODE_MATH_IS_EQUAL (full_ip_sorted_array[j][2], distance))     // and see if there is any with the exact same distance from p0;
-              break;
+            if (GCODE_MATH_IS_EQUAL (full_ip_array[i][0], full_ip_sorted_array[j][0]))  // and see if there is any with the same coordinates;
+              if (GCODE_MATH_IS_EQUAL (full_ip_array[i][1], full_ip_sorted_array[j][1]))
+                break;
 
           if (j == full_ip_sorted_count)                                        // If the loop ran all the way up, there were no matches;
           {
@@ -1263,8 +1264,9 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
           delta = fabs (angle - arc->start_angle);                              // To be able to sort either CW or CCW arcs, we have to use relative angles;
 
           for (j = 0; j < full_ip_sorted_count; j++)                            // Now loop through each of the ALREADY COPIED intersection points,
-            if (GCODE_MATH_IS_EQUAL (full_ip_sorted_array[j][2], delta))        // and see if there is any the exact same angle away from p0;
-              break;
+            if (GCODE_MATH_IS_EQUAL (full_ip_array[i][0], full_ip_sorted_array[j][0]))  // and see if there is any with the same coordinates;
+              if (GCODE_MATH_IS_EQUAL (full_ip_array[i][1], full_ip_sorted_array[j][1]))
+                break;
 
           if (j == full_ip_sorted_count)                                        // If the loop ran all the way up, there were no matches;
           {
