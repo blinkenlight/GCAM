@@ -39,6 +39,8 @@
 #define GERBER_PASS_7         6
 #define GERBER_PASSES         7
 
+#define GERBER_EPSILON        GCODE_PRECISION / 10
+
 /**
  * Convert the [0.0 ... 1.0] progress fraction of a specific Gerber pass into 
  * a [0.0 ... 1.0] progress fraction relevant to the total number of passes;
@@ -120,7 +122,11 @@ insert_trace_elbow (int *trace_elbow_count, gcode_vec3d_t **trace_elbow_set, uin
 static int
 point_inside_circle (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t diameter)
 {
-  if (GCODE_MATH_2D_DISTANCE (point, center) < 0.5 * diameter - GCODE_PRECISION)
+  gfloat_t eps;
+
+  eps = GERBER_EPSILON;
+
+  if (GCODE_MATH_2D_DISTANCE (point, center) < 0.5 * diameter - eps)
     return (1);
 
   return (0);
@@ -134,8 +140,12 @@ point_inside_circle (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t diamete
 static int
 point_inside_rectangle (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t width, gfloat_t height)
 {
-  if (GCODE_MATH_1D_DISTANCE (point[0], center[0]) < 0.5 * width - GCODE_PRECISION)
-    if (GCODE_MATH_1D_DISTANCE (point[1], center[1]) < 0.5 * height - GCODE_PRECISION)
+  gfloat_t eps;
+
+  eps = GERBER_EPSILON;
+
+  if (GCODE_MATH_1D_DISTANCE (point[0], center[0]) < 0.5 * width - eps)
+    if (GCODE_MATH_1D_DISTANCE (point[1], center[1]) < 0.5 * height - eps)
       return (1);
 
   return (0);
@@ -1340,6 +1350,9 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
   gcode_arc_t *arc;
   int block_count, block_index, remove_block;
   gfloat_t progress;
+  gfloat_t eps;
+
+  eps = GERBER_EPSILON;
 
   gcode = (gcode_t *)sketch_block->gcode;
 
@@ -1434,7 +1447,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
       dist = GCODE_MATH_2D_DISTANCE (dpos, p0);                                 // See how far the endpoint 'p0' of the block is from 'dpos';
 
-      if (dist < trace_array[i].radius - GCODE_PRECISION)                       // If it's closer than the trace radius, intruder alert...!
+      if (dist < trace_array[i].radius - eps)                                   // If it's closer than the trace radius, intruder alert...!
         remove_block = 1;
 
       /* Intersect Test 2 - does end pt fall within trace domain and is it less than aperture radius. */
@@ -1452,22 +1465,22 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
       dist = GCODE_MATH_2D_DISTANCE (dpos, p1);                                 // See how far the endpoint 'p1' of the block is from 'dpos';
 
-      if (dist < trace_array[i].radius - GCODE_PRECISION)                       // If it's closer than the trace radius, intruder alert...!
+      if (dist < trace_array[i].radius - eps)                                   // If it's closer than the trace radius, intruder alert...!
         remove_block = 1;
 
       /* Intersect Test 3 - Check End Points to see if they fall within the trace end radius */
       /* Arguably, this shouldn't be here at all anymore - the previous step covers this now */
 
-      if (GCODE_MATH_2D_DISTANCE (line->p0, p0) < trace_array[i].radius - GCODE_PRECISION)
+      if (GCODE_MATH_2D_DISTANCE (line->p0, p0) < trace_array[i].radius - eps)
         remove_block = 1;
 
-      if (GCODE_MATH_2D_DISTANCE (line->p0, p1) < trace_array[i].radius - GCODE_PRECISION)
+      if (GCODE_MATH_2D_DISTANCE (line->p0, p1) < trace_array[i].radius - eps)
         remove_block = 1;
 
-      if (GCODE_MATH_2D_DISTANCE (line->p1, p0) < trace_array[i].radius - GCODE_PRECISION)
+      if (GCODE_MATH_2D_DISTANCE (line->p1, p0) < trace_array[i].radius - eps)
         remove_block = 1;
 
-      if (GCODE_MATH_2D_DISTANCE (line->p1, p1) < trace_array[i].radius - GCODE_PRECISION)
+      if (GCODE_MATH_2D_DISTANCE (line->p1, p1) < trace_array[i].radius - eps)
         remove_block = 1;
 
       /* Intersect Test 4 - Lines only - Check if lines pass through the trace end radius */
@@ -1475,10 +1488,10 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
       if (index1_block->type == GCODE_TYPE_LINE)
       {
-        if (GCODE_MATH_2D_DISTANCE (line->p0, midp) < trace_array[i].radius - GCODE_PRECISION)
+        if (GCODE_MATH_2D_DISTANCE (line->p0, midp) < trace_array[i].radius - eps)
           remove_block = 1;
 
-        if (GCODE_MATH_2D_DISTANCE (line->p1, midp) < trace_array[i].radius - GCODE_PRECISION)
+        if (GCODE_MATH_2D_DISTANCE (line->p1, midp) < trace_array[i].radius - eps)
           remove_block = 1;
       }
 
@@ -1499,7 +1512,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
         dist = GCODE_MATH_2D_DISTANCE (dpos, midp);                             // See how far the midpoint 'midp' of the arc is from 'dpos';
 
-        if (dist < trace_array[i].radius - GCODE_PRECISION)                     // If it's closer than the trace radius, intruder alert...!
+        if (dist < trace_array[i].radius - eps)                                 // If it's closer than the trace radius, intruder alert...!
           remove_block = 1;
       }
     }
