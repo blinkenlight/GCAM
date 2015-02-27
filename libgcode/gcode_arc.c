@@ -201,8 +201,16 @@ gcode_arc_make (gcode_block_t *block)
 
   gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &start_angle);
 
-  /* Do not proceed if arc_radius is <= GCODE_PRECISION */
-  if (arc_radius_offset <= GCODE_PRECISION)
+  /* Do not proceed if the radius is effectively zero (or even negative!) */
+
+  if (arc_radius_offset < GCODE_PRECISION)
+    return;
+
+  /* Do not proceed if the endpoints are the same but the sweep is not 360 */
+
+  if (GCODE_MATH_IS_EQUAL (origin[0], p0[0]) &&
+      GCODE_MATH_IS_EQUAL (origin[1], p0[1]) &&
+      !GCODE_MATH_IS_EQUAL (fabs (arc->sweep_angle), 360.0))
     return;
 
   GCODE_2D_LINE (block, origin[0], origin[1], "");
