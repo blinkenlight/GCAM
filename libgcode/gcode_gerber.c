@@ -37,7 +37,8 @@
 #define GERBER_PASS_5         4
 #define GERBER_PASS_6         5
 #define GERBER_PASS_7         6
-#define GERBER_PASSES         7
+#define GERBER_PASS_8         7
+#define GERBER_PASSES         8
 
 #define GERBER_EPSILON        GCODE_PRECISION / 10
 
@@ -1826,6 +1827,129 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
 }
 
 /**
+ * PASS 8 - Merge adjacent arcs with matching centers.
+ */
+
+static void
+gcode_gerber_pass8 (gcode_block_t *sketch_block)
+{
+  gcode_t *gcode;
+  gcode_block_t *index1_block, *index2_block;
+  gcode_arc_t *arc1, *arc2;
+  gcode_vec2d_t c1, c2, b1[2], b2[2], pb;
+  int block_count, block_index, merge_block;
+  gfloat_t progress;
+  gfloat_t angle;
+
+  gcode = (gcode_t *)sketch_block->gcode;
+
+  if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
+    return;
+
+  block_count = 0;
+
+  index1_block = sketch_block->listhead;                                        // Start with the first block on the list of 'sketch_block';
+
+  while (index1_block)                                                          // Crawl along the list and count the blocks;
+  {
+    block_count++;                                                              // This may sound like a waste of time, but the progress update needs it;
+
+    index1_block = index1_block->next;                                          // It's a small price to pay for having some feedback that GCAM didn't crash.
+  }
+
+  block_index = 0;
+
+  index1_block = sketch_block->listhead;                                        // Start with the first block in the list;
+
+  while (index1_block)
+  {
+    if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
+    {
+      progress = (gfloat_t)block_index / (gfloat_t)block_count;                 // Calculate the current local progress fraction;
+
+      gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_8, progress));
+    }
+
+    merge_block = 0;                                                            // Preset the merge flag to 'no merge';
+
+    if (index1_block->type == GCODE_TYPE_ARC)                                   // If the current block ('index1') is not an arc, skip it;
+    {
+      arc1 = (gcode_arc_t *)index1_block->pdata;
+
+      gcode_arc_center (index1_block, c1, GCODE_GET);                           // Obtain the center and endpoints of 'index1' as 'c1' and 'b1[]';
+
+      index1_block->ends (index1_block, b1[0], b1[1], GCODE_GET);
+
+      GCODE_MATH_VEC2D_COPY (pb, b1[1]);                                        // Set the current "end of" endpoint ('pb') to the end of 'index1';
+
+      index2_block = index1_block->next;                                        // Start iterating from the block following 'index1' (if any);
+
+      while (index2_block)                                                      // Loop through blocks one by one, crawling away from 'index1';
+      {
+        index2_block->ends (index2_block, b2[0], b2[1], GCODE_GET);             // Obtain the endpoints of the iterator block ('index2');
+
+        if (GCODE_MATH_2D_DISTANCE (pb, b2[0]) >= GCODE_PRECISION)              // If 'index2' is NOT connected to the block before it (which ends at 'pb'),
+          break;                                                                // this is a new contour, there won't be a match for 'index1': stop looking.
+
+        if (index2_block->type == GCODE_TYPE_ARC)                               // If we're within the same contour as 'index1', see if 'index2' is an arc;
+        {
+          arc2 = (gcode_arc_t *)index2_block->pdata;
+
+          gcode_arc_center (index2_block, c2, GCODE_GET);                       // Obtain the center and endpoints of 'index2' as 'c2' and 'b2[]';
+
+          if (GCODE_MATH_2D_DISTANCE (c1, c2) < GCODE_PRECISION)                // Merging can only happen if the arcs have the same center;
+          {
+            angle = arc1->sweep_angle + arc2->sweep_angle;                      // Also, consecutive arcs with a combined sweep bigger than full circle,
+
+            if (fabs (angle) <= 360.0)                                          // no matter how unlikely they are in a Gerber contour, cannot be merged;
+            {
+              if (GCODE_MATH_2D_DISTANCE (b1[1], b2[0]) < GCODE_PRECISION)      // If 'index2' starts right where 'index1' ends, we may merge them;
+              {
+                arc1->sweep_angle = angle;                                      // The sweep of 'index1' is simply replaced with the combined sweep;
+
+                merge_block = 1;                                                // The 'merge flag' gets set to avoid moving 'index1' after the loop;
+
+                block_count--;                                                  // The number of blocks (for progress bar purposes) is now one less;
+
+                gcode_remove_and_destroy (index2_block);                        // Finally 'index2' is removed and disposed of;
+
+                break;                                                          // Stop iterating, but the next round restarts with the same 'index1'.
+              }
+              else if (GCODE_MATH_2D_DISTANCE (b2[1], b1[0]) < GCODE_PRECISION) // If 'index2' ENDS right where 'index1' STARTS, it's a reverse merge;
+              {
+                arc2->sweep_angle = angle;                                      // The sweep of 'index2' is the one to become the combined sweep;
+
+                merge_block = 1;                                                // The 'merge flag' gets set to avoid moving 'index1' after the loop;
+
+                block_count--;                                                  // The number of blocks (for progress bar purposes) is now one less;
+
+                index2_block = index1_block;                                    // This time, the block to be removed is 'index1' itself;
+                index1_block = index1_block->next;                              // So move on to the block next to it while 'index1' still exists,
+
+                gcode_remove_and_destroy (index2_block);                        // then take the saved reference to 'index1' and remove the block;
+
+                break;                                                          // Stop iterating, and the next round starts with the new 'index1'.
+              }
+            }
+          }
+        }
+
+        GCODE_MATH_VEC2D_COPY (pb, b2[1]);                                      // If we're still iterating, the new "end of" is now the end of 'index2';
+
+        index2_block = index2_block->next;                                      // Time to move on the the next block after 'index2';
+      }
+    }
+
+    if (!merge_block)                                                           // If we stopped iterating with 'index2' and not because of a merge,
+    {
+      block_index++;                                                            // there were no matches found for 'index1' to merge with, so move on;
+
+      index1_block = index1_block->next;                                        // Increment the progress block count and point 'index1' to the next block.
+    }
+  }
+}
+
+/**
  * Main Gerber import routine - read 'filename', call all processing passes
  * and return the resulting contours inserted under the supplied 'sketch_block'
  * NOTE: the supplied sketch will see its extrusion depth set to 'depth', with
@@ -1888,6 +2012,7 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
     gcode_gerber_pass5 (sketch_block);
     gcode_gerber_pass6 (sketch_block);
     gcode_gerber_pass7 (sketch_block);
+    gcode_gerber_pass8 (sketch_block);
   }
 
   free (trace_array);
