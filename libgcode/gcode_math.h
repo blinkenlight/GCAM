@@ -49,6 +49,10 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
 /**
  * Macros returning their result as a returned value
  */
+#define GCODE_MATH_IS_APART(_min1, _max1, _min2, _max2) \
+        ((_min1[0] > _max2[0]) || (_min2[0] > _max1[0]) || \
+         (_min1[1] > _max2[1]) || (_min2[1] > _max1[1]))
+
 #define GCODE_MATH_IS_EQUAL(_a, _b) \
         (fabs (_a - _b) < GCODE_PRECISION)
 

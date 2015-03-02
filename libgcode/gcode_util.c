@@ -179,6 +179,39 @@ gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num)
 }
 
 /**
+ * "Quick & Dirty" bounding box for arcs and lines - not a correct bounding box
+ * but a faster one that is guaranteed to be LARGER than the real bounding box,
+ * useful to quickly filter out blocks that CANNOT POSSIBLY intersect, so only
+ * the remaining ones are getting intersected in an "each-with-each" scenario;
+ * NOTE: this does NOT take offsets into account - use it only when offsets are
+ * not involved
+ */
+
+void
+gcode_util_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  switch (block->type)
+  {
+    case GCODE_TYPE_LINE:
+
+      gcode_line_qdbb (block, min, max);
+
+      break;
+
+    case GCODE_TYPE_ARC:
+
+      gcode_arc_qdbb (block, min, max);
+
+      break;
+
+    default:
+
+      GCODE_MATH_VEC2D_SET (min, DBL_MIN, DBL_MIN);
+      GCODE_MATH_VEC2D_SET (max, DBL_MAX, DBL_MAX);
+  }
+}
+
+/**
  * Calculate and return the points where a line segments and an arc intersect
  * NOTE: valid points have to actually lie between the segment's/arc's endpoints
  * NOTE: the calculations are done taking each block's offset into account

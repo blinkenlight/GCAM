@@ -46,6 +46,7 @@ void gcode_line_draw (gcode_block_t *block, gcode_block_t *selected);
 int gcode_line_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x_index);
 int gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
 void gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_line_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 gfloat_t gcode_line_length (gcode_block_t *block);
 void gcode_line_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);

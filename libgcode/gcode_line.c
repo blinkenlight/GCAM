@@ -427,6 +427,24 @@ gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
     max[1] = p1[1];
 }
 
+void
+gcode_line_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_line_t *line;
+
+  line = (gcode_line_t *)block->pdata;
+
+  min[0] = (line->p0[0] < line->p1[0]) ? line->p0[0] : line->p1[0];
+  max[0] = (line->p0[0] > line->p1[0]) ? line->p0[0] : line->p1[0];
+  min[1] = (line->p0[1] < line->p1[1]) ? line->p0[1] : line->p1[1];
+  max[1] = (line->p0[1] > line->p1[1]) ? line->p0[1] : line->p1[1];
+
+  min[0] -= GCODE_PRECISION;
+  max[0] += GCODE_PRECISION;
+  min[0] -= GCODE_PRECISION;
+  max[0] += GCODE_PRECISION;
+}
+
 gfloat_t
 gcode_line_length (gcode_block_t *block)
 {

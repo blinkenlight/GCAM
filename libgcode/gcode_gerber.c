@@ -1102,6 +1102,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   gcode_t *gcode;
   gcode_block_t *index1_block, *index2_block;
   gcode_block_t *original_listhead;
+  gcode_vec2d_t min1, max1, min2, max2;
   gcode_vec2d_t p0, p1;
   gcode_vec2d_t ip_array[2];
   gcode_vec2d_t full_ip_array[256];
@@ -1145,25 +1146,32 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
 
     index1_block->ends (index1_block, p0, p1, GCODE_GET);                       // We'll need the endpoints of the scrutinized block soon, so we save them;
 
+    gcode_util_qdbb (index1_block, min1, max1);                                 // Calculate the "quick and dirty" bounding box of 'index1_block';
+
     index2_block = original_listhead;                                           // Starting from the same listhead,
 
     while (index2_block)                                                        // loop through all the other blocks of 'sketch_block' with a second index;
     {
       if (index1_block != index2_block)                                         // Don't perform intersection against self.
       {
-        if (!gcode_util_intersect (index1_block, index2_block, ip_array, &ip_count))
+        gcode_util_qdbb (index2_block, min2, max2);                             // Calculate the "quick and dirty" bounding box of 'index2_block';
+
+        if (!GCODE_MATH_IS_APART (min1, max1, min2, max2))                      // If the two bounding boxes clear each other, don't try to intersect;
         {
-          for (int i = 0; i < ip_count; i++)                                    // Examine every intersection point returned (if any):
+          if (gcode_util_intersect (index1_block, index2_block, ip_array, &ip_count) == 0)
           {
-            if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)     // Something touching one of the endpoints of 'index1_block', while technically
-              continue;                                                         // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
+            for (int i = 0; i < ip_count; i++)                                  // Examine every intersection point returned (if any):
+            {
+              if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)   // Something touching one of the endpoints of 'index1_block', while technically
+                continue;                                                       // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
 
-            if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)     // Same with the other endpoint - if the only intersections found coincide with
-              continue;                                                         // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
+              if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)   // Same with the other endpoint - if the only intersections found coincide with
+                continue;                                                       // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
 
-            GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);  // If we're here, this is a genuine intersection that will divide the block...
+              GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);        // If we're here, this is a genuine intersection that will divide the block...
 
-            full_ip_count++;                                                    // So save it into the full array and increase the total intersection count;
+              full_ip_count++;                                                  // So save it into the full array and increase the total intersection count;
+            }
           }
         }
       }
@@ -1216,7 +1224,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
         {
           gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
 
-          gcode_append_as_listtail (sketch_block, line_block);
+          gcode_insert_as_listhead (sketch_block, line_block);
 
           new_line = (gcode_line_t *)line_block->pdata;
 
@@ -1229,7 +1237,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
         /* Just copy the line, do nothing, no intersections. */
         gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
 
-        gcode_append_as_listtail (sketch_block, line_block);
+        gcode_insert_as_listhead (sketch_block, line_block);
 
         new_line = (gcode_line_t *)line_block->pdata;
 
@@ -1293,7 +1301,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
         {
           gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
 
-          gcode_append_as_listtail (sketch_block, arc_block);
+          gcode_insert_as_listhead (sketch_block, arc_block);
 
           new_arc = (gcode_arc_t *)arc_block->pdata;
 
@@ -1319,7 +1327,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
         /* Just copy the arc, do nothing, no intersections. */
         gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
 
-        gcode_append_as_listtail (sketch_block, arc_block);
+        gcode_insert_as_listhead (sketch_block, arc_block);
 
         new_arc = (gcode_arc_t *)arc_block->pdata;
 

@@ -638,6 +638,22 @@ gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
     min[1] = center[1] - arc_radius_offset;
 }
 
+void
+gcode_arc_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+{
+  gcode_arc_t *arc;
+  gcode_vec2d_t center;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  gcode_arc_center (block, center, GCODE_GET);
+
+  min[0] = center[0] - arc->radius - GCODE_PRECISION;
+  max[0] = center[0] + arc->radius + GCODE_PRECISION;
+  min[1] = center[1] - arc->radius - GCODE_PRECISION;
+  max[1] = center[1] + arc->radius + GCODE_PRECISION;
+}
+
 gfloat_t
 gcode_arc_length (gcode_block_t *block)
 {

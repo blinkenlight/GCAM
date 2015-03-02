@@ -73,6 +73,7 @@ int gcode_arc_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_
 int gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
 int gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode);
 void gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_arc_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 gfloat_t gcode_arc_length (gcode_block_t *block);
 void gcode_arc_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_arc_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
