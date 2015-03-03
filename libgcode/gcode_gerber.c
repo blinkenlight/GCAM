@@ -1388,6 +1388,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
   while (index1_block)
   {
+    gcode_vec2d_t bmin, bmax;
     gcode_vec2d_t p0, p1, midp;
 
     if (gcode->progress_callback)                                               // Make sure there is a progress update function to call
@@ -1397,13 +1398,15 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
       gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_4, progress));
     }
 
-    index1_block->ends (index1_block, p0, p1, GCODE_GET);
+    index1_block->ends (index1_block, p0, p1, GCODE_GET);                       // Calculate the endpoints of 'index1_block";
 
     switch (index1_block->type)
     {
       case GCODE_TYPE_LINE:
 
-        midp[0] = 0.5 * (p0[0] + p1[0]);
+        gcode_line_qdbb (index1_block, bmin, bmax);                             // Calculate the "quick and dirty" bounding box of 'index1_block' as a line;
+
+        midp[0] = 0.5 * (p0[0] + p1[0]);                                        // Calculate 'midp' for 'index1_block' as the point halfway between its ends;
         midp[1] = 0.5 * (p0[1] + p1[1]);
 
         break;
@@ -1414,7 +1417,9 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
         arc = (gcode_arc_t *)index1_block->pdata;
 
-        gcode_arc_center (index1_block, center, GCODE_GET);
+        gcode_line_qdbb (index1_block, bmin, bmax);                             // Calculate the "quick and dirty" bounding box of 'index1_block' as an arc;
+
+        gcode_arc_center (index1_block, center, GCODE_GET);                     // Calculate 'midp' for 'index1_block' as the point on the arc at half sweep;
 
         midp[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
         midp[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
@@ -1423,25 +1428,29 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
       }
     }
 
-    remove_block = 0;
+    remove_block = 0;                                                           // Preset the "remove flag" to "do not remove";
 
     /**
      * Trace Interference Check
      */
 
-    for (int i = 0; i < trace_count && !remove_block; i++)
+    for (int i = 0; i < trace_count && !remove_block; i++)                      // Loop through each trace in the trace array;
     {
       gcode_vec2d_t ip_array[2], dpos;
+      gcode_vec2d_t tmin, tmax;
       gfloat_t dist, u;
       int ip_count;
 
-      GCODE_MATH_VEC2D_COPY (line->p0, trace_array[i].p0);
+      GCODE_MATH_VEC2D_COPY (line->p0, trace_array[i].p0);                      // Copy the trace into 'line_block' for clearance checks;
       GCODE_MATH_VEC2D_COPY (line->p1, trace_array[i].p1);
+
+      gcode_line_qdbb (line_block, tmin, tmax);                                 // Calculate the "quick and dirty" bounding box of the trace;
 
       /* Intersect Test 0 - does this block explicitly intersect the trace */
 
-      if (gcode_util_intersect (line_block, index1_block, ip_array, &ip_count) == 0)
-        remove_block = 1;
+      if (!GCODE_MATH_IS_APART (bmin, bmax, tmin, tmax))                        // If the bounding boxes clear each other, don't try to intersect;
+        if (gcode_util_intersect (line_block, index1_block, ip_array, &ip_count) == 0)
+          remove_block = 1;
 
       /* Intersect Test 1 - does end pt fall within trace domain and is it less than aperture radius. */
 
