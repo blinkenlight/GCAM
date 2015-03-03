@@ -643,6 +643,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
         if (ij_mask)
         {
           gcode_arc_t *arc;
+          gcode_arcdata_t arcdata;
           gcode_block_t *arc_block;
           gcode_vec2d_t center;
           gfloat_t radius, start_angle, end_angle, sweep_angle;
@@ -650,63 +651,52 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
           /* Calculate arc radius */
           GCODE_MATH_VEC2D_MAG (radius, cur_ij);
 
-          /**
-           * Use the tangent of the previous trace to determine start angle of arc.
-           * Use the tangent of the previous trace to calculate the normal to space the arcs apart.
-           * Starting point of arc is simply current position.
-           * NOTES:
-           * - An elbow may need to be inserted into the list after an arc.
-           * - Store a previous normal.
-           * - Make sure that cur_pos gets updated when a G02/G03 occures, not just after a line.
-           * - Look into whether or not these arcs should exist in the trace list (duplicity etc).
-           */
+          GCODE_MATH_VEC2D_COPY (arcdata.p0, cur_pos);
+          GCODE_MATH_VEC2D_COPY (arcdata.p1, pos);
+          arcdata.radius = radius;
+          arcdata.fla = 0;
+          arcdata.fls = (arc_dir == GCODE_GERBER_ARC_CCW) ? 1 : 0;
 
-          /* Calculate start angle and sweep angle based on current position and destination. */
-          GCODE_MATH_VEC2D_ADD (center, cur_ij, cur_pos);
-
-          gcode_math_xy_to_angle (center, cur_pos, &start_angle);
-          gcode_math_xy_to_angle (center, pos, &end_angle);
-
-          if (end_angle < start_angle)
-            end_angle += 360.0;
-
-          if (arc_dir == GCODE_GERBER_ARC_CW)
+          if (gcode_arc_radius_to_sweep (&arcdata) == 0)
           {
-            sweep_angle = start_angle - end_angle;
+            normal[0] = cos (arcdata.start_angle * GCODE_DEG2RAD);
+            normal[1] = sin (arcdata.start_angle * GCODE_DEG2RAD);
+
+            /* Arc 1 */
+            gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+            gcode_append_as_listtail (sketch_block, arc_block);
+
+            arc = (gcode_arc_t *)arc_block->pdata;
+            arc->p[0] = cur_pos[0] + 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
+            arc->p[1] = cur_pos[1] + 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
+            arc->radius = radius + 0.5 * aperture_set[aperture_ind].v[0];
+            arc->start_angle = arcdata.start_angle;
+            arc->sweep_angle = arcdata.sweep_angle;
+
+            /* Arc 2 */
+            gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+            gcode_append_as_listtail (sketch_block, arc_block);
+
+            arc = (gcode_arc_t *)arc_block->pdata;
+            arc->p[0] = cur_pos[0] - 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
+            arc->p[1] = cur_pos[1] - 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
+            arc->radius = radius - 0.5 * aperture_set[aperture_ind].v[0];
+            arc->start_angle = arcdata.start_angle;
+            arc->sweep_angle = arcdata.sweep_angle;
+
+            /* If the aperture was previously closed insert an elbow - check both position and diameter for duplicity */
+            if (aperture_closed)
+            {
+              insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, cur_pos);
+
+              aperture_closed = 0;
+            }
+
+            /* Insert an elbow at the end of this trace segment - check both position and diameter for duplicity */
+            insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, pos);
           }
-          else if (arc_dir == GCODE_GERBER_ARC_CCW)
-          {
-            if (end_angle < start_angle)
-              end_angle += 360.0;
-
-            sweep_angle = end_angle - start_angle;
-          }
-
-          /* Arc 1 */
-          gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-          gcode_append_as_listtail (sketch_block, arc_block);
-
-          arc = (gcode_arc_t *)arc_block->pdata;
-          arc->p[0] = cur_pos[0] + 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
-          arc->p[1] = cur_pos[1] + 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
-          arc->radius = radius;
-          arc->start_angle = start_angle;
-          arc->sweep_angle = sweep_angle;
-
-          /* Arc 2 */
-          gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-          gcode_append_as_listtail (sketch_block, arc_block);
-
-          arc = (gcode_arc_t *)arc_block->pdata;
-          arc->p[0] = cur_pos[0] - 0.5 * normal[0] * aperture_set[aperture_ind].v[0];
-          arc->p[1] = cur_pos[1] - 0.5 * normal[1] * aperture_set[aperture_ind].v[0];
-          arc->radius = radius;
-          arc->start_angle = start_angle;
-          arc->sweep_angle = sweep_angle;
-
-          insert_trace_elbow (trace_elbow_count, trace_elbow_array, aperture_ind, aperture_set, pos);
         }
         else if (xy_mask)                                                       /* And X or Y has occured - Uses previous aperture_cmd if a new one isn't present. */
         {
