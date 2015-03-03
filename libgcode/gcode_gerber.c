@@ -1315,6 +1315,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
             new_arc->start_angle = arc->start_angle - full_ip_sorted_array[i][2];
 
           GCODE_MATH_WRAP_TO_360_DEGREES (new_arc->start_angle);                // As always, the start angle must be wrapped back to within [0...360);
+          GCODE_MATH_SNAP_TO_360_DEGREES (new_arc->start_angle);
 
           if (arc->sweep_angle > 0)                                             // The sweep angle is simply the difference between the two "sort values";
             new_arc->sweep_angle = full_ip_sorted_array[i + 1][2] - full_ip_sorted_array[i][2];
