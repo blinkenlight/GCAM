@@ -207,9 +207,9 @@ opengl_context_button_event (GtkWidget *widget, GdkEventButton *event)
         if (gui.opengl.views[GUI_OPENGL_VIEW_EXTRUSION].grid < SCALED_INCHES (GUI_OPENGL_MIN_ZOOM))
           gui.opengl.views[GUI_OPENGL_VIEW_EXTRUSION].grid = SCALED_INCHES (GUI_OPENGL_MIN_ZOOM);
       }
-
-      gui_opengl_context_redraw (&gui.opengl, selected_block);
     }
+
+    gui_opengl_context_redraw (&gui.opengl, selected_block);
   }
   else if (event->type == GDK_BUTTON_PRESS)
   {
@@ -367,12 +367,10 @@ opengl_context_motion_event (GtkWidget *widget, GdkEventMotion *event)
 
   /* Drop frames that are older than 20ms old */
   if (update && delay < 0.02)
-  {
     gui_opengl_context_redraw (&gui.opengl, selected_block);
 
-    gui.mouse_x = event->x;
-    gui.mouse_y = event->y;
-  }
+  gui.mouse_x = event->x;
+  gui.mouse_y = event->y;
 
   return (TRUE);
 }
