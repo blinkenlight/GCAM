@@ -29,6 +29,19 @@
 #define GCODE_GERBER_APERTURE_TYPE_RECTANGLE  0x01
 #define GCODE_GERBER_APERTURE_TYPE_OBROUND    0x02
 
+#define GCODE_GERBER_TRACE_TYPE_LINE          0x00
+#define GCODE_GERBER_TRACE_TYPE_ARC           0x01
+
+#define GCODE_GERBER_ARC_CCW                  0x00
+#define GCODE_GERBER_ARC_CW                   0x01
+
+typedef struct gcode_gerber_aperture_s
+{
+  uint8_t type;                                                                 /* Circle, Rectangle or Obround */
+  uint8_t ind;                                                                  /* Wheel Position */
+  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, v[0] = x and v[1] = y if RECTANGLE or OBROUND */
+} gcode_gerber_aperture_t;
+
 typedef struct gcode_gerber_exposure_s
 {
   uint8_t type;
@@ -38,17 +51,15 @@ typedef struct gcode_gerber_exposure_s
 
 typedef struct gcode_gerber_trace_s
 {
+  uint8_t type;                                                                 /* Line or Arc */
   gcode_vec2d_t p0;
   gcode_vec2d_t p1;
-  gfloat_t radius;
+  gcode_vec2d_t cp;                                                             /* Only contains data for arcs */
+  gfloat_t start_angle;                                                         /* Only contains data for arcs */
+  gfloat_t sweep_angle;                                                         /* Only contains data for arcs */
+  gfloat_t radius;                                                              /* Only contains data for arcs */
+  gfloat_t width;
 } gcode_gerber_trace_t;
-
-typedef struct gcode_gerber_aperture_s
-{
-  uint8_t type;                                                                 /* Circle, Rectangle or Obround */
-  uint8_t ind;                                                                  /* Wheel Position */
-  gcode_vec2d_t v;                                                              /* v[0] = diameter if CIRCLE, v[0] = x and v[1] = y if RECTANGLE or OBROUND */
-} gcode_gerber_aperture_t;
 
 int gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth, gfloat_t offset);
 

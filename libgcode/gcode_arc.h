@@ -72,6 +72,7 @@ void gcode_arc_draw (gcode_block_t *block, gcode_block_t *selected);
 int gcode_arc_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x_index);
 int gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
 int gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode);
+int gcode_arc_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode);
 void gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 void gcode_arc_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 gfloat_t gcode_arc_length (gcode_block_t *block);

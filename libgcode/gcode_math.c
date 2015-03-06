@@ -23,6 +23,12 @@
 #include "gcode_math.h"
 #include <stdio.h>
 
+/**
+ * Test whether 'test_angle' is within the sweep that begins at 'start_angle'
+ * and spans 'sweep_angle'; the return value is zero if the angle is within the
+ * specified sweep, one otherwise
+ */
+
 int
 gcode_math_angle_within_arc (gfloat_t start_angle, gfloat_t sweep_angle, gfloat_t test_angle)
 {

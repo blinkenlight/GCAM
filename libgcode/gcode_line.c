@@ -399,6 +399,40 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
   return (0);
 }
 
+int
+gcode_line_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode)
+{
+  gcode_line_t *line;
+  gcode_vec2d_t p0, p1, normal;
+
+  line = (gcode_line_t *)block->pdata;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+
+      midpoint[0] = 0.5 * (line->p0[0] + line->p1[0]);
+      midpoint[1] = 0.5 * (line->p0[1] + line->p1[1]);
+
+      break;
+
+    case GCODE_GET_WITH_OFFSET:
+
+      gcode_line_with_offset (block, p0, p1, normal);
+
+      midpoint[0] = 0.5 * (p0[0] + p1[0]);
+      midpoint[1] = 0.5 * (p0[1] + p1[1]);
+
+      break;
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
+}
+
 void
 gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 {

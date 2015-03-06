@@ -595,6 +595,43 @@ gcode_arc_center (gcode_block_t *block, gcode_vec2d_t center, uint8_t mode)
   return (0);
 }
 
+int
+gcode_arc_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode)
+{
+  gcode_arc_t *arc;
+  gcode_vec2d_t p0, p1, center;
+  gfloat_t radius, start_angle;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+
+      gcode_arc_center (block, center, GCODE_GET);
+
+      midpoint[0] = center[0] + arc->radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
+      midpoint[1] = center[1] + arc->radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep_angle * 0.5));
+
+      break;
+
+    case GCODE_GET_WITH_OFFSET:
+
+      gcode_arc_with_offset (block, p0, center, p1, &radius, &start_angle);
+
+      midpoint[0] = center[0] + radius * cos (GCODE_DEG2RAD * (start_angle + arc->sweep_angle * 0.5));
+      midpoint[1] = center[1] + radius * sin (GCODE_DEG2RAD * (start_angle + arc->sweep_angle * 0.5));
+
+      break;
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
+}
+
 void
 gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 {
@@ -625,16 +662,16 @@ gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
     max[1] = end_pos[1];
 
   /* Test if arc intersects X or Y axis with respect to arc center */
-  if (!gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 0.0))
+  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 0.0) == 0)
     max[0] = center[0] + arc_radius_offset;
 
-  if (!gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 90.0))
+  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 90.0) == 0)
     max[1] = center[1] + arc_radius_offset;
 
-  if (!gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 180.0))
+  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 180.0) == 0)
     min[0] = center[0] - arc_radius_offset;
 
-  if (!gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 270.0))
+  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 270.0) == 0)
     min[1] = center[1] - arc_radius_offset;
 }
 
