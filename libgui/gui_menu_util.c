@@ -360,15 +360,6 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
 
     set_selected_row_with_iter (gui, &new_iter);
 
-    /* Set the Comment cell for this block to be in editing mode as a default behaviour. */
-
-    gui->ignore_signals = 1;
-    gtk_tree_view_set_cursor_on_cell (GTK_TREE_VIEW (gui->gcode_block_treeview),
-                                      gtk_tree_model_get_path (model, &new_iter),
-                                      gtk_tree_view_get_column (GTK_TREE_VIEW (gui->gcode_block_treeview), 4),
-                                      gui->comment_cell,
-                                      TRUE);
-    gui->ignore_signals = 0;
     gui->modified = 1;
   }
 
