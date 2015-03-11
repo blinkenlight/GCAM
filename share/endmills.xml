@@ -3,7 +3,8 @@
 	<endmill number='2' type='flat bottom' unit='inch' diameter='0.187500' description='3/16" flat bottom'/>
 	<endmill number='3' type='flat bottom' unit='inch' diameter='0.250000' description='1/4" flat bottom'/>
 	<endmill number='4' type='flat bottom' unit='inch' diameter='0.375000' description='3/8" flat bottom'/>
-	<endmill number='5' type='flat bottom' unit='millimeter' diameter='1.0' description='1mm flat bottom'/>
-	<endmill number='6' type='flat bottom' unit='millimeter' diameter='2.0' description='2mm flat bottom'/>
-	<endmill number='7' type='flat bottom' unit='millimeter' diameter='3.0' description='3mm flat bottom'/>
+	<endmill number='5' type='flat bottom' unit='millimeter' diameter='0.2' description='0.2mm v-tip'/>
+	<endmill number='6' type='flat bottom' unit='millimeter' diameter='1.0' description='1mm flat bottom'/>
+	<endmill number='7' type='flat bottom' unit='millimeter' diameter='2.0' description='2mm flat bottom'/>
+	<endmill number='8' type='flat bottom' unit='millimeter' diameter='3.0' description='3mm flat bottom'/>
 </list>
