@@ -20,9 +20,19 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
 bin_PROGRAMS = gcam
+
+if HAVE_WINDRES
+gcam_SOURCES = gcam.c gcam-icon.rc
+else
 gcam_SOURCES = gcam.c
+endif
+
 gcam_LDFLAGS = -static
-gcam_LDADD = $(top_builddir)/libgui/libgui.la $(top_builddir)/libgcode/libgcode.la $(AM_LDFLAGS)
+
+gcam_LDADD = \
+	$(top_builddir)/libgui/libgui.la \
+	$(top_builddir)/libgcode/libgcode.la \
+	$(AM_LDFLAGS)
 
 ACLOCAL_AMFLAGS = -I m4 
 
@@ -41,3 +51,8 @@ SUBDIRS = \
 	libgcode \
 	samples \
 	share
+
+SUFFIXES: .rc
+
+.rc.o:
+	$(WINDRES) $< -o $@

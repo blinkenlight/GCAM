@@ -19,7 +19,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
-AC_INIT([gcam], [2014.05.23])
+AC_INIT([GCAM], [2014.05.23])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([gcam.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -89,13 +89,6 @@ AM_PATH_GTK_2_0(2.10.0,,AC_MSG_ERROR([GTK+ 2.10 or higher is required]))
 AC_SUBST(GTK_CFLAGS)
 AC_SUBST(GTK_LIBS)
 
-## AC_DEFINE_UNQUOTED([GTK_MAJOR_VERSION], [$gtk_config_major_version], GTK Major Version)
-## AC_DEFINE_UNQUOTED([GTK_MINOR_VERSION], [$gtk_config_minor_version], GTK Minor Version)
-
-#AM_PATH_GLIB(1.2.0,,AC_MSG_ERROR("gthread 2.0 is required"), gthread)
-#AC_SUBST(GLIB_CFLAGS)
-#AC_SUBST(GLIB_LIBS)
-
 ##
 ## GTK GL Extension
 ##
@@ -115,6 +108,12 @@ else
 	AC_MSG_RESULT([yes])
 	AC_SUBST(PNG_LIBS)
 fi
+
+##
+## The 'windres' tool
+##
+AC_CHECK_TOOL(WINDRES, windres)
+AM_CONDITIONAL(HAVE_WINDRES, test "$WINDRES" != "")
 
 ##
 ## Define the configuration date

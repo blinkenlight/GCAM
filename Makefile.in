@@ -55,7 +55,10 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_gcam_OBJECTS = gcam.$(OBJEXT)
+am__gcam_SOURCES_DIST = gcam.c gcam-icon.rc
+@HAVE_WINDRES_FALSE@am_gcam_OBJECTS = gcam.$(OBJEXT)
+@HAVE_WINDRES_TRUE@am_gcam_OBJECTS = gcam.$(OBJEXT) \
+@HAVE_WINDRES_TRUE@	gcam-icon.$(OBJEXT)
 gcam_OBJECTS = $(am_gcam_OBJECTS)
 am__DEPENDENCIES_1 = ${top_builddir}/libgui/libgui.la \
 	${top_builddir}/libgcode/libgcode.la
@@ -78,7 +81,7 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(gcam_SOURCES)
-DIST_SOURCES = $(gcam_SOURCES)
+DIST_SOURCES = $(am__gcam_SOURCES_DIST)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -201,6 +204,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
+WINDRES = @WINDRES@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -257,9 +261,14 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-gcam_SOURCES = gcam.c
+@HAVE_WINDRES_FALSE@gcam_SOURCES = gcam.c
+@HAVE_WINDRES_TRUE@gcam_SOURCES = gcam.c gcam-icon.rc
 gcam_LDFLAGS = -static
-gcam_LDADD = $(top_builddir)/libgui/libgui.la $(top_builddir)/libgcode/libgcode.la $(AM_LDFLAGS)
+gcam_LDADD = \
+	$(top_builddir)/libgui/libgui.la \
+	$(top_builddir)/libgcode/libgcode.la \
+	$(AM_LDFLAGS)
+
 ACLOCAL_AMFLAGS = -I m4 
 AM_CFLAGS = \
 	@GTKGLEXT_CFLAGS@ \
@@ -280,7 +289,7 @@ SUBDIRS = \
 all: all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .lo .o .obj
+.SUFFIXES: .c .lo .o .obj .rc
 am--refresh: Makefile
 	@:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
@@ -857,6 +866,11 @@ uninstall-am: uninstall-binPROGRAMS
 	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
 	uninstall uninstall-am uninstall-binPROGRAMS
 
+
+SUFFIXES: .rc
+
+.rc.o:
+	$(WINDRES) $< -o $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
