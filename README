@@ -56,3 +56,19 @@ micro CNC mill can cost on average between $1,000 - $2,000 USD.
 Commercial Off The Shelf (COTS) milling software can cost between $100 
 and $10,000 USD. The purpose of creating this software was to help make 
 CNC Milling as affordable as possible for anyone to get into.
+
+
+WARNING
+=======
+Perhaps needless to say it is entirely your responsibility as the machine 
+operator to ensure that the G-code produced by GCAM will not harm the tool 
+or the machine it is executed on - any changes are extensively tested, but 
+there is ALWAYS A POSSIBILITY that GCAM will do something unexpected or 
+unsafe, and each new version could potentially introduce errant behavior 
+even for things that used to work just fine before. This is particularly 
+true for the Special Edition of GCAM, which has seen massive changes in its 
+code compared to the legacy version - identical conduct was pursued as far 
+as possible, but clearly incorrect behavior HAS BEEN occasionally corrected, 
+so please do consider that your existing projects MAY POTENTIALLY GENERATE 
+UNEXPECTED RESULTS with the Special Edition. You should ALWAYS verify the 
+output of GCAM with a G-code simulator to avoid potentially costly mistakes!
