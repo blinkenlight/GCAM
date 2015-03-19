@@ -28,7 +28,7 @@ gcode_begin_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_begin_t *begin;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_BEGIN, GCODE_FLAGS_LOCK);
 
@@ -177,12 +177,12 @@ gcode_begin_make (gcode_block_t *block)
   sprintf (string, "Notes: %s", block->gcode->notes);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "BEGIN: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   if (begin->coordinate_system == GCODE_BEGIN_COORDINATE_SYSTEM_NONE)
   {

@@ -215,7 +215,7 @@ gui_machines_read (gui_machine_list_t *machine_list)
 
   fseek (fh, 0, SEEK_END);
   length = ftell (fh);
-  buffer = (char *)malloc (length);
+  buffer = malloc (length);
   fseek (fh, 0, SEEK_SET);
   nomore = fread (buffer, 1, length, fh);
 

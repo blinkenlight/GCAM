@@ -222,7 +222,7 @@ gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (3 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -384,7 +384,7 @@ gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+  wlist = malloc (4 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -497,7 +497,7 @@ gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
+  wlist = malloc (2 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -768,7 +768,7 @@ gui_menu_edit_fillet_previous_menuitem_callback (GtkWidget *widget, gpointer dat
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
+  wlist = malloc (2 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -799,7 +799,7 @@ gui_menu_edit_fillet_next_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (2 * sizeof (GtkWidget *));
+  wlist = malloc (2 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -1042,7 +1042,7 @@ gui_menu_edit_generate_pattern_menuitem_callback (GtkWidget *widget, gpointer da
   gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
-  wlist = (GtkWidget **)malloc (7 * sizeof (GtkWidget *));
+  wlist = malloc (7 * sizeof (GtkWidget *));
 
   wlist[0] = (GtkWidget *)gui;
 
@@ -1419,7 +1419,7 @@ gui_menu_edit_project_settings_menuitem_callback (GtkWidget *widget, gpointer da
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (13 * sizeof (GtkWidget *));
+  wlist = malloc (13 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 

@@ -27,7 +27,7 @@ gcode_end_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_end_t *end;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_END, GCODE_FLAGS_LOCK);
 
@@ -159,12 +159,12 @@ gcode_end_make (gcode_block_t *block)
 
   GCODE_CLEAR (block);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "END: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   if (block->gcode->machine_options & GCODE_MACHINE_OPTION_HOME_SWITCHES)
   {

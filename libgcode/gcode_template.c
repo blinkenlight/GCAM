@@ -29,7 +29,7 @@ gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *paren
 {
   gcode_template_t *template;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_TEMPLATE, 0);
 
@@ -305,10 +305,12 @@ gcode_template_make (gcode_block_t *block)
 
   GCODE_MATH_WRAP_TO_360_DEGREES (template->offset.rotation);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "TEMPLATE: %s", block->comment);
   GCODE_COMMENT (block, string);
+
+  GCODE_NEWLINE (block);
 
   index_block = block->listhead;
 

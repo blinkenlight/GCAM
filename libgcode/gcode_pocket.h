@@ -25,6 +25,8 @@
 #include "gcode_internal.h"
 #include "gcode_tool.h"
 
+#define PADDING_FRACTION  0.1
+
 typedef struct gcode_pocket_row_s
 {
   int line_num;

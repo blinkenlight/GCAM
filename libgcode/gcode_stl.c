@@ -30,7 +30,7 @@ gcode_stl_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   gcode_stl_t *stl;
   int i;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_STL, 0);
 
@@ -59,7 +59,7 @@ gcode_stl_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   stl->slices = 10;
   stl->alloc_slices = stl->slices;
 
-  stl->slice_list = (gcode_block_t **)malloc (sizeof (gcode_block_t *) * stl->alloc_slices);
+  stl->slice_list = malloc (sizeof (gcode_block_t *) * stl->alloc_slices);
 
   for (i = 0; i < stl->alloc_slices; i++)
     stl->slice_list[i] = NULL;
@@ -322,7 +322,7 @@ gcode_stl_import (gcode_block_t *block, char *filename)
 
   fread (&stl->tri_num, sizeof (int), 1, fh);
 
-  stl->tri_list = (float *)malloc (sizeof (float) * 12 * stl->tri_num);
+  stl->tri_list = malloc (sizeof (float) * 12 * stl->tri_num);
 
   for (i = 0; i < stl->tri_num; i++)
   {
@@ -370,7 +370,7 @@ gcode_stl_generate_slice_contours (gcode_block_t *block)
   free (stl->slice_list);
 
   stl->alloc_slices = stl->slices;
-  stl->slice_list = (gcode_block_t **)malloc (sizeof (gcode_block_t *) * stl->alloc_slices);
+  stl->slice_list = malloc (sizeof (gcode_block_t *) * stl->alloc_slices);
 
   /**
    * Based off of material thickness (Z) generate a plane

@@ -33,7 +33,7 @@ gcode_bolt_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *par
   gcode_bolt_holes_t *bolt_holes;
   gcode_block_t *extrusion_block;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_BOLT_HOLES, 0);
 
@@ -125,7 +125,7 @@ gcode_bolt_holes_make (gcode_block_t *block)
   gcode_block_t *offset_block;
   gcode_block_t *index_block;
   gcode_vec2d_t p0, p1, e0, e1, cp;
-  gfloat_t z, z0, z1, touch_z;
+  gfloat_t z, z0, z1, safe_z, touch_z;
   gfloat_t tool_radius;
   char string[256];
   int number, initial;
@@ -148,12 +148,12 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   tool_radius = tool->diameter * 0.5;                                           // If a tool was found, obtain its radius;
 
-  GCODE_APPEND (block, "\n");                                                   // Print some generic info and newlines into the g-code string;
+  GCODE_NEWLINE (block);                                                        // Print some generic info and newlines into the g-code string;
 
   sprintf (string, "BOLT HOLES: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   block->extruder->ends (block->extruder, p0, p1, GCODE_GET);                   // Find the start and end depth of the extrusion curve;
 
@@ -198,24 +198,35 @@ gcode_bolt_holes_make (gcode_block_t *block)
     }
     else                                                                        // If the tool cannot drill this hole, mill it out instead;
     {
-      if (number > 1)                                                           // Separate subsequent holes from each other with a newline;
-      {
-        GCODE_APPEND (block, "\n");
-      }
+      GCODE_NEWLINE (block);
 
       sprintf (string, "Hole #%d", number);
       GCODE_COMMENT (block, string);                                            // This may take a while: throw in some comments at the start;
 
-      GCODE_RETRACT (block, block->gcode->ztraverse);                           // Retract - should already be retracted, but here for safety reasons.
+      GCODE_NEWLINE (block);
 
       initial = 1;                                                              // For the first pass (whether it is a 'zero pass' or not) this stays true;
 
+      safe_z = block->gcode->ztraverse;                                         // This is just a short-hand for the traverse z...
+
       touch_z = block->gcode->material_origin[2];                               // Track the depth the material begins at (gets lower after every pass);
 
-      z = z0;                                                                   // Start the first pass at z0 (arguably this should start one step lower);
+      if (z0 - z1 > extrusion->resolution)                                      // Start one step deeper than z0 if the total depth is larger than one step;
+        z = z0 - extrusion->resolution;
+      else                                                                      // If even a single step would be too deep, start the pass at z1 instead;
+        z = z1;
+
+      GCODE_RETRACT (block, block->gcode->ztraverse);                           // Retract - should already be retracted, but here for safety reasons.
 
       while (z >= z1)                                                           // Loop on the current hole, creating one pass depth per loop;
       {
+        GCODE_NEWLINE (block);
+
+        gsprintf (string, block->gcode->decimals, "Pass at depth: %z", z);
+        GCODE_COMMENT (block, string);
+
+        GCODE_NEWLINE (block);
+
         gcode_extrusion_evaluate_offset (block->extruder, z, &bolt_holes->offset.eval); // Get the extrusion profile offset calculated for the current z-depth;
 
         gcode_util_get_sublist_snapshot (&offset_block, index_block, index_block);      // We need a working snapshot of... uhhh... a single block?!? Oh well...
@@ -236,19 +247,17 @@ gcode_bolt_holes_make (gcode_block_t *block)
          * Pocketing is complete, get in position for the contour pass
          */
 
-        if (initial || bolt_holes->pocket)                                      // This applies on the first pass, or every pass if pocketing being done;
-        {
-          GCODE_APPEND (block, "\n");
+        offset_block->ends (offset_block, e0, e1, GCODE_GET_WITH_OFFSET);       // Get the endpoints of the hole / arc (both should be the same anyway...);
 
-          offset_block->ends (offset_block, e0, e1, GCODE_GET_WITH_OFFSET);     // Get the endpoints of the hole / arc (both should be the same anyway...);
+        GCODE_NEWLINE (block);
 
-          GCODE_2D_MOVE (block, e0[0], e0[1], "move to start");                 // Once found, move to that position then plunge;
-        }
+        GCODE_COMMENT (block, "Hole Contour Milling Phase");
 
-        if (touch_z - z > GCODE_PRECISION)                                      // If the touch depth is above the target depth,
-          GCODE_PLUMMET (block, touch_z);                                       // fast dive to touch depth first;
+        GCODE_NEWLINE (block);
 
-        GCODE_DESCEND (block, z, tool);                                         // Either way, proceed to target depth, but slooowly;
+        GCODE_MOVE_TO (block, e0[0], e0[1], z, safe_z, touch_z, tool, "start of contour");
+
+        GCODE_2D_MOVE (block, e0[0], e0[1], "move to start");                   // Once found, move to that position then plunge;
 
         offset_block->offset->z[0] = z;                                         // Thankfully, this is the trivial part - everything happens at 'z';
         offset_block->offset->z[1] = z;

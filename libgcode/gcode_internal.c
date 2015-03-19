@@ -71,7 +71,7 @@ format_z (char *format, char **format2, unsigned int number)
     return;
 
   s = strlen (format) + 1;
-  *format2 = (char *)malloc (2 * s);
+  *format2 = malloc (2 * s);
   memcpy (*format2, format, s);
 
   j = 0;

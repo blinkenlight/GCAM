@@ -58,7 +58,7 @@ comment_cell_edited (GtkCellRendererText *cell,
   gtk_tree_model_get_iter (model, &iter, path);
 
   /* Replace certain characters in string */
-  modified_text = (char *)malloc (strlen (new_text) + 1);
+  modified_text = malloc (strlen (new_text) + 1);
   j = 0;
 
   for (i = 0; i < strlen (new_text); i++)

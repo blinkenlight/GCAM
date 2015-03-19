@@ -166,7 +166,7 @@ gui_menu_assistant_polygon_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (3 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 

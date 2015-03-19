@@ -408,7 +408,7 @@ gui_menu_file_new_project_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (13 * sizeof (GtkWidget *));
+  wlist = malloc (13 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -930,7 +930,7 @@ gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (3 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 
@@ -1074,7 +1074,7 @@ import_gcam_callback (gui_t *gui, gcode_t *gcode)
   gcode_prep (imported);
 
   /* Create window list of blocks to choose from */
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+  wlist = malloc (4 * sizeof (GtkWidget *));
 
   window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   gtk_window_set_modal (GTK_WINDOW (window), TRUE);
@@ -1203,7 +1203,7 @@ gui_menu_file_import_gcam_menuitem_callback (GtkWidget *widget, gpointer data)
 
     gtk_widget_destroy (dialog);
 
-    imported = (gcode_t *)malloc (sizeof (gcode_t));
+    imported = malloc (sizeof (gcode_t));
 
     gcode_init (imported);
 
@@ -1932,7 +1932,7 @@ gui_menu_file_import_gerber_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
+  wlist = malloc (8 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 

@@ -33,7 +33,7 @@ gcode_image_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_image_t *image;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_IMAGE, 0);
 
@@ -221,12 +221,12 @@ gcode_image_make (gcode_block_t *block)
   if (tool == NULL)
     return;
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "IMAGE: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   xpos = ((gfloat_t)0) * image->size[0] / (gfloat_t)image->resolution[0];
   ypos = ((gfloat_t)0) * image->size[1] / (gfloat_t)image->resolution[1];
@@ -448,7 +448,7 @@ gcode_image_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
   image->size[2] = model_image->size[2];
 
   /* Copy Depth Map */
-  image->dmap = (gfloat_t *)malloc (image->resolution[0] * image->resolution[1] * sizeof (gfloat_t));
+  image->dmap = malloc (image->resolution[0] * image->resolution[1] * sizeof (gfloat_t));
 
   for (i = 0; i < image->resolution[0] * image->resolution[1]; i++)
     image->dmap[i] = model_image->dmap[i];
@@ -527,10 +527,10 @@ gcode_image_open (gcode_block_t *block, char *filename)
     return;
   }
 
-  row_pointers = (png_bytep *) malloc (sizeof (png_bytep) * image->resolution[1]);
+  row_pointers = malloc (sizeof (png_bytep) * image->resolution[1]);
 
   for (y = 0; y < image->resolution[1]; y++)
-    row_pointers[y] = (png_byte *)malloc (png_get_rowbytes (png_ptr, info_ptr));
+    row_pointers[y] = malloc (png_get_rowbytes (png_ptr, info_ptr));
 
   png_read_image (png_ptr, row_pointers);
 

@@ -409,7 +409,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
   fseek (fh, 0, SEEK_END);
   length = ftell (fh);
   fseek (fh, 0, SEEK_SET);
-  buffer = (char *)malloc (length);
+  buffer = malloc (length);
   nomore = fread (buffer, 1, length, fh);
 
   index = 0;

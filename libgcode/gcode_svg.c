@@ -1124,17 +1124,18 @@ gcode_svg_import (gcode_block_t *template_block, char *filename)
 
   if (!length)                                                                  // A zero length file is not an error, strictly speaking;
   {
-    fclose (fh);
     XML_ParserFree (parser);
+    fclose (fh);
     return (0);
   }
 
-  buffer = (char *)malloc (length);
+  buffer = malloc (length);
 
   if (!buffer)
   {
     REMARK ("Failed to allocate memory for SVG import buffer\n");
     XML_ParserFree (parser);
+    fclose (fh);
     return (1);
   }
 

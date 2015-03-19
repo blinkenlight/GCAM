@@ -27,7 +27,7 @@ gcode_tool_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_tool_t *tool;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_TOOL, 0);
 
@@ -220,12 +220,12 @@ gcode_tool_make (gcode_block_t *block)
   if (block->flags & GCODE_FLAGS_SUPPRESS)
     return;
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "TOOL CHANGE: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "Selected Tool: %s", tool->label);
   GCODE_COMMENT (block, string);

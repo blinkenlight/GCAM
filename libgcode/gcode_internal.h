@@ -389,8 +389,8 @@ void strswp (char *target, char oldchar, char newchar);
 #define GCODE_CLEAR(_block) { \
         _block->code_len = 1; \
         _block->code_alloc = 1; \
-        _block->code = (char *) realloc (_block->code, _block->code_alloc); \
-        _block->code[0] = 0; }
+        _block->code = realloc (_block->code, _block->code_alloc); \
+        _block->code[0] = '\0'; }
 
 /**
  * increase by 64kB + string length + 1 if request to append greater than current buffer size.
@@ -402,11 +402,14 @@ void strswp (char *target, char oldchar, char newchar);
         if (_block->code_len + _slen > _block->code_alloc) \
         { \
           _block->code_alloc +=  (1 << 16) + _slen; \
-          _block->code = (char *) realloc (_block->code, _block->code_alloc); \
+          _block->code = realloc (_block->code, _block->code_alloc); \
         } \
         for (_i = 0; _i < _slen; _i++) \
-          _block->code[_block->code_len + _i-1] = _str[_i]; \
+          _block->code[_block->code_len + _i - 1] = _str[_i]; \
         _block->code_len += _slen - 1; }
+
+#define GCODE_NEWLINE(_block) { \
+        GCODE_APPEND (_block, "\n"); }
 
 #define GCODE_PADDING(_block, _comment) { \
         if (*_comment) \
@@ -453,7 +456,7 @@ void strswp (char *target, char oldchar, char newchar);
 
 #define GCODE_DESCEND(_block, _depth, _tool) { \
         gfloat_t _z = _block->gcode->material_origin[2] + _depth; \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _z)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
         { \
           char _string[256]; \
           gsprintf (_string, _block->gcode->decimals, "G01 Z%z F%.3f ", _z, _tool->feed * _tool->plunge_ratio); \
@@ -467,7 +470,7 @@ void strswp (char *target, char oldchar, char newchar);
 
 #define GCODE_PLUMMET(_block, _depth) { \
         gfloat_t _z = _block->gcode->material_origin[2] + _depth; \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _z)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
         { \
           char _string[256]; \
           gsprintf (_string, _block->gcode->decimals, "G00 Z%z ", _z); \
@@ -478,7 +481,7 @@ void strswp (char *target, char oldchar, char newchar);
 
 #define GCODE_RETRACT(_block, _depth) { \
         gfloat_t _z = _block->gcode->material_origin[2] + _depth; \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _z)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
         { \
           char _string[256]; \
           gsprintf (_string, _block->gcode->decimals, "G00 Z%z ", _z); \
@@ -488,7 +491,7 @@ void strswp (char *target, char oldchar, char newchar);
         }}
 
 #define GCODE_PULL_UP(_block, _depth) { \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _depth)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _depth)) \
         { \
           char _string[256]; \
           gsprintf (_string, _block->gcode->decimals, "G00 Z%z ", _depth); \
@@ -509,17 +512,17 @@ void strswp (char *target, char oldchar, char newchar);
         _block->gcode->tool_ypos = _y; }
 
 #define GCODE_2D_MOVE(_block, _x, _y, _comment) { \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x) || \
-            !GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x) || \
+            !GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
         { \
           char _string[256]; \
           GCODE_APPEND (_block, "G00"); \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " X%z", _x); \
             GCODE_APPEND (_block, _string); \
           } \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " Y%z", _y); \
             GCODE_APPEND (_block, _string); \
@@ -531,17 +534,17 @@ void strswp (char *target, char oldchar, char newchar);
         }}
 
 #define GCODE_2D_LINE(_block, _x, _y, _comment) { \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x) || \
-            !GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x) || \
+            !GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
         { \
           char _string[256]; \
           GCODE_APPEND (_block, "G01"); \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " X%z", _x); \
             GCODE_APPEND (_block, _string); \
           } \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " Y%z", _y); \
             GCODE_APPEND (_block, _string); \
@@ -553,23 +556,23 @@ void strswp (char *target, char oldchar, char newchar);
         }}
 
 #define GCODE_3D_LINE(_block, _x, _y, _z, _comment) { \
-        if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x) || \
-            !GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y) || \
-            !GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _z)) \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x) || \
+            !GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y) || \
+            !GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
         { \
           char _string[256]; \
           GCODE_APPEND (_block, "G01"); \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_xpos, _x)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " X%z", _x); \
             GCODE_APPEND (_block, _string); \
           } \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_ypos, _y)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " Y%z", _y); \
             GCODE_APPEND (_block, _string); \
           } \
-          if (!GCODE_MATH_IS_EQUAL(_block->gcode->tool_zpos, _z)) \
+          if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
           { \
             gsprintf (_string, _block->gcode->decimals, " Z%z", _z); \
             GCODE_APPEND (_block, _string); \
@@ -639,6 +642,24 @@ void strswp (char *target, char oldchar, char newchar);
         _block->gcode->tool_xpos = FLT_MAX; \
         _block->gcode->tool_ypos = FLT_MAX; \
         _block->gcode->tool_zpos = FLT_MAX; }
+
+#define GCODE_MOVE_TO(_block, _x, _y, _z, _travel_z, _touch_z, _tool, _target) { \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_xpos, _x) || \
+            !GCODE_MATH_IS_EQUAL (_block->gcode->tool_ypos, _y)) \
+        { \
+          char _remark[256]; \
+          sprintf (_remark, "move to %s", _target); \
+          GCODE_RETRACT (_block, _travel_z); \
+          GCODE_2D_MOVE (_block, _x, _y, _remark); \
+        } \
+        if (!GCODE_MATH_IS_EQUAL (_block->gcode->tool_zpos, _z)) \
+        { \
+          if (_touch_z >= _z) \
+          { \
+            GCODE_PLUMMET (_block, _touch_z); \
+          } \
+          GCODE_DESCEND (_block, _z, _tool); \
+        }}
 
 /**
  * Macros for writing the binary type savefile

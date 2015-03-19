@@ -159,7 +159,7 @@ gui_endmills_read (gui_endmill_list_t *endmill_list)
 
   fseek (fh, 0, SEEK_END);
   length = ftell (fh);
-  buffer = (char *)malloc (length);
+  buffer = malloc (length);
   fseek (fh, 0, SEEK_SET);
   nomore = fread (buffer, 1, length, fh);
 

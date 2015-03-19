@@ -31,7 +31,7 @@ gcode_extrusion_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pare
   gcode_block_t *line_block;
   gcode_line_t *line;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_EXTRUSION, GCODE_FLAGS_LOCK);
 

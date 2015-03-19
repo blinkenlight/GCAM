@@ -74,9 +74,9 @@ void gcode_init (gcode_t *gcode);
 void gcode_prep (gcode_t *gcode);
 void gcode_free (gcode_t *gcode);
 
-int gcode_save (gcode_t *gcode, const char *filename);
-int gcode_load (gcode_t *gcode, const char *filename);
-int gcode_export (gcode_t *gcode, const char *filename);
+int gcode_save (gcode_t *gcode, char *filename);
+int gcode_load (gcode_t *gcode, char *filename);
+int gcode_export (gcode_t *gcode, char *filename);
 
 void gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed);
 

@@ -96,7 +96,7 @@ gcode_excellon_import (gcode_block_t *template_block, char *filename)
     return (0);
   }
 
-  buffer = (char *)malloc (length + 1);
+  buffer = malloc (length + 1);
 
   if (!buffer)
   {

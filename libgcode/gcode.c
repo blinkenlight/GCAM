@@ -927,7 +927,7 @@ gcode_prep (gcode_t *gcode)
 
   size = gcode->voxel_number[0] * gcode->voxel_number[1] * gcode->voxel_number[2];
 
-  gcode->voxel_map = (uint8_t *)realloc (gcode->voxel_map, size);
+  gcode->voxel_map = realloc (gcode->voxel_map, size);
   memset (gcode->voxel_map, 1, size);
 }
 
@@ -939,39 +939,8 @@ gcode_free (gcode_t *gcode)
   gcode->voxel_map = NULL;
 }
 
-static void
-gcode_crlf (char **string)
-{
-  char *crlf_string;
-  int i, n, len;
-
-  crlf_string = malloc (2 * strlen (*string) + 1);
-
-  len = strlen (*string) + 1;
-  n = 0;
-
-  for (i = 0; i < len; i++)
-  {
-    crlf_string[n] = (*string)[i];
-    n++;
-
-    if (crlf_string[n - 1] == '\n')
-    {
-      crlf_string[n - 1] = '\r';
-      crlf_string[n] = '\n';
-      n++;
-    }
-  }
-
-  *string = realloc (*string, strlen (crlf_string) + 1);
-
-  memcpy (*string, crlf_string, strlen (crlf_string) + 1);
-
-  free (crlf_string);
-}
-
 int
-gcode_save (gcode_t *gcode, const char *filename)
+gcode_save (gcode_t *gcode, char *filename)
 {
   FILE *fh;
   char *fileext;
@@ -983,6 +952,7 @@ gcode_save (gcode_t *gcode, const char *filename)
 
   if (!fh)
   {
+    REMARK ("Failed to open file '%s'\n", basename (filename));
     return (1);
   }
 
@@ -1166,7 +1136,7 @@ gcode_save (gcode_t *gcode, const char *filename)
 }
 
 int
-gcode_load (gcode_t *gcode, const char *filename)
+gcode_load (gcode_t *gcode, char *filename)
 {
   FILE *fh;
   int result;
@@ -1182,7 +1152,7 @@ gcode_load (gcode_t *gcode, const char *filename)
 
   if (!fh)
   {
-    REMARK ("Failed to open file '%s'\n", basename ((char *)filename));
+    REMARK ("Failed to open file '%s'\n", basename (filename));
     return (result);
   }
 
@@ -1486,58 +1456,85 @@ gcode_load (gcode_t *gcode, const char *filename)
 }
 
 int
-gcode_export (gcode_t *gcode, const char *filename)
+gcode_export (gcode_t *gcode, char *filename)
 {
-  gcode_block_t *index_block;
   FILE *fh;
-  int size;
+  char *code;
+  size_t code_size;
+  gcode_block_t *index_block;
 
   fh = fopen (filename, "w");
 
   if (!fh)
+  {
+    REMARK ("Failed to open file '%s'\n", basename (filename));
     return (1);
-
-  /**
-   * Check whether this is a windows machine or not by checking whether
-   * writing \n results in \r\n in the file (2 bytes).
-   */
-
-  fprintf (fh, "\n");
-  fseek (fh, 0, SEEK_END);
-  size = ftell (fh);
-
-  fseek (fh, 0, SEEK_SET);
+  }
 
   /**
    * Set appropriate number of decimals given driver
    */
+
   switch (gcode->driver)
   {
     case GCODE_DRIVER_HAAS:
+
       gcode->decimals = 4;
+
       break;
 
     default:
+
       gcode->decimals = 5;
+
       break;
   }
 
   /* Make all */
   gcode_list_make (gcode);
 
+  code_size = 1;
+
+  code = malloc (code_size);
+
+  if (!code)
+  {
+    REMARK ("Failed to allocate memory for G-code export buffer\n");
+    fclose (fh);
+    return (1);
+  }
+
+  code[0] = '\0';
+
   index_block = gcode->listhead;
 
   while (index_block)
   {
-    if (size == 1)
-      gcode_crlf (&index_block->code);
+    code_size += strlen (index_block->code);
 
-    fwrite (index_block->code, 1, strlen (index_block->code), fh);
+    code = realloc (code, code_size);
+
+    if (!code)
+    {
+      REMARK ("Failed to reallocate memory for G-code export buffer\n");
+      fclose (fh);
+      return (1);
+    }
+
+    strcat (code, index_block->code);
 
     index_block = index_block->next;
   }
 
+  gcode_util_filter_newlines (code);                                            // This just removes multiple empty lines in the text (leaving max. one);
+
+  code_size = strlen (code);                                                    // Sine we messed with the text, its length should be re-evaluated;
+
+  fwrite (code, 1, code_size, fh);
+
   fclose (fh);
+
+  free (code);
 
   if (gcode->progress_callback)
     gcode->progress_callback (gcode->gui, 0.0);
@@ -1548,11 +1545,14 @@ gcode_export (gcode_t *gcode, const char *filename)
 void
 gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
 {
-  char *source, line[256], *sp, *tsp, *gv;
+  char *code;
+  size_t code_size;
   gcode_block_t *index_block;
   gcode_sim_t sim;
+  char line[256], *sp, *tsp, *gv;
   uint32_t size, line_count, line_index, mode = 0;
-  gfloat_t G83_depth = 0.0, G83_retract = 0.0;
+  gfloat_t G83_depth = 0.0;
+  gfloat_t G83_retract = 0.0;
 
   /* Make all */
   gcode_list_make (gcode);
@@ -1567,22 +1567,40 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
   size = gcode->voxel_number[0] * gcode->voxel_number[1] * gcode->voxel_number[2];
   memset (gcode->voxel_map, 1, size);
 
-  source = (char *)malloc (1);
-  source[0] = 0;
+  code_size = 1;
+
+  code = malloc (code_size);
+
+  if (!code)
+  {
+    REMARK ("Failed to allocate memory for G-code simulation buffer\n");
+    return;
+  }
+
+  code[0] = '\0';
 
   index_block = gcode->listhead;
 
   while (index_block)
   {
-    source = (char *)realloc (source, strlen (source) + strlen (index_block->code) + 1);
-    strcat (source, index_block->code);
+    code_size += strlen (index_block->code);
+
+    code = realloc (code, code_size);
+
+    if (!code)
+    {
+      REMARK ("Failed to reallocate memory for G-code simulation buffer\n");
+      return;
+    }
+
+    strcat (code, index_block->code);
 
     index_block = index_block->next;
   }
 
   /* Count the number of lines */
   line_count = 0;
-  sp = source;
+  sp = code;
 
   while ((tsp = strchr (sp, '\n')))
   {
@@ -1592,7 +1610,7 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
 
   /* Isolate each line */
   line_index = 0;
-  sp = source;
+  sp = code;
 
   while ((tsp = strchr (sp, '\n')))
   {
@@ -1757,7 +1775,7 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
     line_index++;
   }
 
-  free (source);
+  free (code);
 
   /* Calculate elapsed time */
   sim.time_elapsed = 60 * sim.time_elapsed / sim.feed;

@@ -466,13 +466,41 @@ gcode_sketch_add_up_path_length (gcode_block_t *listhead, gfloat_t *length)
   }
 }
 
+static void
+gcode_sketch_flip_direction (gcode_block_t **listhead)
+{
+  gcode_block_t *index_block, *next_block;
+
+  index_block = *listhead;
+
+  if (!index_block)
+    return;
+
+  gcode_util_flip_direction (index_block);
+
+  index_block = index_block->next;
+
+  while (index_block)
+  {
+    next_block = index_block->next;
+
+    gcode_util_flip_direction (index_block);
+
+    gcode_place_block_before (*listhead, index_block);
+
+    *listhead = index_block;
+
+    index_block = next_block;
+  }
+}
+
 void
 gcode_sketch_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_sketch_t *sketch;
   gcode_block_t *extrusion_block;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_SKETCH, 0);
 
@@ -767,7 +795,8 @@ gcode_sketch_make (gcode_block_t *block)
   gcode_block_t *sorted_listhead, *offset_listhead;
   gcode_block_t *start_block, *index_block, *index2_block;
   gcode_vec2d_t p0, p1, e0, e1, t;
-  gfloat_t z, z0, z1, touch_z;
+  gfloat_t z, z0, z1, safe_z, touch_z;
+  gfloat_t current_proffset, maximum_proffset;
   gfloat_t tool_radius, accum_length, path_length, path_drop, length_coef;
   int inside, closed, tapered, helical, initial;
   char string[256];
@@ -790,12 +819,12 @@ gcode_sketch_make (gcode_block_t *block)
 
   tool_radius = tool->diameter * 0.5;                                           // If a tool was found, obtain its radius;
 
-  GCODE_APPEND (block, "\n");                                                   // Print some generic info and newlines into the g-code string;
+  GCODE_NEWLINE (block);                                                        // Print some generic info and newlines into the g-code string;
 
   sprintf (string, "SKETCH: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   /**
    * WARNING: Code is being duplicated into the sketch.  This is wasteful,
@@ -876,9 +905,9 @@ gcode_sketch_make (gcode_block_t *block)
         break;
     }
 
-    GCODE_RETRACT (block, block->gcode->ztraverse);                             // Retract - should already be retracted, but here for safety reasons;
-
     initial = 1;                                                                // For the first pass (whether it is a 'zero pass' or not) this stays true;
+
+    safe_z = block->gcode->ztraverse;                                           // This is just a short-hand for the traverse z...
 
     touch_z = block->gcode->material_origin[2];                                 // Track the depth the material begins at (gets lower after every pass);
 
@@ -889,8 +918,17 @@ gcode_sketch_make (gcode_block_t *block)
     else                                                                        // If even a single step would be too deep, start the pass at z1 instead;
       z = z1;
 
+    GCODE_RETRACT (block, safe_z);                                              // Retract - should already be retracted, but here for safety reasons;
+
     while (z >= z1)                                                             // Loop within the current sub-chain, creating one pass depth per loop;
     {
+      GCODE_NEWLINE (block);
+
+      gsprintf (string, block->gcode->decimals, "Pass at depth: %z", z);
+      GCODE_COMMENT (block, string);
+
+      GCODE_NEWLINE (block);
+
       sketch->offset.origin[0] = block->offset->origin[0];                      // Start by inheriting the offset of the parent; considering the taper's effect
       sketch->offset.origin[1] = block->offset->origin[1];                      // changes with the depth, we need to re-apply this on every z-pass...
       sketch->offset.rotation = block->offset->rotation;
@@ -898,7 +936,9 @@ gcode_sketch_make (gcode_block_t *block)
       sketch->offset.origin[0] += sketch->taper_offset[0] * (z0 - z) / (z0 - z1);       // Anyway, the rest of the offset must be applied: the taper offset...
       sketch->offset.origin[1] += sketch->taper_offset[1] * (z0 - z) / (z0 - z1);
 
-      gcode_extrusion_evaluate_offset (block->extruder, z, &sketch->offset.eval);       // ...and the extrusion profile offset calculated for the current z-depth;
+      gcode_extrusion_evaluate_offset (block->extruder, z, &current_proffset);  // ...and the extrusion profile offset calculated for the current z-depth;
+
+      sketch->offset.eval = current_proffset;
 
       gcode_util_get_sublist_snapshot (&offset_listhead, start_block, index_block);     // Another working snapshot is needed, so we can preserve 'sorted_list';
       gcode_util_convert_to_no_offset (offset_listhead);                        // Recalculate that snapshot with offsets included & link it to a zero offset;
@@ -950,29 +990,62 @@ gcode_sketch_make (gcode_block_t *block)
             sketch->offset.origin[0] += sketch->taper_offset[0];                // Anyway, the reason we can freely mess up the offset of the sketch is that
             sketch->offset.origin[1] += sketch->taper_offset[1];                // it is already applied for this round and will be recalculated in the next;
 
-            gcode_extrusion_evaluate_offset (block->extruder, z1, &sketch->offset.eval);
+            gcode_extrusion_evaluate_offset (block->extruder, z1, &maximum_proffset);
 
-            gcode_util_get_sublist_snapshot (&outer_offset_listhead, start_block, index_block); // Once the offset is ready, create another working snapshot;
-            gcode_util_convert_to_no_offset (outer_offset_listhead);            // Recalculate the snapshot with the new 'z1' offsets included & a zero offset;
-            gcode_util_remove_null_sections (&outer_offset_listhead);           // Just making sure nothing BECAME zero-sized by applying the offset;
+            sketch->offset.eval = maximum_proffset;
 
-            gcode_sketch_trim_intersections (outer_offset_listhead, closed);    // Find and trim intersecting primitives back to the intersection point;
-            gcode_sketch_insert_transitions (outer_offset_listhead, closed);    // Add transition arcs wherever connected endpoints were pulled apart;
+            if (fabs (maximum_proffset - current_proffset) > GCODE_PRECISION)   // If the current profile offset is equal to the largest profile offset,
+            {                                                                   // there is no need at all for the outer pass, it matches the inner one;
+              gcode_util_get_sublist_snapshot (&outer_offset_listhead, start_block, index_block);       // Once the offset is ready, create another working snapshot;
+              gcode_util_convert_to_no_offset (outer_offset_listhead);          // Recalculate the snapshot with the new 'z1' offsets included & a zero offset;
+              gcode_util_remove_null_sections (&outer_offset_listhead);         // Just making sure nothing BECAME zero-sized by applying the offset;
 
-            gcode_pocket_init (&inner_pocket, tool_radius);                     // Create two pockets, one for the inner contour, one for the outer;
-            gcode_pocket_init (&outer_pocket, tool_radius);
+              gcode_sketch_trim_intersections (outer_offset_listhead, closed);  // Find and trim intersecting primitives back to the intersection point;
+              gcode_sketch_insert_transitions (outer_offset_listhead, closed);  // Add transition arcs wherever connected endpoints were pulled apart;
 
-            gcode_pocket_prep (&inner_pocket, inner_offset_listhead, NULL);     // Create the inner pocket from the current 'z' depth contour / list;
-            gcode_pocket_prep (&outer_pocket, outer_offset_listhead, NULL);     // Create the outer pocket from the final 'z1' depth contour / list;
+              if (fabs (maximum_proffset - current_proffset) > tool->diameter)  // The thing is, if the current profile offset is less than a tool diameter
+              {                                                                 // away from the maximum profile offset, there is no need to pocket at all;
+                gcode_pocket_init (&inner_pocket, tool_radius);                 // Create two pockets, one for the inner contour, one for the outer;
+                gcode_pocket_init (&outer_pocket, tool_radius);
 
-            gcode_pocket_subtract (&outer_pocket, &inner_pocket);               // Subtract the inner pocket from the outer one,
-            gcode_pocket_make (&outer_pocket, block, z, touch_z, tool);         // and create the g-code resulting from what remains;
+                gcode_pocket_prep (&inner_pocket, inner_offset_listhead, NULL); // Create the inner pocket from the current 'z' depth contour / list;
+                gcode_pocket_prep (&outer_pocket, outer_offset_listhead, NULL); // Create the outer pocket from the final 'z1' depth contour / list;
 
-            gcode_pocket_free (&inner_pocket);                                  // The two pockets are no longer needed and can be disposed of;
-            gcode_pocket_free (&outer_pocket);
+                gcode_pocket_subtract (&outer_pocket, &inner_pocket);           // Subtract the inner pocket from the outer one,
+                gcode_pocket_make (&outer_pocket, block, z, touch_z, tool);     // and create the g-code resulting from what remains;
 
-            free (outer_offset_listhead->offset);                               // The specially created zero-offset of the list is no longer needed;
-            gcode_list_free (&outer_offset_listhead);                           // The pocket is done, we can get rid of the 'outer' / 'z1' list as well;
+                gcode_pocket_free (&inner_pocket);                              // The two pockets are no longer needed and can be disposed of;
+                gcode_pocket_free (&outer_pocket);
+              }
+
+              gcode_sketch_flip_direction (&outer_offset_listhead);             // Flip the outer contour in order to match the milling mode of the inner one;
+
+              outer_offset_listhead->ends (outer_offset_listhead, e0, e1, GCODE_GET_WITH_OFFSET);
+
+              GCODE_NEWLINE (block);
+
+              GCODE_COMMENT (block, "Secondary Contour Milling Phase");
+
+              GCODE_NEWLINE (block);
+
+              GCODE_MOVE_TO (block, e0[0], e0[1], z, safe_z, touch_z, tool, "start of contour");
+
+              index2_block = outer_offset_listhead;
+
+              while (index2_block)
+              {
+                index2_block->offset->z[0] = z;
+                index2_block->offset->z[1] = z;
+
+                index2_block->make (index2_block);
+                GCODE_APPEND (block, index2_block->code);
+
+                index2_block = index2_block->next;
+              }
+
+              free (outer_offset_listhead->offset);                             // The specially created zero-offset of the list is no longer needed;
+              gcode_list_free (&outer_offset_listhead);                         // The pocket is done, we can get rid of the 'outer' / 'z1' list as well;
+            }
 
             break;
           }
@@ -983,28 +1056,15 @@ gcode_sketch_make (gcode_block_t *block)
        * Pocketing is complete, get in position for the contour pass
        */
 
-      if (initial || !helical)                                                  // This applies on the first pass or if the path is not helical;
-      {
-        if (!initial && !closed)                                                // If this is NOT the first pass and the sketch is not closed,
-          GCODE_RETRACT (block, block->gcode->ztraverse);                       // raise to traverse height (since first pass begins retracted);
+      offset_listhead->ends (offset_listhead, e0, e1, GCODE_GET_WITH_OFFSET);   // Find again the starting point of the first block;
 
-        if (!initial)                                                           // Separate subsequent depth passes with a newline
-          GCODE_APPEND (block, "\n");
+      GCODE_NEWLINE (block);
 
-        offset_listhead->ends (offset_listhead, e0, e1, GCODE_GET_WITH_OFFSET); // Find again the starting point of the first block;
+      GCODE_COMMENT (block, "Primary Contour Milling Phase");
 
-        GCODE_2D_MOVE (block, e0[0], e0[1], "move to start");                   // Once found, move to that position then plunge;
+      GCODE_NEWLINE (block);
 
-        if (touch_z - z > GCODE_PRECISION)                                      // If the touch depth is above the target depth,
-          GCODE_PLUMMET (block, touch_z);                                       // fast dive to touch depth first;
-
-        GCODE_DESCEND (block, z, tool);                                         // Either way, proceed to target depth, but slooowly;
-      }
-      else
-      {
-        if (!initial)                                                           // Separate subsequent depth passes with a newline
-          GCODE_APPEND (block, "\n");
-      }
+      GCODE_MOVE_TO (block, e0[0], e0[1], z, safe_z, touch_z, tool, "start of contour");        // Go there (outputs nothing if already there);
 
       /**
        * Generate G-Code for each block primitive in a contour pass
@@ -1045,7 +1105,7 @@ gcode_sketch_make (gcode_block_t *block)
       }
 
       free (offset_listhead->offset);                                           // The specially created zero-offset is no longer needed;
-      gcode_list_free (&offset_listhead);                                       // This sub-chain has been drawn - get rid of the offset list;
+      gcode_list_free (&offset_listhead);                                       // This sub-chain has been milled - get rid of the offset list;
 
       initial = 0;                                                              // Further passes are not the 'first pass' any more;
       touch_z = z;                                                              // The current z depth is now the new boundary between air and material;
@@ -1061,7 +1121,7 @@ gcode_sketch_make (gcode_block_t *block)
     index_block = index_block->next;                                            // Move on to the next sub-chain: continue with the first 'unconnected' block;
   }
 
-  GCODE_RETRACT (block, block->gcode->ztraverse);                               // The entire sketch has been drawn - raise to traverse height;
+  GCODE_RETRACT (block, safe_z);                                                // The entire sketch has been milled - raise to traverse height;
 
   gcode_list_free (&sorted_listhead);                                           // Once the sketch is done, get rid of the sorted list;
 

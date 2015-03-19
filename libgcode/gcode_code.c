@@ -25,7 +25,7 @@
 void
 gcode_code_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_CODE, GCODE_FLAGS_LOCK);
 

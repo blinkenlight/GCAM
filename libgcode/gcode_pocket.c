@@ -53,8 +53,10 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *start_block, gcode_blo
 {
   gcode_block_t *index_block;
   gcode_tool_t *tool;
+  gcode_pocket_row_t *row;
   gfloat_t x_array[64], y;
   uint32_t x_index, i;
+  gfloat_t y_min, y_max;
 
   tool = gcode_tool_find (start_block);
 
@@ -65,15 +67,21 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *start_block, gcode_blo
    */
   pocket->row_num = (int)(1 + start_block->gcode->material_size[1] / pocket->resolution);
 
-  pocket->row_array = (gcode_pocket_row_t *) malloc (pocket->row_num * sizeof (gcode_pocket_row_t));
+  pocket->row_array = malloc (pocket->row_num * sizeof (gcode_pocket_row_t));
 
   pocket->row_num = 0;
 
-  for (y = -start_block->gcode->material_origin[1]; y <= start_block->gcode->material_size[1] - start_block->gcode->material_origin[1]; y += pocket->resolution)
+  y_min = 0.0 - start_block->gcode->material_origin[1];
+  y_max = y_min + start_block->gcode->material_size[1];
+
+  for (y = y_min; y <= y_max; y += pocket->resolution)
   {
-    pocket->row_array[pocket->row_num].line_array = (gcode_vec2d_t *)malloc (64 * sizeof (gcode_vec2d_t));
+    row = &pocket->row_array[pocket->row_num];
+
+    row->line_array = malloc (64 * sizeof (gcode_vec2d_t));
 
     x_index = 0;
+
     index_block = start_block;
 
     while (index_block != end_block)
@@ -85,7 +93,7 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *start_block, gcode_blo
     qsort (x_array, x_index, sizeof (gfloat_t), gcode_util_qsort_compare_asc);
     gcode_util_remove_duplicate_scalars (x_array, &x_index);
 
-    pocket->row_array[pocket->row_num].line_num = 0;
+    row->line_num = 0;
 
     /* Generate the Lines */
 
@@ -93,70 +101,53 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *start_block, gcode_blo
     {
       for (i = 0; i + 1 < x_index; i += 2)
       {
-        /**
-         * Avoid printing G-Code that does nothing.
-         * The blocks being evaluated have already had the offset applied.
-         * 2*tool diameter is the material that will be removed without pocketing.
-         * Do not worry about segments that are less than the tool diameter.
-         * It would be 2*tool diameter if offset had not already been applied.
-         *
-         * If two segments are adjacent then it's the result of a horizontal line,
-         * Throw away duplicate x values.
-         */
-
-        if (fabs (x_array[i + 1] - x_array[i]) > tool->diameter)
-        {
-          /**
-           * Nudge the pocket lines in by 10% of the tool diameter so that
-           * the final pass that does the perimeter leaves a better finish
-           */
-          pocket->row_array[pocket->row_num].line_array[pocket->row_array[pocket->row_num].line_num][0] = x_array[i] + 0.1 * tool->diameter;
-          pocket->row_array[pocket->row_num].line_array[pocket->row_array[pocket->row_num].line_num][1] = x_array[i + 1] - 0.1 * tool->diameter;
-          pocket->row_array[pocket->row_num].line_num++;
-          pocket->seg_num++;
-        }
+        row->line_array[row->line_num][0] = x_array[i];
+        row->line_array[row->line_num][1] = x_array[i + 1];
+        row->line_num++;
+        pocket->seg_num++;
       }
     }
 
-    pocket->row_array[pocket->row_num].y = y;
+    row->y = y;
+
     pocket->row_num++;
   }
 }
 
 void
-gcode_pocket_make (gcode_pocket_t *pocket, gcode_block_t *block, gfloat_t depth, gfloat_t rapid_depth, gcode_tool_t *tool)
+gcode_pocket_make (gcode_pocket_t *pocket, gcode_block_t *block, gfloat_t depth, gfloat_t touch_z, gcode_tool_t *tool)
 {
-  int i, j, row, first_cut;
-  char string[256];
+  gcode_pocket_row_t *row;
+  gfloat_t padding;
+  int i, j;
 
-  /* Return if no pocketing is to occur */
-  if (pocket->seg_num == 0)
+  padding = tool->diameter * PADDING_FRACTION;
+
+  if (pocket->seg_num == 0)                                                     // Return if no pocketing is to occur
     return;
 
-  first_cut = 1;
+  GCODE_NEWLINE (block);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_COMMENT (block, "Preliminary Pocket Milling Phase");
 
-  gsprintf (string, block->gcode->decimals, "Pass depth: %z", depth);
-  GCODE_COMMENT (block, string);
-
-  GCODE_APPEND (block, "\n");
-
-  row = 0;
+  GCODE_NEWLINE (block);
 
   for (i = 0; i < pocket->row_num; i++)
   {
+    row = &pocket->row_array[i];
+
     /* Zig Zag */
     if (i % 2)
     {
       /* Right to Left */
-      for (j = pocket->row_array[i].line_num - 1; j >= 0; j--)
+      for (j = row->line_num - 1; j >= 0; j--)
       {
-        if (fabs (pocket->row_array[i].line_array[j][0] - pocket->row_array[i].line_array[j][1]) < tool->diameter)
+        if (fabs (row->line_array[j][0] - row->line_array[j][1]) < tool->diameter)
           continue;
 
         /**
-         * This retract exists because it is not guaranteed that the next pass of the zig-zag will not remove material that should remain, e.g.
+         * This retract exists because it is not guaranteed that the next pass 
+         * of the zig-zag will not remove material that should remain, e.g.
          * +---------------+
          * +---*********---+
          * +------***------+
@@ -164,42 +155,46 @@ gcode_pocket_make (gcode_pocket_t *pocket, gcode_block_t *block, gfloat_t depth,
          * +---------------+
          * where "*" is the path of the end-mill.
          */
+
         GCODE_RETRACT (block, block->gcode->ztraverse);
 
-        GCODE_2D_MOVE (block, pocket->row_array[i].line_array[j][1], pocket->row_array[i].y, "");
+        GCODE_2D_MOVE (block, row->line_array[j][1] - padding, row->y, "");
 
-        /* Only rapid plunge if depth is lower than rapid_depth */
-        if (rapid_depth >= depth - GCODE_PRECISION)
+        if (touch_z >= depth)
         {
-          GCODE_PLUMMET (block, rapid_depth);
+          GCODE_PLUMMET (block, touch_z);
         }
 
         GCODE_DESCEND (block, depth, tool);
 
-        GCODE_2D_LINE (block, pocket->row_array[i].line_array[j][0], pocket->row_array[i].y, "");
+        GCODE_2D_LINE (block, row->line_array[j][0] + padding, row->y, "");
       }
     }
     else
     {
       /* Left to Right */
-      for (j = 0; j < pocket->row_array[i].line_num; j++)
+      for (j = 0; j < row->line_num; j++)
       {
-        if (fabs (pocket->row_array[i].line_array[j][0] - pocket->row_array[i].line_array[j][1]) < tool->diameter)
+        if (fabs (row->line_array[j][0] - row->line_array[j][1]) < tool->diameter)
           continue;
 
-        /* This retract exists because it is not guaranteed that the next pass of the zig-zag will not remove material that should remain. */
+        /**
+         * This retract exists because it is not guaranteed that the next pass
+         *  of the zig-zag will not remove material that should remain.
+         */
+
         GCODE_RETRACT (block, block->gcode->ztraverse);
 
-        GCODE_2D_MOVE (block, pocket->row_array[i].line_array[j][0], pocket->row_array[i].y, "");
+        GCODE_2D_MOVE (block, row->line_array[j][0] + padding, row->y, "");
 
-        if (rapid_depth >= depth - GCODE_PRECISION)
+        if (touch_z >= depth)
         {
-          GCODE_PLUMMET (block, rapid_depth);
+          GCODE_PLUMMET (block, touch_z);
         }
 
         GCODE_DESCEND (block, depth, tool);
 
-        GCODE_2D_LINE (block, pocket->row_array[i].line_array[j][1], pocket->row_array[i].y, "");
+        GCODE_2D_LINE (block, row->line_array[j][1] - padding, row->y, "");
       }
     }
   }
@@ -210,19 +205,24 @@ gcode_pocket_make (gcode_pocket_t *pocket, gcode_block_t *block, gfloat_t depth,
 void
 gcode_pocket_subtract (gcode_pocket_t *pocket_a, gcode_pocket_t *pocket_b)
 {
+  gcode_pocket_row_t *row_a;
+  gcode_pocket_row_t *row_b;
   int i, j, k, l;
 
   for (i = 0; i < pocket_a->row_num; i++)
   {
-    for (j = 0; j < pocket_a->row_array[i].line_num; j++)
-    {
-      /**
-       * Compare each line in pocket_a with each line in pocket_b.
-       * If there is an overlap of a line from pocket_b with a line in pocket_a
-       * then subtract it from pocket_a.
-       */
+    row_a = &pocket_a->row_array[i];
+    row_b = &pocket_b->row_array[i];
 
-      for (k = 0; k < pocket_b->row_array[i].line_num; k++)
+    /**
+     * Compare each line in pocket_a with each line in pocket_b.
+     * If there is an overlap of a line from pocket_b with a line in pocket_a
+     * then subtract it from pocket_a.
+     */
+
+    for (j = 0; j < row_a->line_num; j++)
+    {
+      for (k = 0; k < row_b->line_num; k++)
       {
         /**
          * CASE 1: *---+---+---*   contained within (or complete overlap)
@@ -231,42 +231,42 @@ gcode_pocket_subtract (gcode_pocket_t *pocket_a, gcode_pocket_t *pocket_b)
          * Where '*' is pocket_a and '+' is pocket_b.
          */
 
-        if (pocket_b->row_array[i].line_array[k][0] + GCODE_PRECISION >= pocket_a->row_array[i].line_array[j][0] &&
-            pocket_b->row_array[i].line_array[k][0] - GCODE_PRECISION <= pocket_a->row_array[i].line_array[j][1] &&
-            pocket_b->row_array[i].line_array[k][1] + GCODE_PRECISION >= pocket_a->row_array[i].line_array[j][0] &&
-            pocket_b->row_array[i].line_array[k][1] - GCODE_PRECISION <= pocket_a->row_array[i].line_array[j][1])
+        if (row_b->line_array[k][0] + GCODE_PRECISION >= row_a->line_array[j][0] &&
+            row_b->line_array[k][0] - GCODE_PRECISION <= row_a->line_array[j][1] &&
+            row_b->line_array[k][1] + GCODE_PRECISION >= row_a->line_array[j][0] &&
+            row_b->line_array[k][1] - GCODE_PRECISION <= row_a->line_array[j][1])
         {
           /* CASE 1: split into 2 lines, shift all lines up one, insert new line into free slot */
-          for (l = pocket_a->row_array[i].line_num - 1; l > j; l--)
+          for (l = row_a->line_num - 1; l > j; l--)
           {
-            pocket_a->row_array[i].line_array[l + 1][0] = pocket_a->row_array[i].line_array[l][0];
-            pocket_a->row_array[i].line_array[l + 1][1] = pocket_a->row_array[i].line_array[l][1];
+            row_a->line_array[l + 1][0] = row_a->line_array[l][0];
+            row_a->line_array[l + 1][1] = row_a->line_array[l][1];
           }
 
           /* Line j is now a free slot, everything has been shifted up 1 slot */
-          pocket_a->row_array[i].line_array[j + 1][0] = pocket_b->row_array[i].line_array[k][1];
-          pocket_a->row_array[i].line_array[j + 1][1] = pocket_a->row_array[i].line_array[j][1];
+          row_a->line_array[j + 1][0] = row_b->line_array[k][1];
+          row_a->line_array[j + 1][1] = row_a->line_array[j][1];
 
           /* trim existing line to beginning of overlapping line */
-          pocket_a->row_array[i].line_array[j][1] = pocket_b->row_array[i].line_array[k][0];
+          row_a->line_array[j][1] = row_b->line_array[k][0];
 
           /* Increment the number of lines */
-          pocket_a->row_array[i].line_num++;
+          row_a->line_num++;
 
           /* Increment to newly created line */
           j++;
         }
-        else if (pocket_b->row_array[i].line_array[k][0] > pocket_a->row_array[i].line_array[j][0] &&
-                 pocket_b->row_array[i].line_array[k][0] < pocket_a->row_array[i].line_array[j][1])
+        else if (row_b->line_array[k][0] > row_a->line_array[j][0] &&
+                 row_b->line_array[k][0] < row_a->line_array[j][1])
         {
           /* CASE 2 */
-          pocket_a->row_array[i].line_array[j][1] = pocket_b->row_array[i].line_array[k][0];
+          row_a->line_array[j][1] = row_b->line_array[k][0];
         }
-        else if (pocket_b->row_array[i].line_array[k][1] > pocket_a->row_array[i].line_array[j][0] &&
-                 pocket_b->row_array[i].line_array[k][1] < pocket_a->row_array[i].line_array[j][1])
+        else if (row_b->line_array[k][1] > row_a->line_array[j][0] &&
+                 row_b->line_array[k][1] < row_a->line_array[j][1])
         {
           /* CASE 3 */
-          pocket_a->row_array[i].line_array[j][0] = pocket_b->row_array[i].line_array[k][1];
+          row_a->line_array[j][0] = row_b->line_array[k][1];
         }
       }
     }

@@ -28,7 +28,7 @@ gcode_point_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
   gcode_point_t *point;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_POINT, 0);
 

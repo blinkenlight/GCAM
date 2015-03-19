@@ -129,7 +129,7 @@ gui_settings_read (gui_settings_t *settings)
 
   fseek (fh, 0, SEEK_END);
   length = ftell (fh);
-  buffer = (char *)malloc (length);
+  buffer = malloc (length);
   fseek (fh, 0, SEEK_SET);
   nomore = fread (buffer, 1, length, fh);
 

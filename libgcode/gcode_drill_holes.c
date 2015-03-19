@@ -37,7 +37,7 @@ gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pa
 {
   gcode_drill_holes_t *drill_holes;
 
-  *block = (gcode_block_t *)malloc (sizeof (gcode_block_t));
+  *block = malloc (sizeof (gcode_block_t));
 
   gcode_internal_init (*block, gcode, parent, GCODE_TYPE_DRILL_HOLES, 0);
 
@@ -146,7 +146,7 @@ gcode_drill_holes_make (gcode_block_t *block)
     index_block = index_block->next;
   }
 
-  hole_sort_array = (hole_sort_t *) malloc (hole_num * sizeof (hole_sort_t));
+  hole_sort_array = malloc (hole_num * sizeof (hole_sort_t));
 
   i = 0;
   index_block = block->listhead;
@@ -165,20 +165,20 @@ gcode_drill_holes_make (gcode_block_t *block)
     index_block = index_block->next;
   }
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   sprintf (string, "DRILL HOLES: %s", block->comment);
   GCODE_COMMENT (block, string);
 
-  GCODE_APPEND (block, "\n");
+  GCODE_NEWLINE (block);
 
   if (drill_holes->increment <= GCODE_PRECISION)                                // Start of pecking cycle (G83);
   {
-    GCODE_DRILL (block, "G83", drill_holes->depth, 0.1 * tool->feed, block->gcode->ztraverse);
+    GCODE_DRILL (block, "G83", drill_holes->depth, tool->feed * tool->plunge_ratio, block->gcode->ztraverse);
   }
   else
   {
-    GCODE_Q_DRILL (block, "G83", drill_holes->depth, 0.1 * tool->feed, block->gcode->ztraverse, drill_holes->increment);
+    GCODE_Q_DRILL (block, "G83", drill_holes->depth, tool->feed * tool->plunge_ratio, block->gcode->ztraverse, drill_holes->increment);
   }
 
   if (drill_holes->optimal_path)
@@ -236,6 +236,8 @@ gcode_drill_holes_make (gcode_block_t *block)
       index_block = index_block->next;
     }
   }
+
+  GCODE_RETRACT (block, block->gcode->ztraverse);                               // Pull back up when done;
 
   GCODE_COMMAND (block, "G80", "end canned cycle");                             // End of canned cycle (G80)
 

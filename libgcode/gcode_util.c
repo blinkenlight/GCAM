@@ -156,6 +156,33 @@ gcode_util_remove_comment (char *string)
 }
 
 void
+gcode_util_filter_newlines (char *string)
+{
+  uint32_t i, j;
+
+  i = j = 0;
+
+  while (string[j] != '\0')                                                     // Only loop as long as string[j] is not the terminating null;
+  {                                                                             // If so, string[j+1] must still be part of the string, null included;
+    if ((string[j] == '\n') && (string[j + 1] == '\n'))                         // If both string[j] and string[j+1] are newlines, are there more?
+    {                                                                           // If so, string[j+2] must ALSO be part of the string, null included;
+      while (string[j + 2] == '\n')                                             // That means we may test it, and as long as there are further newlines
+        j++;                                                                    // past the first two, we keep dropping chars - that means when we stop
+    }                                                                           // skipping there will be exactly two newlines left to copy, not more;
+
+    if (j > i)
+    {
+      string[i] = string[j];
+    }
+
+    i++;
+    j++;
+  }
+
+  string[i] = '\0';
+}
+
+void
 gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num)
 {
   int32_t i, j, num2;
@@ -1073,7 +1100,7 @@ gcode_util_convert_to_no_offset (gcode_block_t *listhead)
   if (!listhead)
     return (1);
 
-  zero_offset = (gcode_offset_t *) malloc (sizeof (gcode_offset_t));
+  zero_offset = malloc (sizeof (gcode_offset_t));
   zero_offset->side = listhead->offset->side;
   zero_offset->tool = 0.0;
   zero_offset->eval = 0.0;

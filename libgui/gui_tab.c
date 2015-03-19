@@ -111,7 +111,7 @@ gui_tab_begin (gui_t *gui, gcode_block_t *block)
 
   begin = (gcode_begin_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (3 * sizeof (GtkWidget *));
   row = 0;
 
   begin_tab = gtk_frame_new ("Begin Parameters");
@@ -199,7 +199,7 @@ gui_tab_end (gui_t *gui, gcode_block_t *block)
 
   end = (gcode_end_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (6 * sizeof (GtkWidget *));
+  wlist = malloc (6 * sizeof (GtkWidget *));
   row = 0;
 
   end_tab = gtk_frame_new ("End Parameters");
@@ -420,7 +420,7 @@ gui_tab_line (gui_t *gui, gcode_block_t *block)
 
   line = (gcode_line_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (8 * sizeof (GtkWidget *));
+  wlist = malloc (8 * sizeof (GtkWidget *));
   row = 0;
 
   line_tab = gtk_frame_new ("Line Parameters");
@@ -809,7 +809,7 @@ gui_tab_arc (gui_t *gui, gcode_block_t *block)
   gcode_arc_ends (block, p0, p1, GCODE_GET);
   gcode_arc_center (block, center, GCODE_GET);
 
-  wlist = (GtkWidget **)malloc (25 * sizeof (GtkWidget *));
+  wlist = malloc (25 * sizeof (GtkWidget *));
   row = 0;
 
   wlist[0] = (GtkWidget *)gui;
@@ -1216,7 +1216,7 @@ gui_tab_bolt_holes (gui_t *gui, gcode_block_t *block)
 
   bolt_holes = (gcode_bolt_holes_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (12 * sizeof (GtkWidget *));
+  wlist = malloc (12 * sizeof (GtkWidget *));
 
   bolt_holes_tab = gtk_frame_new ("Bolt Holes Parameters");
   g_signal_connect (bolt_holes_tab, "destroy", G_CALLBACK (generic_destroy_callback), wlist);
@@ -1391,7 +1391,7 @@ gui_tab_drill_holes (gui_t *gui, gcode_block_t *block)
 
   drill_holes = (gcode_drill_holes_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
+  wlist = malloc (5 * sizeof (GtkWidget *));
 
   drill_holes_tab = gtk_frame_new ("Drill Holes Parameters");
   g_signal_connect (drill_holes_tab, "destroy", G_CALLBACK (generic_destroy_callback), wlist);
@@ -1485,7 +1485,7 @@ gui_tab_point (gui_t *gui, gcode_block_t *block)
 
   point = (gcode_point_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+  wlist = malloc (4 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -1578,7 +1578,7 @@ gui_tab_template (gui_t *gui, gcode_block_t *block)
 
   template = (gcode_template_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
+  wlist = malloc (5 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -1712,7 +1712,7 @@ gui_tab_sketch (gui_t *gui, gcode_block_t *block)
 
   sketch = (gcode_sketch_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (7 * sizeof (GtkWidget *));
+  wlist = malloc (7 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -1857,7 +1857,7 @@ gui_tab_extrusion (gui_t *gui, gcode_block_t *block)
 
   extrusion = (gcode_extrusion_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (4 * sizeof (GtkWidget *));
+  wlist = malloc (4 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -2020,7 +2020,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
 
   tool = (gcode_tool_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (11 * sizeof (GtkWidget *));
+  wlist = malloc (11 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -2254,7 +2254,7 @@ gui_tab_image (gui_t *gui, gcode_block_t *block)
 
   image = (gcode_image_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (5 * sizeof (GtkWidget *));
+  wlist = malloc (5 * sizeof (GtkWidget *));
 
   row = 0;
 
@@ -2351,7 +2351,7 @@ gui_tab_stl (gui_t *gui, gcode_block_t *block)
 
   stl = (gcode_stl_t *)block->pdata;
 
-  wlist = (GtkWidget **)malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (3 * sizeof (GtkWidget *));
 
   row = 0;
 

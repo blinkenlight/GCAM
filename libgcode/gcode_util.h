@@ -30,6 +30,7 @@ void gcode_util_xml_cpysafe (char *safestring, char *string);
 int gcode_util_qsort_compare_asc (const void *a, const void *b);
 void gcode_util_remove_spaces (char *string);
 void gcode_util_remove_comment (char *string);
+void gcode_util_filter_newlines (char *string);
 void gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num);
 void gcode_util_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 int gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip_array[2], int *ip_num);
