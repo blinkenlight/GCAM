@@ -49,49 +49,61 @@ static void
 start (void *data, const char *xmlelem, const char **xmlattr)
 {
   gui_endmill_list_t *endmill_list;
+  gui_endmill_t *new_endmill;
   char tag[256], name[256];
   char *value;
   int i;
 
   endmill_list = (gui_endmill_list_t *)data;
 
-  strcpy (tag, xmlelem);
+  strncpy (tag, xmlelem, sizeof (tag));
+
+  tag[sizeof (tag) - 1] = '\0';
+
   strswp (tag, '_', '-');
 
   if (strcmp (tag, GCODE_XML_TAG_ENDMILL) == 0)
   {
     endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->number + 1) * sizeof (gui_endmill_t));
-    strcpy (endmill_list->endmill[endmill_list->number].description, "");
+
+    new_endmill = &endmill_list->endmill[endmill_list->number];
+
+    strcpy (new_endmill->description, "");
 
     for (i = 0; xmlattr[i]; i += 2)
     {
-      strcpy (name, xmlattr[i]);
+      strncpy (name, xmlattr[i], sizeof (name));
+
+      name[sizeof (name) - 1] = '\0';
+
       strswp (name, '_', '-');
 
       value = (char *)xmlattr[i + 1];
 
       if (strcmp (name, GCODE_XML_ATTR_ENDMILL_NUMBER) == 0)
       {
-        endmill_list->endmill[endmill_list->number].number = (uint8_t)atoi (value);
+        new_endmill->number = (uint8_t)atoi (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DIAMETER) == 0)
       {
-        endmill_list->endmill[endmill_list->number].diameter = atof (value);
+        new_endmill->diameter = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_UNIT) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_INCH) == 0)
         {
-          endmill_list->endmill[endmill_list->number].unit = GCODE_UNITS_INCH;
+          new_endmill->unit = GCODE_UNITS_INCH;
         }
         else if (strcmp (value, GCODE_XML_VAL_ENDMILL_UNIT_MILLIMETER) == 0)
         {
-          endmill_list->endmill[endmill_list->number].unit = GCODE_UNITS_MILLIMETER;
+          new_endmill->unit = GCODE_UNITS_MILLIMETER;
         }
       }
       else if (strcmp (name, GCODE_XML_ATTR_ENDMILL_DESCRIPTION) == 0)
       {
-        strcpy (endmill_list->endmill[endmill_list->number].description, value);
+        strncpy (new_endmill->description, value, sizeof (new_endmill->description));
+
+        new_endmill->description[sizeof (new_endmill->description) - 1] = '\0';
       }
     }
 

@@ -49,40 +49,52 @@ static void
 start (void *data, const char *xmlelem, const char **xmlattr)
 {
   gui_machine_list_t *machine_list;
+  gui_machine_t *new_machine;
   char tag[256], name[256];
   char *value;
   int i;
 
   machine_list = (gui_machine_list_t *)data;
 
-  strcpy (tag, xmlelem);
+  strncpy (tag, xmlelem, sizeof (tag));
+
+  tag[sizeof (tag) - 1] = '\0';
+
   strswp (tag, '_', '-');
 
   if (strcmp (tag, GCODE_XML_TAG_MACHINE) == 0)
   {
     machine_list->machine = realloc (machine_list->machine, (machine_list->number + 1) * sizeof (gui_machine_t));
-    strcpy (machine_list->machine[machine_list->number].name, "");
 
-    machine_list->machine[machine_list->number].travel[0] = 0.0;
-    machine_list->machine[machine_list->number].travel[1] = 0.0;
-    machine_list->machine[machine_list->number].travel[2] = 0.0;
+    new_machine = &machine_list->machine[machine_list->number];
 
-    machine_list->machine[machine_list->number].maxipm[0] = 0.0;
-    machine_list->machine[machine_list->number].maxipm[1] = 0.0;
-    machine_list->machine[machine_list->number].maxipm[2] = 0.0;
+    strcpy (new_machine->name, "");
 
-    machine_list->machine[machine_list->number].options = 0;
+    new_machine->travel[0] = 0.0;
+    new_machine->travel[1] = 0.0;
+    new_machine->travel[2] = 0.0;
+
+    new_machine->maxipm[0] = 0.0;
+    new_machine->maxipm[1] = 0.0;
+    new_machine->maxipm[2] = 0.0;
+
+    new_machine->options = 0;
 
     for (i = 0; xmlattr[i]; i += 2)
     {
-      strcpy (name, xmlattr[i]);
+      strncpy (name, xmlattr[i], sizeof (name));
+
+      name[sizeof (name) - 1] = '\0';
+
       strswp (name, '_', '-');
 
       value = (char *)xmlattr[i + 1];
 
       if (strcmp (name, GCODE_XML_ATTR_MACHINE_NAME) == 0)
       {
-        strcpy (machine_list->machine[machine_list->number].name, value);
+        strncpy (new_machine->name, value, sizeof (new_machine->name));
+
+        new_machine->name[sizeof (new_machine->name) - 1] = '\0';
       }
     }
   }
@@ -90,56 +102,61 @@ start (void *data, const char *xmlelem, const char **xmlattr)
   if ((strcmp (tag, GCODE_XML_TAG_MACHINE_SETTING) == 0) ||
       (strcmp (tag, GCODE_XML_TAG_MACHINE_PROPERTY) == 0))
   {
+    new_machine = &machine_list->machine[machine_list->number];
+
     for (i = 0; xmlattr[i]; i += 2)
     {
-      strcpy (name, xmlattr[i]);
+      strncpy (name, xmlattr[i], sizeof (name));
+
+      name[sizeof (name) - 1] = '\0';
+
       strswp (name, '_', '-');
 
       value = (char *)xmlattr[i + 1];
 
       if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_X) == 0)
       {
-        machine_list->machine[machine_list->number].travel[0] = atof (value);
+        new_machine->travel[0] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_Y) == 0)
       {
-        machine_list->machine[machine_list->number].travel[1] = atof (value);
+        new_machine->travel[1] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_Z) == 0)
       {
-        machine_list->machine[machine_list->number].travel[2] = atof (value);
+        new_machine->travel[2] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_X) == 0)
       {
-        machine_list->machine[machine_list->number].maxipm[0] = atof (value);
+        new_machine->maxipm[0] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_Y) == 0)
       {
-        machine_list->machine[machine_list->number].maxipm[1] = atof (value);
+        new_machine->maxipm[1] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_Z) == 0)
       {
-        machine_list->machine[machine_list->number].maxipm[2] = atof (value);
+        new_machine->maxipm[2] = atof (value);
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_SPINDLE_CONTROL) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
-          machine_list->machine[machine_list->number].options |= GCODE_MACHINE_OPTION_SPINDLE_CONTROL;
+          new_machine->options |= GCODE_MACHINE_OPTION_SPINDLE_CONTROL;
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TOOL_CHANGE) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_PROPERTY_AUTO) == 0)
-          machine_list->machine[machine_list->number].options |= GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE;
+          new_machine->options |= GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE;
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_HOME_SWITCHES) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
-          machine_list->machine[machine_list->number].options |= GCODE_MACHINE_OPTION_HOME_SWITCHES;
+          new_machine->options |= GCODE_MACHINE_OPTION_HOME_SWITCHES;
       }
       else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_COOLANT) == 0)
       {
         if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
-          machine_list->machine[machine_list->number].options |= GCODE_MACHINE_OPTION_COOLANT;
+          new_machine->options |= GCODE_MACHINE_OPTION_COOLANT;
       }
     }
   }
@@ -153,7 +170,10 @@ end (void *data, const char *xmlelem)
 
   machine_list = (gui_machine_list_t *)data;
 
-  strcpy (tag, xmlelem);
+  strncpy (tag, xmlelem, sizeof (tag));
+
+  tag[sizeof (tag) - 1] = '\0';
+
   strswp (tag, '_', '-');
 
   if (strcmp (tag, GCODE_XML_TAG_MACHINE) == 0)

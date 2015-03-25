@@ -2009,8 +2009,10 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   GtkWidget *coolant_check_button;
   gcode_t *gcode;
   gcode_tool_t *tool;
+  char string[256];
   uint16_t row;
   int selind;
+  int i;
 
   /**
    * Tool Parameters
@@ -2037,39 +2039,32 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   gtk_container_set_border_width (GTK_CONTAINER (tool_table), 4);
   gtk_container_add (GTK_CONTAINER (alignment), tool_table);
 
+  label = gtk_label_new ("End Mill");
+  gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 2, row, row + 1);
+  row++;
+
+  end_mill_combo = gtk_combo_box_new_text ();
+  selind = -1;
+
+  for (i = 0; i < gui->endmills.number; i++)
   {
-    char string[32];
-    int i;
-
-    label = gtk_label_new ("End Mill");
-    gtk_table_attach_defaults (GTK_TABLE (tool_table), label, 0, 2, row, row + 1);
-    row++;
-
-    end_mill_combo = gtk_combo_box_new_text ();
-    selind = -1;
-
-    for (i = 0; i < gui->endmills.number; i++)
-    {
-      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
-        selind = i;
-
-      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
-      gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
-    }
-
-    if (selind == -1)
-    {
-      sprintf (string, "#%.2d - %s", tool->number, tool->label);
-      gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+    if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
       selind = i;
-    }
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), selind);
-
-    g_signal_connect (end_mill_combo, "changed", G_CALLBACK (tool_update_callback), wlist);
-    gtk_table_attach_defaults (GTK_TABLE (tool_table), end_mill_combo, 0, 2, row, row + 1);
+    sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+    gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
   }
 
+  if (selind == -1)
+  {
+    sprintf (string, "#%.2d - %s", tool->number, tool->label);
+    gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+    selind = i;
+  }
+
+  gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), selind);
+  g_signal_connect (end_mill_combo, "changed", G_CALLBACK (tool_update_callback), wlist);
+  gtk_table_attach_defaults (GTK_TABLE (tool_table), end_mill_combo, 0, 2, row, row + 1);
   row++;
 
   label = gtk_label_new ("Feed Rate");

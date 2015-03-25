@@ -51,14 +51,20 @@ start (void *data, const char *xmlelem, const char **xmlattr)
 
   settings = (gui_settings_t *)data;
 
-  strcpy (tag, xmlelem);
+  strncpy (tag, xmlelem, sizeof (tag));
+
+  tag[sizeof (tag) - 1] = '\0';
+
   strswp (tag, '_', '-');
 
   if (strcmp (tag, GCODE_XML_TAG_SETTING) == 0)
   {
     for (i = 0; xmlattr[i]; i += 2)
     {
-      strcpy (name, xmlattr[i]);
+      strncpy (name, xmlattr[i], sizeof (name));
+
+      name[sizeof (name) - 1] = '\0';
+
       strswp (name, '_', '-');
 
       value = (char *)xmlattr[i + 1];
