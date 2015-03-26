@@ -56,31 +56,31 @@ begin_update_callback (GtkWidget *widget, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
-  if (strcmp (text_field, "None") == 0)
+  if (strstr (text_field, "None"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_NONE;
   }
-  else if (strcmp (text_field, "Workspace 1 (G54)") == 0)
+  else if (strstr (text_field, "Workspace 1"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE1;
   }
-  else if (strcmp (text_field, "Workspace 2 (G55)") == 0)
+  else if (strstr (text_field, "Workspace 2"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE2;
   }
-  else if (strcmp (text_field, "Workspace 3 (G56)") == 0)
+  else if (strstr (text_field, "Workspace 3"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE3;
   }
-  else if (strcmp (text_field, "Workspace 4 (G57)") == 0)
+  else if (strstr (text_field, "Workspace 4"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE4;
   }
-  else if (strcmp (text_field, "Workspace 5 (G58)") == 0)
+  else if (strstr (text_field, "Workspace 5"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE5;
   }
-  else if (strcmp (text_field, "Workspace 6 (G59)") == 0)
+  else if (strstr (text_field, "Workspace 6"))
   {
     begin->coordinate_system = GCODE_BEGIN_COORDINATE_SYSTEM_WORKSPACE6;
   }
@@ -1969,13 +1969,13 @@ tool_update_callback (GtkWidget *widget, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[8]));
 
-  if (strcmp (text_field, "100%") == 0)
+  if (strstr (text_field, "100%"))
     tool->plunge_ratio = 1.0;
-  else if (strcmp (text_field, "50%") == 0)
+  else if (strstr (text_field, "50%"))
     tool->plunge_ratio = 0.5;
-  else if (strcmp (text_field, "20%") == 0)
+  else if (strstr (text_field, "20%"))
     tool->plunge_ratio = 0.2;
-  else if (strcmp (text_field, "10%") == 0)
+  else if (strstr (text_field, "10%"))
     tool->plunge_ratio = 0.1;
 
   g_free (text_field);

@@ -26,12 +26,6 @@
 #include "gcode_tool.h"
 #include "gcode.h"
 
-typedef struct hole_sort_s
-{
-  gcode_vec2d_t p;
-  int used;
-} hole_sort_t;
-
 void
 gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
 {
@@ -107,13 +101,13 @@ void
 gcode_drill_holes_make (gcode_block_t *block)
 {
   gcode_drill_holes_t *drill_holes;
-  gcode_point_t *point;
-  gcode_block_t *index_block;
   gcode_tool_t *tool;
-  gcode_vec2d_t xform_pt;
-  hole_sort_t *hole_sort_array;
-  gfloat_t nearest_dist, dist;
-  int hole_num, nearest_ind, i, j, last_nearest_ind = 0;
+  gcode_block_t *sorted_listhead;
+  gcode_block_t *index_block, *index2_block;
+  gcode_block_t *best_block, *next_block;
+  gcode_vec2d_t p, p2;
+  gfloat_t safe_z, touch_z, target_z, z;
+  gfloat_t best_dist, dist;
   char string[256];
 
   GCODE_CLEAR (block);                                                          // Clean up the g-code string of this block to an empty string;
@@ -126,44 +120,22 @@ gcode_drill_holes_make (gcode_block_t *block)
 
   drill_holes = (gcode_drill_holes_t *)block->pdata;                            // Get a reference to the data struct of the drill_holes;
 
-  tool = gcode_tool_find (block);                                               // Find the tool that applies to this block;
+  tool = gcode_tool_find (block);                                               // Find the tool that applies to this block; 
 
   if (!tool)                                                                    // If there is none, this block will not get made - bail out;
     return;
+
+  sorted_listhead = NULL;
 
   drill_holes->offset.origin[0] = block->offset->origin[0];                     // Inherit the offset of the parent by copying it into this block's offset;
   drill_holes->offset.origin[1] = block->offset->origin[1];
   drill_holes->offset.rotation = block->offset->rotation;
 
-  hole_num = 0;
-  index_block = block->listhead;
+  safe_z = block->gcode->ztraverse;                                             // This is just a short-hand for the traverse z...
 
-  while (index_block)                                                           // Count total number of drill holes
-  {
-    if (!(index_block->flags & GCODE_FLAGS_SUPPRESS))
-      hole_num++;
+  touch_z = block->gcode->material_origin[2];                                   // Track the depth the material begins at (gets lower after every pass);
 
-    index_block = index_block->next;
-  }
-
-  hole_sort_array = malloc (hole_num * sizeof (hole_sort_t));
-
-  i = 0;
-  index_block = block->listhead;
-
-  while (index_block)                                                           // Populate array with all drill hole data
-  {
-    if (!(index_block->flags & GCODE_FLAGS_SUPPRESS))
-    {
-      gcode_point_with_offset (index_block, hole_sort_array[i].p);
-
-      hole_sort_array[i].used = 0;
-
-      i++;
-    }
-
-    index_block = index_block->next;
-  }
+  target_z = drill_holes->depth;                                                // Another shorthand for the depth of the holes...
 
   GCODE_NEWLINE (block);
 
@@ -172,78 +144,140 @@ gcode_drill_holes_make (gcode_block_t *block)
 
   GCODE_NEWLINE (block);
 
-  if (drill_holes->increment <= GCODE_PRECISION)                                // Start of pecking cycle (G83);
+  if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
   {
-    GCODE_DRILL (block, "G83", drill_holes->depth, tool->feed * tool->plunge_ratio, block->gcode->ztraverse);
+    if (drill_holes->increment <= GCODE_PRECISION)                              // Start of peck drilling cycle (G83);
+    {
+      GCODE_DRILL (block, "G83", target_z, tool->feed * tool->plunge_ratio, safe_z);
+    }
+    else
+    {
+      GCODE_Q_DRILL (block, "G83", target_z, tool->feed * tool->plunge_ratio, safe_z, drill_holes->increment);
+    }
   }
-  else
-  {
-    GCODE_Q_DRILL (block, "G83", drill_holes->depth, tool->feed * tool->plunge_ratio, block->gcode->ztraverse, drill_holes->increment);
-  }
+
+  index_block = block->listhead;
 
   if (drill_holes->optimal_path)
   {
-    /* Choose the first point in the list as the initial point */
-    hole_sort_array[0].used = 1;
+    gcode_util_get_sublist_snapshot (&sorted_listhead, index_block, NULL);
 
-    xform_pt[0] = hole_sort_array[0].p[0];
-    xform_pt[1] = hole_sort_array[0].p[1];
+    index_block = sorted_listhead;
 
-    GCODE_XY_PAIR (block, xform_pt[0], xform_pt[1], "drill hole");
-
-    for (j = 1; j < hole_num; j++)
+    while (index_block->next)
     {
-      nearest_ind = 0;
-
-      /* Cycle through hole indices not already evaluated */
-      for (i = 0; i < hole_num; i++)
+      if (index_block->flags & GCODE_FLAGS_SUPPRESS)
       {
-        /* Hole is not already used */
-        if (hole_sort_array[i].used == 0)
-        {
-          dist = GCODE_MATH_2D_DISTANCE (hole_sort_array[last_nearest_ind].p, hole_sort_array[i].p);
+        index_block = index_block->next;
 
-          if ((dist < nearest_dist) || !nearest_ind)
-          {
-            nearest_dist = dist;
-            nearest_ind = i;
-          }
-        }
+        continue;
       }
 
-      hole_sort_array[nearest_ind].used = 1;
-      last_nearest_ind = nearest_ind;
+      gcode_point_with_offset (index_block, p);
 
-      xform_pt[0] = hole_sort_array[nearest_ind].p[0];
-      xform_pt[1] = hole_sort_array[nearest_ind].p[1];
+      best_block = NULL;
 
-      GCODE_XY_PAIR (block, xform_pt[0], xform_pt[1], "drill hole");
-    }
-  }
-  else
-  {
-    index_block = block->listhead;
+      index2_block = index_block->next;
 
-    while (index_block)
-    {
-      if (!(index_block->flags & GCODE_FLAGS_SUPPRESS))
+      while (index2_block)
       {
-        gcode_point_with_offset (index_block, xform_pt);
+        if (index2_block->flags & GCODE_FLAGS_SUPPRESS)
+        {
+          index2_block = index2_block->next;
 
-        GCODE_XY_PAIR (block, xform_pt[0], xform_pt[1], index_block->comment);
+          continue;
+        }
+
+        gcode_point_with_offset (index2_block, p2);
+
+        dist = GCODE_MATH_2D_DISTANCE (p, p2);
+
+        if (dist < GCODE_PRECISION)
+        {
+          next_block = index2_block->next;
+
+          gcode_remove_and_destroy (index2_block);
+
+          index2_block = next_block;
+
+          continue;
+        }
+
+        if ((dist < best_dist) || (!best_block))
+        {
+          best_dist = dist;
+
+          best_block = index2_block;
+        }
+
+        index2_block = index2_block->next;
+      }
+
+      if (best_block)
+      {
+        gcode_place_block_behind (index_block, best_block);
       }
 
       index_block = index_block->next;
     }
+
+    index_block = sorted_listhead;
   }
 
-  GCODE_RETRACT (block, block->gcode->ztraverse);                               // Pull back up when done;
+  while (index_block)
+  {
+    if (index_block->flags & GCODE_FLAGS_SUPPRESS)
+    {
+      index_block = index_block->next;
 
-  GCODE_COMMAND (block, "G80", "end canned cycle");                             // End of canned cycle (G80)
+      continue;
+    }
 
-  GCODE_F_VALUE (block, tool->feed, "restore feed rate");
+    gcode_point_with_offset (index_block, p);
 
-  free (hole_sort_array);
+    if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
+    {
+      GCODE_XY_PAIR (block, p[0], p[1], index_block->comment);
+    }
+    else
+    {
+      if (drill_holes->increment < GCODE_PRECISION)
+        z = target_z;
+      else if (touch_z - target_z > drill_holes->increment)
+        z = touch_z - drill_holes->increment;
+      else
+        z = target_z;
+
+      GCODE_MOVE_TO (block, p[0], p[1], z, safe_z, touch_z, tool, index_block->comment);
+
+      while (z > target_z)
+      {
+        GCODE_RETRACT (block, safe_z);
+        GCODE_PLUMMET (block, 0.95 * z);
+
+        if (z - target_z > drill_holes->increment)
+          z = z - drill_holes->increment;
+        else
+          z = target_z;
+
+        GCODE_DESCEND (block, z, tool);
+      }
+
+      GCODE_RETRACT (block, safe_z);
+    }
+
+    index_block = index_block->next;
+  }
+
+  if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
+  {
+    GCODE_COMMAND (block, "G80", "end canned cycle");                           // End of canned cycle (G80)
+    GCODE_F_VALUE (block, tool->feed, "restore feed rate");
+  }
+
+  GCODE_RETRACT (block, safe_z);                                                // Pull back up when done;
+
+  gcode_list_free (&sorted_listhead);
 }
 
 void

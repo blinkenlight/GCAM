@@ -175,9 +175,16 @@ gcode_bolt_holes_make (gcode_block_t *block)
   bolt_holes->offset.side = -1.0;                                               // The offset side is always "inside" (it matters for tapered extrusions);
   bolt_holes->offset.tool = tool_radius;                                        // Making very much depends on the tool size - set it up;
 
+  safe_z = block->gcode->ztraverse;                                             // This is just a short-hand for the traverse z...
+
+  touch_z = block->gcode->material_origin[2];                                   // Track the depth the material begins at (gets lower after every pass);
+
   if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)      // Start of drill cycle (G81 - if the tool can create the holes by drilling);
   {
-    GCODE_DRILL (block, "G81", z1, tool->feed * tool->plunge_ratio, block->gcode->ztraverse);
+    if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
+    {
+      GCODE_DRILL (block, "G81", z1, tool->feed * tool->plunge_ratio, safe_z);
+    }
   }
 
   number = 1;                                                                   // Astonishingly, human beings tend to start counting from "1", not "0"...
@@ -193,7 +200,15 @@ gcode_bolt_holes_make (gcode_block_t *block)
         gcode_arc_center (index_block, cp, GCODE_GET_WITH_OFFSET);              // Get the (offset) position of the center of this arc / hole;
 
         sprintf (string, "hole #%d", number);
-        GCODE_XY_PAIR (block, cp[0], cp[1], string);                            // Punch out a "canned" hole at the position of the center;
+
+        if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)             // If "canned" cycles are allowed,
+        {
+          GCODE_XY_PAIR (block, cp[0], cp[1], string);                          // punch out a "canned" hole at the position of the center;
+        }
+        else                                                                    // If they are not, emulate them with simple motions;
+        {
+          GCODE_MOVE_TO (block, cp[0], cp[1], z1, safe_z, touch_z, tool, string);
+        }
       }
     }
     else                                                                        // If the tool cannot drill this hole, mill it out instead;
@@ -207,16 +222,12 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
       initial = 1;                                                              // For the first pass (whether it is a 'zero pass' or not) this stays true;
 
-      safe_z = block->gcode->ztraverse;                                         // This is just a short-hand for the traverse z...
-
-      touch_z = block->gcode->material_origin[2];                               // Track the depth the material begins at (gets lower after every pass);
-
       if (z0 - z1 > extrusion->resolution)                                      // Start one step deeper than z0 if the total depth is larger than one step;
         z = z0 - extrusion->resolution;
       else                                                                      // If even a single step would be too deep, start the pass at z1 instead;
         z = z1;
 
-      GCODE_RETRACT (block, block->gcode->ztraverse);                           // Retract - should already be retracted, but here for safety reasons.
+      GCODE_RETRACT (block, safe_z);                                            // Retract - should already be retracted, but here for safety reasons.
 
       while (z >= z1)                                                           // Loop on the current hole, creating one pass depth per loop;
       {
@@ -255,9 +266,7 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
         GCODE_NEWLINE (block);
 
-        GCODE_MOVE_TO (block, e0[0], e0[1], z, safe_z, touch_z, tool, "start of contour");
-
-        GCODE_2D_MOVE (block, e0[0], e0[1], "move to start");                   // Once found, move to that position then plunge;
+        GCODE_MOVE_TO (block, e0[0], e0[1], z, safe_z, touch_z, tool, "start of contour");      // Once found, move to that position then plunge;
 
         offset_block->offset->z[0] = z;                                         // Thankfully, this is the trivial part - everything happens at 'z';
         offset_block->offset->z[1] = z;
@@ -279,7 +288,7 @@ gcode_bolt_holes_make (gcode_block_t *block)
           break;
       }
 
-      GCODE_RETRACT (block, block->gcode->ztraverse);                           // Pull back up when done;
+      GCODE_RETRACT (block, safe_z);                                            // Pull back up when done;
     }
 
     number++;                                                                   // Count the completed hole;
@@ -289,11 +298,13 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)      // End of canned cycle (G80)
   {
-    GCODE_RETRACT (block, block->gcode->ztraverse);                             // Pull back up when done;
+    if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
+    {
+      GCODE_COMMAND (block, "G80", "end canned cycle");
+      GCODE_F_VALUE (block, tool->feed, "normal feed rate");
+    }
 
-    GCODE_COMMAND (block, "G80", "end canned cycle");
-
-    GCODE_F_VALUE (block, tool->feed, "normal feed rate");
+    GCODE_RETRACT (block, safe_z);                                              // Pull back up when done;
   }
 
   bolt_holes->offset.side = 0.0;                                                // Not of any importance strictly speaking (anywhere these actually matter they

@@ -84,6 +84,9 @@
 #define GCODE_FLAGS_LOCK              0x01
 #define GCODE_FLAGS_SUPPRESS          0x02
 
+#define GCODE_DRILLING_CANNED         0x00
+#define GCODE_DRILLING_SIMPLE         0x01
+
 /* *INDENT-OFF* */
 
 enum
@@ -331,6 +334,8 @@ typedef struct gcode_s
 
   uint8_t machine_options;
 
+  uint8_t drilling_motion;
+
   uint32_t decimals;                                                            // Number of decimal places to print
 
   uint32_t project_number;                                                      // For Haas Machines only
@@ -416,13 +421,18 @@ void strswp (char *target, char oldchar, char newchar);
           GCODE_APPEND (_block, " "); }
 
 #define GCODE_COMMENT(_block, _comment) { \
+        char _buffer[256]; \
         char _string[256]; \
         if (*_comment) \
         { \
+          strncpy (_buffer, _comment, 200); \
+          _buffer[200] = '\0'; \
+          strswp (_buffer, '(', '['); \
+          strswp (_buffer, ')', ']'); \
           if (_block->gcode->driver == GCODE_DRIVER_TURBOCNC) \
-            sprintf (_string, "; %s\n", _comment); \
+            sprintf (_string, "; %s\n", _buffer); \
           else \
-            sprintf (_string, "(%s)\n", _comment); \
+            sprintf (_string, "(%s)\n", _buffer); \
         } \
         else \
         { \

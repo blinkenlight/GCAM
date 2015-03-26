@@ -81,7 +81,7 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
-  if (strcmp (text_field, "inch") == 0)
+  if (strstr (text_field, "inch"))
     chosen_unit = GCODE_UNITS_INCH;
   else
     chosen_unit = GCODE_UNITS_MILLIMETER;
@@ -90,23 +90,23 @@ new_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
 
-  if (strcmp (text_field, "aluminium") == 0)
+  if (strstr (text_field, "aluminium"))
   {
     material_type = GCODE_MATERIAL_ALUMINUM;
   }
-  else if (strcmp (text_field, "foam") == 0)
+  else if (strstr (text_field, "foam"))
   {
     material_type = GCODE_MATERIAL_FOAM;
   }
-  else if (strcmp (text_field, "plastic") == 0)
+  else if (strstr (text_field, "plastic"))
   {
     material_type = GCODE_MATERIAL_PLASTIC;
   }
-  else if (strcmp (text_field, "steel") == 0)
+  else if (strstr (text_field, "steel"))
   {
     material_type = GCODE_MATERIAL_STEEL;
   }
-  else if (strcmp (text_field, "wood") == 0)
+  else if (strstr (text_field, "wood"))
   {
     material_type = GCODE_MATERIAL_WOOD;
   }
@@ -760,19 +760,33 @@ export_gcode_on_assistant_apply (GtkWidget *assistant, gpointer data)
   gui = (gui_t *)wlist[0];
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[1]));
-  gui->gcode.project_number = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
 
-  if (strcmp (text_field, "LinuxCNC") == 0)
+  if (strstr (text_field, "LinuxCNC"))
   {
     gui->gcode.driver = GCODE_DRIVER_LINUXCNC;
   }
-  else if (strcmp (text_field, "TurboCNC") == 0)
+  else if (strstr (text_field, "TurboCNC"))
   {
     gui->gcode.driver = GCODE_DRIVER_TURBOCNC;
   }
-  else if (strcmp (text_field, "Haas") == 0)
+  else if (strstr (text_field, "Haas"))
   {
     gui->gcode.driver = GCODE_DRIVER_HAAS;
+  }
+
+  g_free (text_field);
+
+  gui->gcode.project_number = (uint32_t)gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[2]));
+
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+
+  if (strstr (text_field, "Canned"))
+  {
+    gui->gcode.drilling_motion = GCODE_DRILLING_CANNED;
+  }
+  else if (strstr (text_field, "Simple"))
+  {
+    gui->gcode.drilling_motion = GCODE_DRILLING_SIMPLE;
   }
 
   g_free (text_field);
@@ -831,15 +845,15 @@ export_format_changed_callback (GtkWidget *widget, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[1]));
 
-  if (strcmp (text_field, "EMC") == 0)
+  if (strstr (text_field, "EMC"))
   {
     gtk_widget_set_sensitive (wlist[2], 0);
   }
-  else if (strcmp (text_field, "TurboCNC") == 0)
+  else if (strstr (text_field, "TurboCNC"))
   {
     gtk_widget_set_sensitive (wlist[2], 0);
   }
-  else if (strcmp (text_field, "Haas") == 0)
+  else if (strstr (text_field, "Haas"))
   {
     gtk_widget_set_sensitive (wlist[2], 1);
   }
@@ -855,6 +869,7 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
   GtkWidget *label;
   GtkWidget *export_format_combo;
   GtkWidget *project_number_spin;
+  GtkWidget *drilling_motion_combo;
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
@@ -862,7 +877,7 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
 
   gui = (gui_t *)wlist[0];
 
-  table = gtk_table_new (2, 2, FALSE);
+  table = gtk_table_new (3, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
@@ -889,8 +904,27 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
 
   g_signal_connect_swapped (project_number_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
+  label = gtk_label_new ("Drill Using");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
+
+  drilling_motion_combo = gtk_combo_box_new_text ();
+  gtk_combo_box_append_text (GTK_COMBO_BOX (drilling_motion_combo), "Canned cycles (G8x)");
+  gtk_combo_box_append_text (GTK_COMBO_BOX (drilling_motion_combo), "Simple motion (G0x)");
+  gtk_combo_box_set_active (GTK_COMBO_BOX (drilling_motion_combo), 0);
+  gtk_table_attach (GTK_TABLE (table), drilling_motion_combo, 1, 2, 2, 3, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  if (gui->gcode.drilling_motion == GCODE_DRILLING_CANNED)
+  {
+    gtk_combo_box_set_active (GTK_COMBO_BOX (drilling_motion_combo), 0);
+  }
+  else if (gui->gcode.drilling_motion == GCODE_DRILLING_SIMPLE)
+  {
+    gtk_combo_box_set_active (GTK_COMBO_BOX (drilling_motion_combo), 1);
+  }
+
   wlist[1] = export_format_combo;
   wlist[2] = project_number_spin;
+  wlist[3] = drilling_motion_combo;
 
   gtk_widget_set_sensitive (project_number_spin, 0);
 
@@ -930,7 +964,7 @@ gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = malloc (3 * sizeof (GtkWidget *));
+  wlist = malloc (4 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 

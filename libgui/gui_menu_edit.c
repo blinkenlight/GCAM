@@ -1095,7 +1095,7 @@ update_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
-  if (strcmp (text_field, "inch") == 0)
+  if (strstr (text_field, "inch"))
     chosen_unit = GCODE_UNITS_INCH;
   else
     chosen_unit = GCODE_UNITS_MILLIMETER;
@@ -1110,23 +1110,23 @@ update_project_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
 
-  if (strcmp (text_field, "aluminium") == 0)
+  if (strstr (text_field, "aluminium"))
   {
     material_type = GCODE_MATERIAL_ALUMINUM;
   }
-  else if (strcmp (text_field, "foam") == 0)
+  else if (strstr (text_field, "foam"))
   {
     material_type = GCODE_MATERIAL_FOAM;
   }
-  else if (strcmp (text_field, "plastic") == 0)
+  else if (strstr (text_field, "plastic"))
   {
     material_type = GCODE_MATERIAL_PLASTIC;
   }
-  else if (strcmp (text_field, "steel") == 0)
+  else if (strstr (text_field, "steel"))
   {
     material_type = GCODE_MATERIAL_STEEL;
   }
-  else if (strcmp (text_field, "wood") == 0)
+  else if (strstr (text_field, "wood"))
   {
     material_type = GCODE_MATERIAL_WOOD;
   }

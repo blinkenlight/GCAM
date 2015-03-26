@@ -68,7 +68,7 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
-  if (strcmp (text_field, "inch") == 0)
+  if (strstr (text_field, "inch"))
     chosen_unit = GCODE_UNITS_INCH;
   else
     chosen_unit = GCODE_UNITS_MILLIMETER;

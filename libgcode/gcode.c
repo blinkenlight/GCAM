@@ -893,6 +893,8 @@ gcode_init (gcode_t *gcode)
 
   strcpy (gcode->machine_name, "");
 
+  gcode->drilling_motion = GCODE_DRILLING_CANNED;
+
   gcode->machine_options = 0;
   gcode->decimals = 5;
   gcode->project_number = 0;
