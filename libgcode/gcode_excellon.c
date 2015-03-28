@@ -314,10 +314,10 @@ gcode_excellon_import (gcode_block_t *template_block, char *filename)
                 tool->number = tool_set[tool_index].number;                     // Technically, the tool HAS a number but it doesn't match the project toolset;
                 tool->prompt = 1;
 
-                snprintf (tool_block->comment, 32, "%.4f drill (imported T%d)", tool->diameter, tool->number);
-                snprintf (tool->label, 32, "%.4f drill (imported T%d)", tool->diameter, tool->number);
-                tool_block->comment[31] = 0;                                    // About that 'snprintf' - what do you think happens when 'diameter' ends up having
-                tool->label[31] = 0;                                            // 300 digits because, say, you tried to select a tool that was never defined...?!?
+                snprintf (tool_block->comment, sizeof (tool_block->comment), "%.4f drill (imported T%d)", tool->diameter, tool->number);
+                snprintf (tool->label, sizeof (tool->label), "%.4f drill (imported T%d)", tool->diameter, tool->number);
+                tool_block->comment[sizeof (tool_block->comment) - 1] = '\0';   // About that 'snprintf' - what do you think happens when 'diameter' ends up having
+                tool->label[sizeof (tool->label) - 1] = '\0';                   // 300 digits because, say, you tried to select a tool that was never defined...?!?
 
                 gcode_append_as_listtail (template_block, tool_block);          // Append 'tool_block' to the end of 'template_block's list (as head if the list is NULL)
                 gcode_append_as_listtail (template_block, drill_block);         // Append 'drill_block' to the end of 'template_block's list (as head if the list is NULL)
