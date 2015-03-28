@@ -21,6 +21,7 @@
  */
 
 #include "gui_endmills.h"
+#include "gui_define.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <libgen.h>
@@ -69,6 +70,12 @@ start (void *data, const char *xmlelem, const char **xmlattr)
     new_endmill = &endmill_list->endmill[endmill_list->number];
 
     strcpy (new_endmill->description, "");
+
+    new_endmill->number = 0;
+    new_endmill->diameter = 0.0;
+    new_endmill->unit = DEF_UNITS;
+
+    new_endmill->origin = GUI_ENDMILL_INTERNAL;
 
     for (i = 0; xmlattr[i]; i += 2)
     {
@@ -204,13 +211,13 @@ gui_endmills_size (gui_endmill_t *endmill, uint8_t unit)
 }
 
 gui_endmill_t *
-gui_endmills_find (gui_endmill_list_t *endmill_list, char *endmill_name, uint8_t fallback)
+gui_endmills_find (gui_endmill_list_t *endmill_list, char *description, uint8_t fallback)
 {
   int i;
 
   for (i = 0; i < endmill_list->number; i++)
   {
-    if (strcmp (endmill_name, endmill_list->endmill[i].description) == 0)
+    if (strcmp (description, endmill_list->endmill[i].description) == 0)
     {
       return (&endmill_list->endmill[i]);
     }
@@ -220,4 +227,53 @@ gui_endmills_find (gui_endmill_list_t *endmill_list, char *endmill_name, uint8_t
     return (&endmill_list->endmill[0]);
 
   return (NULL);
+}
+
+void
+gui_endmills_tack (gui_endmill_list_t *endmill_list, uint8_t number, gfloat_t diameter, uint8_t unit, char *description)
+{
+  gui_endmill_t *new_endmill;
+
+  endmill_list->endmill = realloc (endmill_list->endmill, (endmill_list->number + 1) * sizeof (gui_endmill_t));
+
+  new_endmill = &endmill_list->endmill[endmill_list->number];
+
+  strncpy (new_endmill->description, description, sizeof (new_endmill->description));
+
+  new_endmill->description[sizeof (new_endmill->description) - 1] = '\0';
+
+  new_endmill->number = number;
+  new_endmill->diameter = diameter;
+  new_endmill->unit = unit;
+
+  new_endmill->origin = GUI_ENDMILL_EXTERNAL;
+
+  endmill_list->number++;
+}
+
+void
+gui_endmills_cull (gui_endmill_list_t *endmill_list)
+{
+  gui_endmill_t *endmill;
+  int count;
+  int i;
+
+  count = 0;
+
+  for (i = 0; i < endmill_list->number; i++)
+    if (endmill_list->endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      count++;
+
+  endmill = malloc (count * sizeof (gui_endmill_t));
+
+  count = 0;
+
+  for (i = 0; i < endmill_list->number; i++)
+    if (endmill_list->endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      memcpy (&endmill[count++], &endmill_list->endmill[i], sizeof (gui_endmill_t));
+
+  free (endmill_list->endmill);
+
+  endmill_list->endmill = endmill;
+  endmill_list->number = count;
 }

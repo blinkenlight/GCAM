@@ -687,6 +687,37 @@ gui_renumber_whole_tree (gui_t *gui)
 }
 
 /**
+ * Recursively crawl the list of 'block' and add any new tools to the tool list
+ */
+
+void
+gui_collect_endmills_of (gui_t *gui, gcode_block_t *block)
+{
+  gcode_block_t *index_block;
+  gcode_tool_t *tool;
+
+  if (block)
+    index_block = block->listhead;
+  else
+    index_block = gui->gcode.listhead;
+
+  while (index_block)
+  {
+    if (index_block->type == GCODE_TYPE_TOOL)
+    {
+      tool = (gcode_tool_t *)index_block->pdata;
+
+      if (!gui_endmills_find (&gui->endmills, tool->label, FALSE))
+        gui_endmills_tack (&gui->endmills, tool->number, tool->diameter, gui->gcode.units, tool->label);
+    }
+
+    gui_collect_endmills_of (gui, index_block);
+
+    index_block = index_block->next;
+  }
+}
+
+/**
  * Recursively crawl the GTK tree until the iter associated with 'block' is found
  */
 

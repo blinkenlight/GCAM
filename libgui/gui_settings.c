@@ -21,6 +21,7 @@
  */
 
 #include "gui_settings.h"
+#include "gui_define.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <libgen.h>

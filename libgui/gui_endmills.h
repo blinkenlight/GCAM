@@ -25,6 +25,9 @@
 
 #include "gcode.h"
 
+#define GUI_ENDMILL_INTERNAL   0x0
+#define GUI_ENDMILL_EXTERNAL   0x1
+
 static const char *GCODE_XML_ENDMILLS_FILENAME = "endmills.xml";
 
 static const char *GCODE_XML_TAG_ENDMILL = "endmill";
@@ -43,6 +46,7 @@ typedef struct gui_endmill_s
   uint8_t number;
   gfloat_t diameter;
   uint8_t unit;
+  uint8_t origin;
   char description[64];
 } gui_endmill_t;
 
@@ -56,6 +60,8 @@ void gui_endmills_init (gui_endmill_list_t *endmill_list);
 void gui_endmills_free (gui_endmill_list_t *endmill_list);
 int gui_endmills_read (gui_endmill_list_t *endmill_list);
 gfloat_t gui_endmills_size (gui_endmill_t *endmill, uint8_t unit);
-gui_endmill_t *gui_endmills_find (gui_endmill_list_t *endmill_list, char *endmill_name, uint8_t fallback);
+gui_endmill_t *gui_endmills_find (gui_endmill_list_t *endmill_list, char *description, uint8_t fallback);
+void gui_endmills_tack (gui_endmill_list_t *endmill_list, uint8_t number, gfloat_t diameter, uint8_t unit, char *description);
+void gui_endmills_cull (gui_endmill_list_t *endmill_list);
 
 #endif

@@ -41,6 +41,7 @@ void gui_recreate_subtree_of (gui_t *gui, GtkTreeIter *iter);
 void gui_recreate_whole_tree (gui_t *gui);
 void gui_renumber_subtree_of (gui_t *gui, GtkTreeIter *iter);
 void gui_renumber_whole_tree (gui_t *gui);
+void gui_collect_endmills_of (gui_t *gui, gcode_block_t *block);
 void get_selected_block (gui_t *gui, gcode_block_t **selected_block, GtkTreeIter *iter);
 void set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter);
 void set_selected_row_with_block (gui_t *gui, gcode_block_t *block);

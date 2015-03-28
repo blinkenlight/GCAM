@@ -1939,27 +1939,37 @@ tool_update_callback (GtkWidget *widget, gpointer data)
   block = (gcode_block_t *)wlist[1];
   tool = (gcode_tool_t *)block->pdata;
 
+  /**
+   * Highly questionable (but workable) hack: while attempting to identify the
+   * item selected in the combo box, attempt to strip the embellishments that
+   * were added constructing the combo box (the "Txx - " part) by passing the
+   * address OF THE SIXTH CHARACTER, NOT THE ADDRESS WHERE THE STRING BEGINS;
+   * This will break if the combo label format ever deviates from the current.
+   */
+
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
-  strcpy (tool->label, &text_field[6]);
+
+  endmill = gui_endmills_find (&gui->endmills, &text_field[6], FALSE);
+
+  if (endmill)
+  {
+    strncpy (tool->label, endmill->description, sizeof (tool->label));
+    tool->label[sizeof (tool->label) - 1] = '\0';
+
+    tool->diameter = gui_endmills_size (endmill, gui->gcode.units);
+    tool->number = endmill->number;
+  }
+
   g_free (text_field);
-
-  endmill = gui_endmills_find (&gui->endmills, tool->label, TRUE);
-
-  tool->diameter = gui_endmills_size (endmill, gui->gcode.units);
-  tool->number = endmill->number;
 
   tool->feed = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[4]));
 
-  if (strcmp (text_field, "On") == 0)
-  {
+  if (strstr (text_field, "On"))
     tool->prompt = 1;
-  }
-  else if (strcmp (text_field, "Off") == 0)
-  {
+  else if (strstr (text_field, "Off"))
     tool->prompt = 0;
-  }
 
   g_free (text_field);
 
@@ -2011,6 +2021,7 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   gcode_tool_t *tool;
   char string[256];
   uint16_t row;
+  int boxind;
   int selind;
   int i;
 
@@ -2044,25 +2055,50 @@ gui_tab_tool (gui_t *gui, gcode_block_t *block)
   row++;
 
   end_mill_combo = gtk_combo_box_new_text ();
+
+  /* Should not be needed, but we rely on being able to find this tool later */
+
+  if (!gui_endmills_find (&gui->endmills, tool->label, FALSE))
+    gui_endmills_tack (&gui->endmills, tool->number, tool->diameter, gui->gcode.units, tool->label);
+
   selind = -1;
+  boxind = 0;
+
+  /* No matter of actual order, internal tools get listed first */
 
   for (i = 0; i < gui->endmills.number; i++)
   {
-    if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
-      selind = i;
+    if (gui->endmills.endmill[i].origin == GUI_ENDMILL_INTERNAL)
+    {
+      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+      gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
 
-    sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
-    gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
+        selind = boxind;
+
+      boxind++;
+    }
   }
 
-  if (selind == -1)
+  /* Any external (imported) tools get listed at the end */
+
+  for (i = 0; i < gui->endmills.number; i++)
   {
-    sprintf (string, "#%.2d - %s", tool->number, tool->label);
-    gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
-    selind = i;
+    if (gui->endmills.endmill[i].origin == GUI_ENDMILL_EXTERNAL)
+    {
+      sprintf (string, "#%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+      gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+
+      if (strcmp (tool->label, gui->endmills.endmill[i].description) == 0)
+        selind = boxind;
+
+      boxind++;
+    }
   }
 
-  gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), selind);
+  if (selind != -1)
+    gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), selind);
+
   g_signal_connect (end_mill_combo, "changed", G_CALLBACK (tool_update_callback), wlist);
   gtk_table_attach_defaults (GTK_TABLE (tool_table), end_mill_combo, 0, 2, row, row + 1);
   row++;

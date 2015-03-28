@@ -337,8 +337,11 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
     for (i = 0; i < gui->endmills.number; i++)
     {
-      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
-      gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+      if (gui->endmills.endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      {
+        sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+        gtk_combo_box_append_text (GTK_COMBO_BOX (end_mill_combo), string);
+      }
     }
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (end_mill_combo), 0);
@@ -495,6 +498,8 @@ gui_menu_file_load_project_menuitem_callback (GtkWidget *widget, gpointer data)
 
       gcode_prep (&gui->gcode);
 
+      gui_collect_endmills_of (gui, NULL);
+
       gui_show_project (gui);
 
       update_project_modified_flag (gui, 0);
@@ -635,6 +640,9 @@ close_callback (GtkDialog *dialog, gint response, gpointer data)
   }
 
   gcode_free (&gui->gcode);
+
+  /* Eliminate external endmills */
+  gui_endmills_cull (&gui->endmills);
 
   /* Refresh G-Code Block Tree */
   gui_recreate_whole_tree (gui);
@@ -1074,6 +1082,8 @@ import_gcam_block_callback (GtkWidget *widget, gpointer data)
   gcode_free ((gcode_t *)wlist[3]);                                             // Free the graphic context;
   free (wlist[3]);
   free (wlist);
+
+  gui_collect_endmills_of (gui, NULL);                                          // Add any newly imported tools to the tool list;
 
   update_project_modified_flag (gui, 1);                                        // Finally, mark the project as 'changed'.
 }
@@ -1775,8 +1785,11 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
 
     for (i = 0; i < gui->endmills.number; i++)
     {
-      sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
-      gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), string);
+      if (gui->endmills.endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      {
+        sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+        gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), string);
+      }
     }
 
     gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
@@ -2080,6 +2093,8 @@ gui_menu_file_import_excellon_menuitem_callback (GtkWidget *widget, gpointer dat
     gui_opengl_build_gridxz_display_list (&gui->opengl);
 
     gcode_prep (&gui->gcode);
+
+    gui_collect_endmills_of (gui, NULL);                                        // Add any newly imported tools to the tool list;
 
     gui->opengl.rebuild_view_display_list = 1;
     gui_opengl_context_redraw (&gui->opengl, selected_block);
