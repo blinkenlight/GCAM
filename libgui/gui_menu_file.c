@@ -449,6 +449,12 @@ gui_menu_file_load_project_menuitem_callback (GtkWidget *widget, gpointer data)
                                         NULL);
 
   filter = gtk_file_filter_new ();
+  gtk_file_filter_set_name (filter, "GCAM project (*.gcam,*.gcamx)");
+  gtk_file_filter_add_pattern (filter, "*.gcam");
+  gtk_file_filter_add_pattern (filter, "*.gcamx");
+  gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (dialog), filter);
+
+  filter = gtk_file_filter_new ();
   gtk_file_filter_set_name (filter, "GCAM binary (*.gcam)");
   gtk_file_filter_add_pattern (filter, "*.gcam");
   gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (dialog), filter);
@@ -557,6 +563,12 @@ gui_menu_file_save_project_as_menuitem_callback (GtkWidget *widget, gpointer dat
 
   sprintf (proposed_filename, "%s.gcam", gui->gcode.name);
   gtk_file_chooser_set_current_name (GTK_FILE_CHOOSER (dialog), proposed_filename);
+
+  filter = gtk_file_filter_new ();
+  gtk_file_filter_set_name (filter, "GCAM project (*.gcam,*.gcamx)");
+  gtk_file_filter_add_pattern (filter, "*.gcam");
+  gtk_file_filter_add_pattern (filter, "*.gcamx");
+  gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (dialog), filter);
 
   filter = gtk_file_filter_new ();
   gtk_file_filter_set_name (filter, "GCAM binary (*.gcam)");
@@ -1222,6 +1234,12 @@ gui_menu_file_import_gcam_menuitem_callback (GtkWidget *widget, gpointer data)
                                         GTK_STOCK_OPEN,
                                         GTK_RESPONSE_ACCEPT,
                                         NULL);
+
+  filter = gtk_file_filter_new ();
+  gtk_file_filter_set_name (filter, "GCAM project (*.gcam,*.gcamx)");
+  gtk_file_filter_add_pattern (filter, "*.gcam");
+  gtk_file_filter_add_pattern (filter, "*.gcamx");
+  gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (dialog), filter);
 
   filter = gtk_file_filter_new ();
   gtk_file_filter_set_name (filter, "GCAM binary (*.gcam)");
