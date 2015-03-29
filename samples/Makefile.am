@@ -21,7 +21,7 @@
 gcamfilesdir = $(pkgdatadir)/samples
 dist_gcamfiles_DATA = \
 	board_layout.gbr \
-	board_drill.cnc \
+	board_drill.drl \
 	continuity.gcam \
 	fish.gcam \
 	hub.gcam \
