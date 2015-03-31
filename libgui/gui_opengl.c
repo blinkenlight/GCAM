@@ -725,7 +725,7 @@ gui_opengl_context_redraw (gui_opengl_t *opengl, gcode_block_t *block)
             glTranslatef (-opengl->views[view].pos[0], -opengl->views[view].pos[1], -opengl->views[view].pos[2]);
 
             draw_XY_grid (opengl);
-            draw_top_level_blocks (opengl, block->parent);
+            draw_top_level_blocks (opengl, block);
           }
         }
 
