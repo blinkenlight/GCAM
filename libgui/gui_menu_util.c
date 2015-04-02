@@ -266,6 +266,7 @@ GtkTreeIter
 insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block, GtkTreeIter *target_iter, int insert_spot)
 {
   GtkTreeModel *model;
+  GtkTreePath *path;
   GtkTreeIter parent_iter, new_iter;
 
   if (!block)                                                                   // If 'block' is NULL, abort;
@@ -352,9 +353,13 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
       set_tangent_to_previous (block);
 
     if (gtk_tree_model_iter_parent (model, &parent_iter, &new_iter))
-      gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (model, &parent_iter));
+    {
+      path = gtk_tree_model_get_path (model, &parent_iter);
 
-    update_menu_by_selected_item (gui, block);
+      gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
+
+      gtk_tree_path_free (path);
+    }
 
     gui_renumber_whole_tree (gui);
 
@@ -779,7 +784,31 @@ get_selected_block (gui_t *gui, gcode_block_t **selected_block, GtkTreeIter *ite
 void
 set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
 {
+  GtkTreeModel *model;
+  GtkTreePath *path;
+  gcode_block_t *block;
+  GValue value = { 0, };
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  path = gtk_tree_model_get_path (model, iter);
+
+  gtk_tree_model_get_value (model, iter, 5, &value);                            // Using the iter, we can fetch the content of the fifth column of that row,
+  block = (gcode_block_t *)g_value_get_pointer (&value);                        // to retrieve the pointer to the associated block;
+  g_value_unset (&value);
+
+  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
+
   gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), iter);
+
+  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), path, NULL, TRUE, 0.0, 0.0);
+
+  gtk_tree_path_free (path);
+
+  update_menu_by_selected_item (gui, block);
+
+  gui->opengl.rebuild_view_display_list = 1;
+  gui_opengl_context_redraw (&gui->opengl, block);
 }
 
 /**
@@ -790,6 +819,7 @@ void
 set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
 {
   GtkTreeModel *model;
+  GtkTreePath *path;
   GtkTreeIter iter, found_iter;
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
@@ -798,11 +828,15 @@ set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
 
   find_tree_row_iter_with_block (gui, model, &iter, &found_iter, block);
 
-  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (model, &found_iter));
+  path = gtk_tree_model_get_path (model, &found_iter);
+
+  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
 
   gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), &found_iter);
 
-  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (model, &found_iter), NULL, TRUE, 0.0, 0.0);
+  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), path, NULL, TRUE, 0.0, 0.0);
+
+  gtk_tree_path_free (path);
 
   update_menu_by_selected_item (gui, block);
 
