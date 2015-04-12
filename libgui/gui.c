@@ -41,87 +41,40 @@
 gui_t gui;
 
 static void
-comment_cell_edited (GtkCellRendererText *cell,
-                     const gchar *path_string,
-                     const gchar *new_text,
-                     gpointer data)
+gcode_tree_cursor_changed_event (GtkTreeView *treeview, gpointer data)
 {
-  GtkTreeModel *model = (GtkTreeModel *)data;
-  GtkTreePath *path = gtk_tree_path_new_from_string (path_string);
-  GtkTreeIter iter;
+  GtkTreeIter selected_iter;
   gcode_block_t *selected_block;
-  int i, j;
-  char *modified_text;
 
-  gint column = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (cell), "column"));
+  get_selected_block (&gui, &selected_block, &selected_iter);
+  gui_tab_display (&gui, selected_block, 0);
+  update_menu_by_selected_item (&gui, selected_block);
+}
 
-  gtk_tree_model_get_iter (model, &iter, path);
+static void
+gcode_tree_row_collapsed_event (GtkTreeView *tree_view, GtkTreeIter *iter, GtkTreePath *path, gpointer data)
+{
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
 
-  /* Replace certain characters in string */
-  modified_text = malloc (strlen (new_text) + 1);
-  j = 0;
+  get_selected_block (&gui, &selected_block, &selected_iter);
 
-  for (i = 0; i < strlen (new_text); i++)
-  {
-    modified_text[j] = new_text[i];
-
-    if (new_text[i] == '(')
-      modified_text[j] = '[';
-
-    if (new_text[i] == ')')
-      modified_text[j] = ']';
-
-    if (new_text[i] == ';')
-      j--;
-
-    j++;
+  if (!selected_block)                                                          // If the previously selected path was a descendant of the one just collapsed,
+  {                                                                             // 'selected_block' comes back as NULL since the old selection is now invalid;
+    set_selected_row_with_iter (&gui, iter);                                    // So in order to avoid a rather awkward "nothing is selected" situation, we
+    get_selected_block (&gui, &selected_block, &selected_iter);                 // use the supplied iter pointing to the collapsed row to select that instead;
+    gui_tab_display (&gui, selected_block, 0);
+    update_menu_by_selected_item (&gui, selected_block);
   }
-
-  modified_text[j] = 0;                                                         /* Null terminate the string */
-
-  gtk_tree_store_set (GTK_TREE_STORE (model), &iter, column, modified_text, -1);
-
-  /* Update the gcode block too. */
-  get_selected_block (&gui, &selected_block, &iter);
-
-  if (selected_block)
-    strcpy (selected_block->comment, modified_text);
-
-  gtk_tree_path_free (path);
-  free (modified_text);
-
-  update_project_modified_flag (&gui, 1);
-}
-
-static void
-gcode_tree_cursor_changed_event (GtkTreeView *treeview, gpointer ptr)
-{
-  gcode_block_t *selected_block;
-  GtkTreeIter iter;
-
-  get_selected_block (&gui, &selected_block, &iter);
-  gui_tab_display (&gui, selected_block, 0);
-  update_menu_by_selected_item (&gui, selected_block);
-}
-
-static void
-gcode_tree_row_collapsed_event (GtkTreeView *tree_view, GtkTreeIter *iter, GtkTreePath *path, gpointer user_data)
-{
-  gcode_block_t *selected_block;
-
-  set_selected_row_with_iter (&gui, iter);
-  get_selected_block (&gui, &selected_block, iter);
-  gui_tab_display (&gui, selected_block, 0);
-  update_menu_by_selected_item (&gui, selected_block);
 }
 
 static void
 opengl_context_expose_event (GtkWidget *widget, gpointer data)
 {
   gcode_block_t *selected_block;
-  GtkTreeIter iter;
+  GtkTreeIter selected_iter;
 
-  get_selected_block (&gui, &selected_block, &iter);
+  get_selected_block (&gui, &selected_block, &selected_iter);
 
   /**
    * When resizing the exposed event is triggered.
@@ -145,10 +98,10 @@ static gboolean
 opengl_context_button_event (GtkWidget *widget, GdkEventButton *event)
 {
   gcode_block_t *selected_block;
-  GtkTreeIter iter;
+  GtkTreeIter selected_iter;
   guint modifiers;
 
-  get_selected_block (&gui, &selected_block, &iter);
+  get_selected_block (&gui, &selected_block, &selected_iter);
 
   if (!selected_block)
     return (TRUE);
@@ -227,10 +180,10 @@ opengl_context_motion_event (GtkWidget *widget, GdkEventMotion *event)
   uint8_t update;
   gfloat_t delay;
   gcode_block_t *selected_block;
-  GtkTreeIter iter;
+  GtkTreeIter selected_iter;
   guint modifiers;
 
-  get_selected_block (&gui, &selected_block, &iter);
+  get_selected_block (&gui, &selected_block, &selected_iter);
 
   if (!selected_block)
     return (TRUE);
@@ -379,10 +332,10 @@ static gboolean
 opengl_context_scroll_event (GtkWidget *widget, GdkEventScroll *event)
 {
   gcode_block_t *selected_block;
-  GtkTreeIter iter;
+  GtkTreeIter selected_iter;
   gfloat_t z;
 
-  get_selected_block (&gui, &selected_block, &iter);
+  get_selected_block (&gui, &selected_block, &selected_iter);
 
   if (!selected_block)
     return (TRUE);
@@ -429,32 +382,39 @@ opengl_context_scroll_event (GtkWidget *widget, GdkEventScroll *event)
 }
 
 static void
-suppress_toggled (GtkCellRendererToggle *cell, gchar *path_str, gpointer data)
+suppress_toggled (GtkCellRendererToggle *cell, gchar *path_string, gpointer data)
 {
-  gcode_block_t *selected_block;
-  GtkTreeModel *model = (GtkTreeModel *)data;
-  GtkTreePath *path = gtk_tree_path_new_from_string (path_str);
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
+  GtkTreePath *path;
   GtkTreeIter iter;
+  gcode_block_t *selected_block;
   gboolean toggle_item;
   gint *column;
+
+  tree_view = GTK_TREE_VIEW (gui.gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
+
+  path = gtk_tree_path_new_from_string (path_string);
 
   column = g_object_get_data (G_OBJECT (cell), "column");
 
   /* get toggled iter */
-  gtk_tree_model_get_iter (model, &iter, path);
+  gtk_tree_model_get_iter (tree_model, &iter, path);
   set_selected_row_with_iter (&gui, &iter);                                     /* This is done because the selected block is currently the old one */
   get_selected_block (&gui, &selected_block, &iter);
 
   if (gui.ignore_signals || selected_block->flags & GCODE_FLAGS_LOCK)
     return;
 
-  gtk_tree_model_get (model, &iter, column, &toggle_item, -1);
+  gtk_tree_model_get (tree_model, &iter, column, &toggle_item, -1);
 
   /* do something with the value */
   toggle_item ^= 1;
 
   /* set new value */
-  gtk_tree_store_set (GTK_TREE_STORE (model), &iter, column, toggle_item, -1);
+  gtk_tree_store_set (GTK_TREE_STORE (tree_model), &iter, column, toggle_item, -1);
 
   /* clean up */
   gtk_tree_path_free (path);
@@ -465,6 +425,63 @@ suppress_toggled (GtkCellRendererToggle *cell, gchar *path_str, gpointer data)
   /* Update OpenGL context */
   gui.opengl.rebuild_view_display_list = 1;
   gui_opengl_context_redraw (&gui.opengl, selected_block);
+
+  update_project_modified_flag (&gui, 1);
+}
+
+static void
+comment_cell_edited (GtkCellRendererText *cell, gchar *path_string, gchar *new_text, gpointer data)
+{
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
+  GtkTreePath *path;
+  GtkTreeIter iter;
+  gcode_block_t *selected_block;
+  int i, j;
+  char *modified_text;
+
+  tree_view = GTK_TREE_VIEW (gui.gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
+
+  path = gtk_tree_path_new_from_string (path_string);
+
+  gint column = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (cell), "column"));
+
+  gtk_tree_model_get_iter (tree_model, &iter, path);
+
+  /* Replace certain characters in string */
+  modified_text = malloc (strlen (new_text) + 1);
+  j = 0;
+
+  for (i = 0; i < strlen (new_text); i++)
+  {
+    modified_text[j] = new_text[i];
+
+    if (new_text[i] == '(')
+      modified_text[j] = '[';
+
+    if (new_text[i] == ')')
+      modified_text[j] = ']';
+
+    if (new_text[i] == ';')
+      j--;
+
+    j++;
+  }
+
+  modified_text[j] = 0;                                                         /* Null terminate the string */
+
+  gtk_tree_store_set (GTK_TREE_STORE (tree_model), &iter, column, modified_text, -1);
+
+  /* Update the gcode block too. */
+  get_selected_block (&gui, &selected_block, &iter);
+
+  if (selected_block)
+    strcpy (selected_block->comment, modified_text);
+
+  gtk_tree_path_free (path);
+  free (modified_text);
 
   update_project_modified_flag (&gui, 1);
 }
@@ -995,7 +1012,7 @@ gui_init (char *filename)
   /* Code Block Tree List */
   {
     GtkWidget *sw;
-    GtkTreeModel *tree;
+    GtkTreeModel *model;
     GtkCellRenderer *renderer;
     GtkTreeViewColumn *column;
 
@@ -1009,23 +1026,25 @@ gui_init (char *filename)
 
     /* Create Code Block Tree List */
     gui.gcode_block_store = gtk_tree_store_new (6, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN, G_TYPE_STRING, G_TYPE_POINTER);
-    tree = GTK_TREE_MODEL (gui.gcode_block_store);
+    model = GTK_TREE_MODEL (gui.gcode_block_store);
 
     /* create tree view */
-    gui.gcode_block_treeview = gtk_tree_view_new_with_model (tree);
+    gui.gcode_block_treeview = gtk_tree_view_new_with_model (model);
+
+    g_object_unref (model);
+
 #if GTK_MAJOR_VERSION >= 2
 #if GTK_MINOR_VERSION >= 10
     gtk_tree_view_set_enable_tree_lines (GTK_TREE_VIEW (gui.gcode_block_treeview), 1);
 #endif
 #endif
+
     gtk_tree_view_set_rules_hint (GTK_TREE_VIEW (gui.gcode_block_treeview), TRUE);
     gtk_tree_view_set_search_column (GTK_TREE_VIEW (gui.gcode_block_treeview), 0);
     gtk_tree_view_set_reorderable (GTK_TREE_VIEW (gui.gcode_block_treeview), TRUE);
     GTK_TREE_DRAG_SOURCE_GET_IFACE (gui.gcode_block_store)->row_draggable = row_draggable;
     GTK_TREE_DRAG_DEST_GET_IFACE (gui.gcode_block_store)->row_drop_possible = row_drop_possible;
     GTK_TREE_DRAG_DEST_GET_IFACE (gui.gcode_block_store)->drag_data_received = drag_data_received;
-
-    g_object_unref (tree);
     g_signal_connect (G_OBJECT (gui.gcode_block_treeview), "cursor-changed", G_CALLBACK (gcode_tree_cursor_changed_event), NULL);
     g_signal_connect (G_OBJECT (gui.gcode_block_treeview), "row-collapsed", G_CALLBACK (gcode_tree_row_collapsed_event), NULL);
     gtk_container_add (GTK_CONTAINER (sw), gui.gcode_block_treeview);
@@ -1054,7 +1073,7 @@ gui_init (char *filename)
     column = gtk_tree_view_column_new_with_attributes ("Suppress", renderer, "active", 3, NULL);
     gtk_tree_view_column_set_alignment (column, 0.5);
     gtk_tree_view_append_column (GTK_TREE_VIEW (gui.gcode_block_treeview), column);
-    g_signal_connect (renderer, "toggled", G_CALLBACK (suppress_toggled), tree);
+    g_signal_connect (renderer, "toggled", G_CALLBACK (suppress_toggled), NULL);
 
     /* COMMENT COLUMN */
     renderer = gtk_cell_renderer_text_new ();
@@ -1063,7 +1082,7 @@ gui_init (char *filename)
     g_object_set_data (G_OBJECT (renderer), "column", GINT_TO_POINTER (4));
     column = gtk_tree_view_column_new_with_attributes ("Comment", renderer, "text", 4, NULL);
     gtk_tree_view_append_column (GTK_TREE_VIEW (gui.gcode_block_treeview), column);
-    g_signal_connect (renderer, "edited", G_CALLBACK (comment_cell_edited), tree);
+    g_signal_connect (renderer, "edited", G_CALLBACK (comment_cell_edited), NULL);
 
     /* Clear drag-and-drop data */
     gui.row_drop_path = NULL;

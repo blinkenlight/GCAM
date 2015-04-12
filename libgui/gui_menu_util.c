@@ -757,7 +757,7 @@ find_tree_row_iter_with_block (gui_t *gui, GtkTreeModel *model, GtkTreeIter *ite
  */
 
 void
-get_selected_block (gui_t *gui, gcode_block_t **selected_block, GtkTreeIter *iter)
+get_selected_block (gui_t *gui, gcode_block_t **block, GtkTreeIter *iter)
 {
   GtkTreeModel *model;
   GtkTreeSelection *selection;
@@ -765,14 +765,13 @@ get_selected_block (gui_t *gui, gcode_block_t **selected_block, GtkTreeIter *ite
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
   selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
-  *selected_block = NULL;
+
+  *block = NULL;
 
   if (gtk_tree_selection_get_selected (selection, NULL, iter))
   {
-    /* get the pointer from the tree */
-    gtk_tree_model_get_value (model, iter, 5, &value);
-    *selected_block = (gcode_block_t *)g_value_get_pointer (&value);
-
+    gtk_tree_model_get_value (model, iter, 5, &value);                          // Using the iter, we can fetch the content of the fifth column of that row,
+    *block = (gcode_block_t *)g_value_get_pointer (&value);                     // to retrieve the pointer to the associated block;
     g_value_unset (&value);
   }
 }
@@ -785,25 +784,19 @@ void
 set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
 {
   GtkTreeModel *model;
-  GtkTreePath *path;
-  gcode_block_t *block;
+  GtkTreeSelection *selection;
   GValue value = { 0, };
+  gcode_block_t *block;
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-
-  path = gtk_tree_model_get_path (model, iter);
 
   gtk_tree_model_get_value (model, iter, 5, &value);                            // Using the iter, we can fetch the content of the fifth column of that row,
   block = (gcode_block_t *)g_value_get_pointer (&value);                        // to retrieve the pointer to the associated block;
   g_value_unset (&value);
 
-  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
 
-  gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), iter);
-
-  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), path, NULL, TRUE, 0.0, 0.0);
-
-  gtk_tree_path_free (path);
+  gtk_tree_selection_select_iter (selection, iter);
 
   update_menu_by_selected_item (gui, block);
 
@@ -819,7 +812,7 @@ void
 set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
 {
   GtkTreeModel *model;
-  GtkTreePath *path;
+  GtkTreeSelection *selection;
   GtkTreeIter iter, found_iter;
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
@@ -828,15 +821,9 @@ set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
 
   find_tree_row_iter_with_block (gui, model, &iter, &found_iter, block);
 
-  path = gtk_tree_model_get_path (model, &found_iter);
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
 
-  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
-
-  gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), &found_iter);
-
-  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), path, NULL, TRUE, 0.0, 0.0);
-
-  gtk_tree_path_free (path);
+  gtk_tree_selection_select_iter (selection, &found_iter);
 
   update_menu_by_selected_item (gui, block);
 
@@ -1170,16 +1157,23 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
 void
 gui_show_project (gui_t *gui)
 {
-  gcode_block_t *selected_block;
+  GtkTreeSelection *selection;
+  GtkTreePath *path;
   GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
 
   /* Refresh G-Code Block Tree */
   gui_recreate_whole_tree (gui);
 
   /* Highlight the Tool block */
-  gtk_tree_selection_select_path (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), gtk_tree_path_new_from_string ("1"));
+  path = gtk_tree_path_new_from_string ("1");
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gtk_tree_selection_select_path (selection, path);
   get_selected_block (gui, &selected_block, &selected_iter);
   gui_tab_display (gui, selected_block, 0);
+
+  gtk_tree_path_free (path);
 
   update_menu_by_project_state (gui, PROJECT_OPEN);
   update_menu_by_selected_item (gui, selected_block);
