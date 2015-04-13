@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="64" height="64" version="1.1">
+ <defs>
+  <linearGradient id="linearGradient3253">
+   <stop stop-color="#ffffff"/>
+   <stop offset="1" stop-color="#c8c800"/>
+  </linearGradient>
+  <radialGradient inkscape:collect="always" xlink:href="#linearGradient3253" id="radialGradient4966" cx="49" cy="22" r="9" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0.7778,0,0,0.7778,10.89,4.889)"/>
+ </defs>
+ <metadata/>
+ <g inkscape:label="Layer 1" inkscape:groupmode="layer">
+  <path transform="translate(-20,7)" d="M 77,25 A 25,25 0 1 1 27,25 A 25,25 0 1 1 77,25 z" sodipodi:ry="25" sodipodi:rx="25" sodipodi:cy="25" sodipodi:cx="52" sodipodi:type="arc" fill="#c8dff0" stroke="#295577" stroke-linejoin="round" stroke-linecap="round" color="#000000" stroke-width="2"/>
+  <path sodipodi:type="arc" sodipodi:cx="32" sodipodi:cy="32" sodipodi:rx="17" sodipodi:ry="17" d="M 49,32 A 17,17 0 0 1 32,49 L 32,32 z" sodipodi:start="0" sodipodi:end="1.571" transform="matrix(1.47,0,0,1.47,-15.04,-15.05)" fill="#295577" stroke="#295577" stroke-linejoin="round" stroke-linecap="round" color="#000000" stroke-width="0"/>
+  <path transform="matrix(-1.47,0,0,-1.47,79.05,79.03)" sodipodi:end="1.571" sodipodi:start="0" d="M 49,32 A 17,17 0 0 1 32,49 L 32,32 z" sodipodi:ry="17" sodipodi:rx="17" sodipodi:cy="32" sodipodi:cx="32" sodipodi:type="arc" fill="#295577" stroke="#295577" stroke-linejoin="round" stroke-linecap="round" color="#000000" stroke-width="0"/>
+  <path sodipodi:type="arc" sodipodi:cx="52" sodipodi:cy="25" sodipodi:rx="8" sodipodi:ry="8" d="M 60,25 A 8,8 0 1 1 44,25 A 8,8 0 1 1 60,25 z" transform="matrix(1.121,0,0,1.121,-26.31,3.956)" fill="url(#radialGradient4966)" stroke="#295577" stroke-linejoin="round" stroke-linecap="round" color="#000000" stroke-width="1.7829"/>
+ </g>
+</svg>

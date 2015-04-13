@@ -1,6 +1,9 @@
 NEWS
 Source code file for G-Code generation, simulation, and visualization
-library. This software is Copyright (C) 2006 by Justin Shumaker
+library. 
+
+Copyright (C) 2006 - 2010 by Justin Shumaker
+Copyright (C) 2014 by Asztalos Attila Oszkár
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -15,4 +18,5 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-Justin Shumaker (justin at js dot cx).
+Justin Shumaker (justin at js dot cx)
+Asztalos Attila Oszkár (attila dot asztalos at gmail dot com).

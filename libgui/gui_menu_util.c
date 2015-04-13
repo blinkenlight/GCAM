@@ -1,132 +1,148 @@
-/*
-*  gui_menu_util.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gui_menu_util.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gui_menu_util.h"
 #include "gui_define.h"
+#include "gui_tab.h"
+#include <time.h>
 
+#define GUI_TREE_ROOT NULL
+
+/* NOT AN EXACT CONVERSION - uses x25 for round values */
+#define SCALED_INCHES(x) (GCODE_UNITS ((&gui->gcode), x))
+
+/**
+ * Update the values, ranges and increments of a series of GUI elements in the 
+ * "new project" or "update project" dialogs when units are selected (inch/mm)
+ * WARNING: any change in the structure of "wlist" affecting the spin buttons
+ * in either of the two dialogs mentioned will obviously break this;
+ */
 
 void
-base_unit_changed_callback (GtkWidget **widget, gpointer data)
+base_unit_changed_callback (GtkWidget *widget, gpointer data)
 {
-  GtkWidget **wlist;
-  gcode_block_t *index_block;
   gui_t *gui;
+  GtkWidget **wlist;
+  GtkSpinButton *spinner;
+  gcode_block_t *index_block;
   gfloat_t value;
-  int changed = 0;
-  char *bu;
+  gfloat_t min, max;
+  gfloat_t step, page;
+  gfloat_t scale_factor;
+  gfloat_t max_clr_z;
+  char *text_field;
+  int unit_in_use;
+  int chosen_unit;
 
-  wlist = (GtkWidget **) widget;
+  wlist = (GtkWidget **)data;
 
-  gui = (gui_t *) wlist[0];
+  gui = (gui_t *)wlist[0];
 
-  bu = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[3]));
+  scale_factor = 1.0;
 
-  /* Scale blocks to new units system */
-  if (!strcmp (bu, "inch"))
-  {
-    if (gui->gcode.units != GCODE_UNITS_INCH)
-    {
-      changed = 1;
-      index_block = gui->gcode.list;
-      while (index_block)
-      {
-        if (index_block->scale)
-          index_block->scale (index_block, GCODE_MM2INCH);
-        index_block = index_block->next;
-      }
-    }
-    gui->gcode.units = GCODE_UNITS_INCH;
-  }
+  gtk_spin_button_get_range (GTK_SPIN_BUTTON (wlist[10]), NULL, &max_clr_z);
+
+  if (fabs (max_clr_z - MAX_CLR_Z) < GCODE_PRECISION)
+    unit_in_use = GCODE_UNITS_INCH;
   else
+    unit_in_use = GCODE_UNITS_MILLIMETER;
+
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
+
+  if (strstr (text_field, "inch"))
+    chosen_unit = GCODE_UNITS_INCH;
+  else
+    chosen_unit = GCODE_UNITS_MILLIMETER;
+
+  g_free (text_field);
+
+  if ((unit_in_use == GCODE_UNITS_INCH) && (chosen_unit == GCODE_UNITS_MILLIMETER))
+    scale_factor = GCODE_INCH2MM;
+
+  if ((unit_in_use == GCODE_UNITS_MILLIMETER) && (chosen_unit == GCODE_UNITS_INCH))
+    scale_factor = GCODE_MM2INCH;
+
+  if (scale_factor == 1.0)
+    return;
+
+  for (int i = 4; i <= 10; i++)
   {
-    if (gui->gcode.units != GCODE_UNITS_MILLIMETER)
-    {
-      changed = 1;
-      index_block = gui->gcode.list;
-      while (index_block)
-      {
-        if (index_block->scale)
-          index_block->scale (index_block, GCODE_INCH2MM);
-        index_block = index_block->next;
-      }
-    }
+    spinner = GTK_SPIN_BUTTON (wlist[i]);
 
-    gui->gcode.units = GCODE_UNITS_MILLIMETER;
+    value = gtk_spin_button_get_value (spinner);
+
+    gtk_spin_button_get_range (spinner, &min, &max);
+    gtk_spin_button_set_range (spinner, min * scale_factor, max * scale_factor);
+
+    gtk_spin_button_get_increments (spinner, &step, &page);
+    gtk_spin_button_set_increments (spinner, step * scale_factor, page * scale_factor);
+
+    gtk_spin_button_set_value (spinner, value * scale_factor);
   }
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[5]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), MAX_DIM_X));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[5]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[5]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[6]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[6]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), MAX_DIM_Y));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[6]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[6]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[7]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[7]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), MAX_DIM_Z));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[7]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[7]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[8]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[8]), GCODE_UNITS ((&gui->gcode), 0.0), GCODE_UNITS ((&gui->gcode), MAX_DIM_X));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[8]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[8]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[9]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[9]), GCODE_UNITS ((&gui->gcode), 0.0), GCODE_UNITS ((&gui->gcode), MAX_DIM_Y));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[9]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[9]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[10]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[10]), GCODE_UNITS ((&gui->gcode), 0.0), GCODE_UNITS ((&gui->gcode), MAX_DIM_Z));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[10]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[10]), value);
-
-  value = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[12]));
-  gtk_spin_button_set_range (GTK_SPIN_BUTTON (wlist[12]), GCODE_UNITS ((&gui->gcode), 0.0), GCODE_UNITS ((&gui->gcode), 1.0));
-  gtk_spin_button_set_increments (GTK_SPIN_BUTTON (wlist[12]), GCODE_UNITS ((&gui->gcode), 0.01), GCODE_UNITS ((&gui->gcode), 0.1));
-  if (changed)
-    value = gui->gcode.units == GCODE_UNITS_INCH ? value * GCODE_MM2INCH : value * GCODE_INCH2MM;
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (wlist[12]), value);
 }
 
+/**
+ * Update the progress bar on the bottom of the GUI
+ */
 
 void
 update_progress (void *gui, gfloat_t progress)
 {
-  gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (((gui_t *) gui)->progress_bar), progress);
-  gtk_main_iteration ();
+  static gfloat_t old_value = 0;
+  static clock_t old_clock = 0;
+  clock_t now_clock;
+  uint8_t update;
+
+  update = 0;
+
+  now_clock = clock ();
+
+  if ((progress == 0.0) || (progress == 1.0))                                   // End of scale values are always updated unconditionally;
+    update = 1;
+
+  if (progress > old_value)                                                     // Everything else has to be larger than current: "regressing" not allowed;
+  {
+    if (progress - old_value > 0.01)                                            // If progress is "large enough", show it even if the update is too early;
+      update = 1;
+
+    if (now_clock - old_clock > CLOCKS_PER_SEC / 25)                            // Smaller progress gets shown not more often than 25 times a second:
+      update = 1;                                                               // thousands of tiny updates would really slow things down otherwise;
+  }
+
+  if (update)
+  {
+    gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (((gui_t *)gui)->progress_bar), progress);
+
+    while (gtk_events_pending ())                                               // One iteration (or even several more) are not enough for reliable updates;
+      gtk_main_iteration ();                                                    // By flushing the queue, updates are shown even if we're hammering the CPU.
+
+    old_clock = now_clock;
+    old_value = progress;
+  }
 }
 
+/**
+ * Display a generic 'info' styled message box
+ */
 
 void
 generic_dialog (void *gui, char *message)
@@ -134,10 +150,12 @@ generic_dialog (void *gui, char *message)
   GtkWidget *dialog;
 
   dialog = gtk_message_dialog_new (GTK_WINDOW (((gui_t *)gui)->window),
-                                  GTK_DIALOG_DESTROY_WITH_PARENT,
-                                  GTK_MESSAGE_INFO,
-                                  GTK_BUTTONS_OK,
-                                  message);
+                                   GTK_DIALOG_DESTROY_WITH_PARENT,
+                                   GTK_MESSAGE_INFO,
+                                   GTK_BUTTONS_OK,
+                                   "%s",
+                                   message);
+
   gtk_window_set_title (GTK_WINDOW (dialog), "Info");
 
   gtk_window_set_modal (GTK_WINDOW (dialog), TRUE);
@@ -147,481 +165,497 @@ generic_dialog (void *gui, char *message)
   gtk_widget_show (dialog);
 }
 
+/**
+ * Display a generic 'error' styled message box 
+ */
+
+void
+generic_error (void *gui, char *message)
+{
+  GtkWidget *dialog;
+
+  dialog = gtk_message_dialog_new (GTK_WINDOW (((gui_t *)gui)->window),
+                                   GTK_DIALOG_DESTROY_WITH_PARENT,
+                                   GTK_MESSAGE_ERROR,
+                                   GTK_BUTTONS_OK,
+                                   "%s",
+                                   message);
+
+  gtk_window_set_title (GTK_WINDOW (dialog), "Error");
+
+  gtk_window_set_modal (GTK_WINDOW (dialog), TRUE);
+  gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (((gui_t *)gui)->window));
+  g_signal_connect_swapped (dialog, "response", G_CALLBACK (gtk_widget_destroy), dialog);
+
+  gtk_widget_show (dialog);
+}
+
+/**
+ * Display a generic 'error' styled message box then quit
+ */
+
+void
+generic_fatal (void *gui, char *message)
+{
+  GtkWidget *dialog;
+
+  dialog = gtk_message_dialog_new (GTK_WINDOW (((gui_t *)gui)->window),
+                                   GTK_DIALOG_DESTROY_WITH_PARENT,
+                                   GTK_MESSAGE_ERROR,
+                                   GTK_BUTTONS_OK,
+                                   "%s",
+                                   message);
+
+  gtk_window_set_title (GTK_WINDOW (dialog), "Fatal Error");
+
+  gtk_window_set_modal (GTK_WINDOW (dialog), TRUE);
+  gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (((gui_t *)gui)->window));
+  g_signal_connect (dialog, "response", G_CALLBACK (gtk_main_quit), NULL);
+
+  gtk_widget_show (dialog);
+}
+
+/**
+ * Roto-translate 'block' into tangential continuity with its previous peer
+ */
 
 static void
 set_tangent_to_previous (gcode_block_t *block)
 {
-  gfloat_t p0[2], p1[2], t0[2], t1[2];
+  gcode_vec2d_t p0, p1, p;
+  gcode_vec2d_t t0, t1, t;
+  gcode_vec2d_t delta;
+  gfloat_t angle;
 
-  /* Auto tangency to previous on insert */
   if (block->prev)
   {
-    gcode_vec2d_t tan0, tan1;
+    block->ends (block, p0, p, GCODE_GET);
+    block->ends (block, t0, t, GCODE_GET_TANGENT);
 
-    block->ends (block, p0, p1, GCODE_GET);
-    block->prev->ends (block->prev, tan0, tan1, GCODE_GET_TANGENT);
-    block->prev->ends (block->prev, t0, t1, GCODE_GET);
+    block->prev->ends (block->prev, p, p1, GCODE_GET);
+    block->prev->ends (block->prev, t, t1, GCODE_GET_TANGENT);
 
-    if (block->type == GCODE_TYPE_LINE)
-    {
-      gfloat_t mag;
-      gcode_vec2d_t vec;
+    GCODE_MATH_VEC2D_SUB (delta, p1, p0);
 
-      GCODE_MATH_VEC2D_SUB (vec, p1, p0);
-      GCODE_MATH_VEC2D_MAG (mag, vec);
-      GCODE_MATH_VEC2D_SCALE (tan1, mag);
-      GCODE_MATH_VEC2D_ADD (p1, t1, tan1);
+    angle = GCODE_RAD2DEG * (atan2 (t1[1], t1[0]) - atan2 (t0[1], t0[0]));
 
-      block->ends (block, t1, p1, GCODE_SET);
-    }
-    else if (block->type == GCODE_TYPE_ARC)
-    {
-      block->ends (block, t1, p1, GCODE_SET);
-    }
+    GCODE_MATH_WRAP_TO_360_DEGREES (angle);
+
+    block->spin (block, p0, angle);
+    block->move (block, delta);
   }
 }
 
-
-int
-insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *selected_block, GtkTreeIter *iter, int action)
-{
-  gcode_block_t *block_ind;
-  GtkTreeModel *model;
-  GtkTreeIter child_iter, parent_iter;
-  int i;
-
-
-  if (selected_block->type == GCODE_TYPE_SKETCH)
-  {
-    if (block->type == GCODE_TYPE_ARC || block->type == GCODE_TYPE_LINE)
-    {
-      gcode_sketch_t *sketch;
-
-      sketch = (gcode_sketch_t *) selected_block->pdata;
-      block->offset = &sketch->offset;
-      block->parent = selected_block;
-
-      gcode_list_insert (&sketch->list, block);
-      gcode_list_move_prev (block); /* so the block is first */
-
-      /* Insert into list */
-      i = 1; /* Because extrusion is 0 */
-      for (block_ind = sketch->list; block_ind != block; block_ind = block_ind->next)
-        i++;
-
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, iter, i, 1);
-    }
-    else
-    {
-      block->offset = selected_block->offset;
-      block->parent = selected_block->parent;
-      gcode_list_insert (&selected_block, block);
-
-      i = 0;
-      for (block_ind = selected_block; block_ind; block_ind = block_ind->prev)
-        i++;
-
-      gtk_tree_model_iter_parent (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &parent_iter, iter);
-
-      if (gtk_tree_store_iter_is_valid (gui->gcode_block_store, &parent_iter))
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-      }
-      else
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, NULL, i, 1);
-      }
-    }
-  }
-  else if (selected_block->type == GCODE_TYPE_EXTRUSION)
-  {
-    gcode_extrusion_t *extrusion;
-
-    extrusion = (gcode_extrusion_t *) selected_block->pdata;
-    block->offset = &extrusion->offset;
-    block->parent = selected_block;
-
-    gcode_list_insert (&extrusion->list, block);
-    gcode_list_move_prev (block); /* so the block is first */
-
-    extrusion->list = block;
-
-    /* Insert into list */
-    child_iter = refresh_gcode_block_tree_recursion (gui, block, iter, 0, 1);
-  }
-  else if (selected_block->type == GCODE_TYPE_TEMPLATE && action == GUI_INSERT_INTO)
-  {
-    if (block->type != GCODE_TYPE_TEMPLATE)
-    {
-      gcode_template_t *template;
-
-      template = (gcode_template_t *) selected_block->pdata;
-      block->offset = &template->offset;
-      block->parent = selected_block;
-
-      gcode_list_insert (&template->list, block);
-      gcode_list_move_prev (block); /* so the block is first */
-
-/*
-      template->list = block;
-      block->parent_list = &template->list;
-*/
-
-      /* Insert into treeview list */
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, iter, 0, 1);
-    }
-    else
-    {
-      gcode_list_insert (&selected_block, block);
-
-      model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-      gtk_tree_model_iter_parent (model, &parent_iter, iter);
-
-      i = 0;
-      for (block_ind = selected_block; block_ind; block_ind = block_ind->prev)
-        i++;
-
-      if (gtk_tree_store_iter_is_valid (gui->gcode_block_store, &parent_iter))
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-      }
-      else
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, NULL, i, 1);
-      }
-    }
-  }
-  else if (selected_block->type == GCODE_TYPE_DRILL_HOLES)
-  {
-    if (block->type == GCODE_TYPE_POINT)
-    {
-      gcode_drill_holes_t *drill_holes;
-
-      drill_holes = (gcode_drill_holes_t *) selected_block->pdata;
-      block->offset = &drill_holes->offset;
-      block->parent = selected_block;
-
-      gcode_list_insert (&drill_holes->list, block);
-      gcode_list_move_prev (block); /* so the block is first */
-
-      drill_holes->list = block;
-
-      /* Insert into treeview list */
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, iter, 0, 1);
-    }
-    else
-    {
-      gcode_list_insert (&selected_block, block);
-
-      /* Does this code ever get executed?  Is there anything besides a point getting places in Drill Holes? */
-      i = 0;
-      for (block_ind = selected_block; block_ind; block_ind = block_ind->prev)
-        i++;
-
-      gtk_tree_model_iter_parent (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &parent_iter, iter);
-
-      if (gtk_tree_store_iter_is_valid (gui->gcode_block_store, &parent_iter))
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-      }
-      else
-      {
-        child_iter = refresh_gcode_block_tree_recursion (gui, block, NULL, i, 1);
-      }
-    }
-  }
-  else if (selected_block->type == GCODE_TYPE_POINT)
-  {
-    gcode_drill_holes_t *drill_holes;
-
-    drill_holes = (gcode_drill_holes_t *) selected_block->parent->pdata;
-
-    block->offset = &drill_holes->offset;
-    block->parent = selected_block->parent;
-    model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-
-    gcode_list_insert (&selected_block, block);
-
-    /* Insert into list */
-    gtk_tree_model_iter_parent (model, &parent_iter, iter);
-
-    i = 0;
-    for (block_ind = drill_holes->list; block_ind != block; block_ind = block_ind->next)
-      i++;
-    child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-  }
-  else if (selected_block->type == GCODE_TYPE_ARC || selected_block->type == GCODE_TYPE_LINE)
-  {
-    if (selected_block->parent->type == GCODE_TYPE_SKETCH)
-    {
-      gcode_sketch_t *sketch;
-
-      sketch = (gcode_sketch_t *) selected_block->parent->pdata;
-
-      block->offset = &sketch->offset;
-      block->parent = selected_block->parent;
-
-      model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-
-      gcode_list_insert (&selected_block, block);
-
-      /* Insert into list */
-      gtk_tree_model_iter_parent (model, &parent_iter, iter);
-
-      i = 1;
-      for (block_ind = sketch->list; block_ind != block; block_ind = block_ind->next)
-        i++;
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-    }
-    else if (selected_block->parent->type == GCODE_TYPE_EXTRUSION)
-    {
-      gcode_extrusion_t *extrusion;
-
-      extrusion = (gcode_extrusion_t *) selected_block->parent->pdata;
-
-      block->offset = &extrusion->offset;
-      block->parent = selected_block->parent;
-      model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-
-      gcode_list_insert (&selected_block, block);
-
-      /* Insert into list */
-      gtk_tree_model_iter_parent (model, &parent_iter, iter);
-
-      i = 1;
-      for (block_ind = extrusion->list; block_ind != block; block_ind = block_ind->next)
-        i++;
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-    }
-  }
-  else
-  {
-    gcode_list_insert (&selected_block, block);
-
-    block->offset = NULL;
-    block->parent_list = selected_block->parent_list;
-    block->parent = selected_block->parent;
-
-    /* Insert into list */
-    i = 0;
-    for (block_ind = selected_block; block_ind; block_ind = block_ind->prev)
-      i++;
-
-    gtk_tree_model_iter_parent (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &parent_iter, iter);
-
-    if (gtk_tree_store_iter_is_valid (gui->gcode_block_store, &parent_iter))
-    {
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, &parent_iter, i, 1);
-    }
-    else
-    {
-      child_iter = refresh_gcode_block_tree_recursion (gui, block, NULL, i, 1);
-    }
-  }
-
-  if (action & GUI_INSERT_WITH_TANGENCY)
-    set_tangent_to_previous (block);
-
-  if (gtk_tree_model_iter_parent (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &parent_iter, &child_iter))
-    gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &parent_iter));
-
-  update_menu_options (gui, block);
-
-  update_block_tree_order (gui);
-
-  set_selected_row_with_iter (gui, &child_iter);
-  /*
-  * Set the Comment cell for this block to be in editing mode as a default behavior.
-  */
-  gui->ignore_signals = 1;
-  gtk_tree_view_set_cursor_on_cell (GTK_TREE_VIEW (gui->gcode_block_treeview),
-                                    gtk_tree_model_get_path (gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview)), &child_iter),
-                                    gtk_tree_view_get_column (GTK_TREE_VIEW (gui->gcode_block_treeview), 4),
-                                    gui->comment_cell,
-                                    TRUE);
-  gui->ignore_signals = 0;
-  gui->modified = 1;
-  return (0);
-}
-
-
-void
-destroy ()
-{
-  gtk_main_quit ();
-}
-
+/**
+ * Insert 'block' into both the block tree after/under 'selected_block' and the
+ * GUI GTK tree after/under 'iter', depending on 'insert_spot' - which, notably,
+ * can combine BOTH 'after or under', which will try to insert 'after' then (if
+ * that fails) will retry to insert 'under' the specified target. Validity of a
+ * target spot is checked via the global validity matrix and/or top level table;
+ * The newly created iter is returned, with the row opened and ready for a note.
+ * NOTE: there's an unsolvable conceptual disconnect between the iter tree and 
+ * the block tree, introduced by the way extrusions are handled separately from
+ * the list of children with blocks, but as part of the list - first child - in
+ * the iter tree; because of this, 'inserting as a first child' means different
+ * things for blocks and iters, and as an attempt to reconcile the two different
+ * approaches 'insert_primitive' attempts to 'skip over' the first child when it
+ * is of extrusion type and insertion to the beginning of the list is requested.
+ */
 
 GtkTreeIter
-refresh_gcode_block_tree_recursion (gui_t *gui, gcode_block_t *block, GtkTreeIter *parent_iter, uint16_t ind, uint8_t single)
+insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block, GtkTreeIter *target_iter, int insert_spot)
 {
-  GtkTreeIter child_iter;
+  GtkTreeModel *model;
+  GtkTreePath *path;
+  GtkTreeIter parent_iter, new_iter;
 
-  for (; block; ind++)
+  if (!block)                                                                   // If 'block' is NULL, abort;
+    return new_iter;
+
+  if (!target_block)                                                            // If 'target_block' is null, abort - a selected target must already exist;
+    return new_iter;
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));  // Retrieve a reference to the tree model - we'll need it later;
+
+  if (insert_spot & GUI_INSERT_AFTER)                                           // If the request contains "insert after", find the would-be parent;
   {
-    gtk_tree_store_insert (gui->gcode_block_store, &child_iter, parent_iter, ind);
-
-/*    gtk_tree_store_append (gui->gcode_block_store, &child_iter, parent_iter); */
-    gtk_tree_store_set (gui->gcode_block_store, &child_iter, 0, ind, 1, GCODE_TYPE_STRING[block->type], 2, block->status, 3, block->flags & GCODE_FLAGS_SUPPRESS, 4, block->comment, 5, block, -1);
-
-    if (block->type == GCODE_TYPE_SKETCH)
+    if (target_block->parent)                                                   // If 'target_block->parent' exists, check validity of 'block' as its child;
     {
-      gcode_sketch_t *sketch;
-      gcode_extrusion_t *extrusion;
-      GtkTreeIter extrusion_iter;
-
-      sketch = (gcode_sketch_t *) block->pdata;
-      extrusion = (gcode_extrusion_t *) sketch->extrusion->pdata;
-
-      refresh_gcode_block_tree_recursion (gui, sketch->list, &child_iter, 1, 0);
-
-      /* Extrusion */
-      gtk_tree_store_insert (gui->gcode_block_store, &extrusion_iter, &child_iter, 0);
-      gtk_tree_store_set (gui->gcode_block_store, &extrusion_iter, 0, 0, 1, GCODE_TYPE_STRING[sketch->extrusion->type], 2, sketch->extrusion->status, 3, sketch->extrusion->flags & GCODE_FLAGS_SUPPRESS, 4, sketch->extrusion->comment, 5, sketch->extrusion, -1);
-      refresh_gcode_block_tree_recursion (gui, extrusion->list, &extrusion_iter, 1, 0);
+      if (GCODE_IS_VALID_PARENT_CHILD[target_block->parent->type][block->type])
+      {
+        gcode_insert_after_block (target_block, block);                         // If the operation is valid, insert 'block' after 'target_block',
+        new_iter = gui_insert_after_iter (gui, target_iter, block);             // then insert a new iter (new row) based on 'block' after 'iter';
+        insert_spot &= ~GUI_ADD_AS_CHILD;                                       // Cancel any requests to retry adding as a child of the target;
+      }
+      else
+      {
+        insert_spot &= ~GUI_INSERT_AFTER;                                       // If the operation is not valid, remove it from the request;
+      }
     }
-    else if (block->type == GCODE_TYPE_BOLT_HOLES)
+    else                                                                        // If 'target_block' has no parent, check validity of 'block' as top level;
     {
-      gcode_bolt_holes_t *bolt_holes;
-      gcode_extrusion_t *extrusion;
-      GtkTreeIter extrusion_iter;
-
-      bolt_holes = (gcode_bolt_holes_t *) block->pdata;
-      extrusion = (gcode_extrusion_t *) bolt_holes->extrusion->pdata;
-
-      gtk_tree_store_insert (gui->gcode_block_store, &extrusion_iter, &child_iter, 0);
-
-      /* Extrusion */
-      gtk_tree_store_set (gui->gcode_block_store, &extrusion_iter, 0, 0, 1, GCODE_TYPE_STRING[bolt_holes->extrusion->type], 2, bolt_holes->extrusion->status, 3, bolt_holes->extrusion->flags & GCODE_FLAGS_SUPPRESS, 4, bolt_holes->extrusion->comment, 5, bolt_holes->extrusion, -1);
-      refresh_gcode_block_tree_recursion (gui, extrusion->list, &extrusion_iter, 1, 0);
-
-      /* Do not expose bolt hole arcs */
+      if (GCODE_IS_VALID_IF_NO_PARENT[block->type])
+      {
+        gcode_insert_after_block (target_block, block);                         // If the operation is valid, insert 'block' after 'target_block',
+        new_iter = gui_insert_after_iter (gui, target_iter, block);             // then insert a new iter (new row) based on 'block' after 'iter';
+        insert_spot &= ~GUI_ADD_AS_CHILD;                                       // Cancel any requests to retry adding as a child of the target;
+      }
+      else
+      {
+        insert_spot &= ~GUI_INSERT_AFTER;                                       // If the operation is not valid, remove it from the request;
+      }
     }
-    else if (block->type == GCODE_TYPE_TEMPLATE)
-    {
-      gcode_template_t *template;
-
-      template = (gcode_template_t *) block->pdata;
-
-      refresh_gcode_block_tree_recursion (gui, template->list, &child_iter, 1, 0);
-    }
-    else if (block->type == GCODE_TYPE_DRILL_HOLES)
-    {
-      gcode_drill_holes_t *drill_holes;
-
-      drill_holes = (gcode_drill_holes_t *) block->pdata;
-
-      refresh_gcode_block_tree_recursion (gui, drill_holes->list, &child_iter, 1, 0);
-    }
-
-    block = single ? NULL : block->next;
   }
 
-  return child_iter;
+  if (insert_spot & GUI_INSERT_UNDER)                                           // If the request (still) contains "insert under", parent would be 'target';
+  {
+    if (GCODE_IS_VALID_PARENT_CHILD[target_block->type][block->type])           // We do know 'target_block' exists, check validity of 'block' as its child;
+    {
+      gcode_insert_as_listhead (target_block, block);                           // If it is valid, insert 'block' under 'target_block' as the first child,
+
+      if (target_block->extruder)                                               // Curve ball: if the first child is an extrusion, we need to skip it;
+      {
+        GtkTreeIter child_iter;
+
+        gtk_tree_model_iter_children (model, &child_iter, target_iter);         // Get an iter to that extrusion as the first child of 'target_iter',
+
+        new_iter = gui_insert_after_iter (gui, &child_iter, block);             // then insert a new iter (new row) based on 'block' AFTER that iter;
+      }
+      else                                                                      // If there are no extrusions involved (meaning we can proceed normally),
+      {
+        new_iter = gui_insert_under_iter (gui, target_iter, block);             // then insert a new iter (new row) based on 'block' under 'target_iter';
+      }
+
+      insert_spot &= ~GUI_APPEND_UNDER;                                         // Cancel any requests to retry adding as a child of the target;
+    }
+    else
+    {
+      insert_spot &= ~GUI_INSERT_UNDER;                                         // If the operation is not valid, remove it from the request;
+    }
+  }
+
+  if (insert_spot & GUI_APPEND_UNDER)                                           // If the request (still) contains "append under", parent would be 'target';
+  {
+    if (GCODE_IS_VALID_PARENT_CHILD[target_block->type][block->type])           // We do know 'target_block' exists, check validity of 'block' as its child;
+    {
+      gcode_append_as_listtail (target_block, block);                           // If it is valid, insert 'block' under 'target_block' as the last child,
+      new_iter = gui_append_under_iter (gui, target_iter, block);               // then insert a new iter (new row) based on 'block' under 'target_iter';
+    }
+    else
+    {
+      insert_spot &= ~GUI_APPEND_UNDER;                                         // If the operation is not valid, remove it from the request;
+    }
+  }
+
+  if (insert_spot & GUI_ADD_AFTER_OR_UNDER)                                     // If the request still contains "after" or "under", one of them succeeded,
+  {                                                                             // so perform any post-insertion actions;
+    if (insert_spot & GUI_INSERT_WITH_TANGENCY)
+      set_tangent_to_previous (block);
+
+    if (gtk_tree_model_iter_parent (model, &parent_iter, &new_iter))
+    {
+      path = gtk_tree_model_get_path (model, &parent_iter);
+
+      gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
+
+      gtk_tree_path_free (path);
+    }
+
+    gui_renumber_whole_tree (gui);
+
+    set_selected_row_with_iter (gui, &new_iter);
+
+    gui->modified = 1;
+  }
+
+  return new_iter;
 }
 
+/**
+ * Remove 'block' from the block tree (but don't free!) then also remove 'iter'
+ * from the GUI GTK tree;
+ */
 
 void
-refresh_gcode_block_tree (gui_t *gui)
+remove_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *iter)
 {
+  GtkTreeModel *model;
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gcode_splice_list_around (block);
+  gtk_tree_store_remove (GTK_TREE_STORE (model), iter);
+}
+
+/**
+ * Remove 'block' from the block tree & recursively free then also remove 'iter'
+ * from the GUI GTK tree;
+ */
+
+void
+remove_and_destroy_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *iter)
+{
+  GtkTreeModel *model;
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gcode_remove_and_destroy (block);
+  gtk_tree_store_remove (GTK_TREE_STORE (model), iter);
+}
+
+/**
+ * Create new rows corresponding to 'block', its extruder and all its children 
+ * and insert them into the tree store before the current first child of 'iter';
+ * The new iter pointing to the new row corresponding to 'block' is returned.
+ * NOTE: the order number field of the new rows is filled in blank ("0") and it
+ * needs to be updated - this is partly to avoid multiple implementations of the
+ * order numbering algorithm and partly because a treeview that has been touched
+ * probably needs renumbering anyway - older rows displaced by newly introduced
+ * ones do not magically change their order numbers to fit their new positions.
+ * TL;DR: refreshing order numbers after this is the CALLER'S responsibility!
+ */
+
+GtkTreeIter
+gui_insert_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
+{
+  uint16_t index;
+  GtkTreeIter new_iter;
+  gcode_block_t *index_block;
+
+  if (!block)
+    return new_iter;
+
+  gtk_tree_store_prepend (gui->gcode_block_store, &new_iter, iter);
+
+  gtk_tree_store_set (gui->gcode_block_store, &new_iter,
+                      0, 0,
+                      1, GCODE_TYPE_STRING[block->type],
+                      2, block->status,
+                      3, block->flags & GCODE_FLAGS_SUPPRESS,
+                      4, block->comment,
+                      5, block,
+                      -1);                                                      // Create and insert a new GUI row, then fill it up with data from 'block';
+
+  index_block = block->extruder;
+
+  if (index_block)
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+  index_block = block->listhead;
+
+  if (block->type == GCODE_TYPE_BOLT_HOLES)
+    index_block = NULL;
+
+  while (index_block)
+  {
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+    index_block = index_block->next;
+  }
+
+  return new_iter;
+}
+
+/**
+ * Create new rows corresponding to 'block', its extruder and all its children 
+ * and append them to the tree store after the current last child of 'iter';
+ * The new iter pointing to the new row corresponding to 'block' is returned.
+ * NOTE: the order number field of the new rows is filled in blank ("0") and it
+ * needs to be updated - this is partly to avoid multiple implementations of the
+ * order numbering algorithm and partly because a treeview that has been touched
+ * probably needs renumbering anyway - older rows displaced by newly introduced
+ * ones do not magically change their order numbers to fit their new positions.
+ * TL;DR: refreshing order numbers after this is the CALLER'S responsibility!
+ */
+
+GtkTreeIter
+gui_append_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
+{
+  uint16_t index;
+  GtkTreeIter new_iter;
+  gcode_block_t *index_block;
+
+  if (!block)
+    return new_iter;
+
+  gtk_tree_store_append (gui->gcode_block_store, &new_iter, iter);
+
+  gtk_tree_store_set (gui->gcode_block_store, &new_iter,
+                      0, 0,
+                      1, GCODE_TYPE_STRING[block->type],
+                      2, block->status,
+                      3, block->flags & GCODE_FLAGS_SUPPRESS,
+                      4, block->comment,
+                      5, block,
+                      -1);                                                      // Create and insert a new GUI row, then fill it up with data from 'block';
+
+  index_block = block->extruder;
+
+  if (index_block)
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+  index_block = block->listhead;
+
+  if (block->type == GCODE_TYPE_BOLT_HOLES)
+    index_block = NULL;
+
+  while (index_block)
+  {
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+    index_block = index_block->next;
+  }
+
+  return new_iter;
+}
+
+/**
+ * Create new rows corresponding to 'block', its extruder and all its children 
+ * and insert them into the tree store right after 'iter' (before the next row);
+ * The new iter pointing to the new row corresponding to 'block' is returned.
+ * NOTE: the order number field of the new rows is filled in blank ("0") and it
+ * needs to be updated - this is partly to avoid multiple implementations of the
+ * order numbering algorithm and partly because a treeview that has been touched
+ * probably needs renumbering anyway - older rows displaced by newly introduced
+ * ones do not magically change their order numbers to fit their new positions.
+ * TL;DR: refreshing order numbers after this is the CALLER'S responsibility!
+ */
+
+GtkTreeIter
+gui_insert_after_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
+{
+  uint16_t index;
+  GtkTreeModel *model;
+  GtkTreeIter new_iter, prev_iter;
+  gcode_block_t *index_block;
+
+  if (!block)
+    return new_iter;
+
+  gtk_tree_store_insert_after (gui->gcode_block_store, &new_iter, NULL, iter);
+
+  gtk_tree_store_set (gui->gcode_block_store, &new_iter,
+                      0, 0,
+                      1, GCODE_TYPE_STRING[block->type],
+                      2, block->status,
+                      3, block->flags & GCODE_FLAGS_SUPPRESS,
+                      4, block->comment,
+                      5, block,
+                      -1);                                                      // Create and insert a new GUI row, then fill it up with data from 'block';
+
+  index_block = block->extruder;
+
+  if (index_block)
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+  index_block = block->listhead;
+
+  if (block->type == GCODE_TYPE_BOLT_HOLES)
+    index_block = NULL;
+
+  while (index_block)
+  {
+    gui_append_under_iter (gui, &new_iter, index_block);
+
+    index_block = index_block->next;
+  }
+
+  return new_iter;
+}
+
+/**
+ * Recursively regenerate everything under 'iter' by first destroying all its 
+ * children then walking the list of children of the block corresponding to it
+ * and recursively appending them back under 'iter' (including its extruder);
+ * Order numbers are refreshed (filled in, actually) after the tree is rebuilt.
+ * NOTE: this ONLY operates on the treeview, the block tree is left untouched!
+ */
+
+void
+gui_recreate_subtree_of (gui_t *gui, GtkTreeIter *iter)
+{
+  gcode_block_t *block, *index_block;
+  GtkTreeModel *model;
+  GtkTreeIter child_iter;
+  GValue value = { 0, };
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));  // Get a reference to the tree model we're supposed to be working on;
+
+  gtk_tree_model_get_value (model, iter, 5, &value);                            // Using 'iter', get a reference to the block it's based on;
+  block = (gcode_block_t *)g_value_get_pointer (&value);
+  g_value_unset (&value);
+
+  if (!block->listhead && !block->extruder)                                     // If the block has neither extruder nor children there's nothing to recreate;
+    return;
+
+  if (gtk_tree_model_iter_children (model, &child_iter, iter))                  // Otherwise, get an iter to the first child of 'iter',
+    while (gtk_tree_store_remove (GTK_TREE_STORE (model), &child_iter));        // and mercilessly get rid of every single one of them;
+
+  if (block->extruder)                                                          // If the block has an extruder, add it back as the first child of 'iter';
+    gui_append_under_iter (gui, iter, block->extruder);
+
+  index_block = block->listhead;                                                // Get a reference to the first child of 'block' (if any),
+
+  while (index_block)                                                           // and keep crawling the list until all of them are added back under 'iter';
+  {
+    gui_append_under_iter (gui, iter, index_block);
+
+    index_block = index_block->next;
+  }
+
+  if (gtk_tree_model_iter_children (model, &child_iter, iter))                  // Slight deja-vu here, but get an iter to the first child of 'iter' AGAIN;
+    gui_renumber_subtree_of (gui, &child_iter);                                 // Remember, remember the fifth of No... ugh, no - the NEED TO RENUMBER. Right!
+}
+
+/**
+ * Regenerate the entire GUI GTK tree by first destroying it then walking the
+ * gcode's block tree and calling a recursive append for each top level block;
+ * Order numbers are refreshed (filled in, actually) after the tree is rebuilt.
+ */
+
+void
+gui_recreate_whole_tree (gui_t *gui)
+{
+  gcode_block_t *index_block;
+
   gtk_tree_store_clear (gui->gcode_block_store);
 
-  refresh_gcode_block_tree_recursion (gui, gui->gcode.list, NULL, 1, 0);
-}
+  index_block = gui->gcode.listhead;
 
-
-void
-get_selected_block (gui_t *gui, gcode_block_t **selected_block, GtkTreeIter *iter)
-{
-  GtkTreeModel *model;
-  GtkTreeSelection *selection;
-  GValue value = { 0, };
-
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
-  *selected_block = NULL;
-
-  if (gtk_tree_selection_get_selected (selection, NULL, iter))
+  while (index_block)
   {
-    /* get the pointer from the tree */
-    gtk_tree_model_get_value (model, iter, 5, &value);
-    *selected_block = (gcode_block_t *) g_value_get_pointer (&value);
+    gui_append_under_iter (gui, GUI_TREE_ROOT, index_block);
 
-    g_value_unset (&value);
+    index_block = index_block->next;
   }
+
+  gui_renumber_whole_tree (gui);
 }
 
+/**
+ * Recursively update the first column / 'order number' of each GTK tree row
+ * starting with 'iter' and children, ending with 'iter's last same-level peer;
+ * Extrusions get '0', anything else gets numbered from '1' in iterating order.
+ * NOTE: it might not be obvious that since renumbering starts from 'iter' and
+ * not the first child of its parent, it's a bad idea to call this for anything
+ * other than a first element of a tree branch or the first element of the tree.
+ */
 
 void
-set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
-{
-  gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), iter);
-}
-
-
-static void
-find_tree_row_iter_with_block_recursion (gui_t *gui, GtkTreeModel *model, GtkTreeIter *iter, GtkTreeIter *found_iter, gcode_block_t *block)
-{
-  gcode_block_t *test_block;
-  GtkTreeIter child_iter;
-  GValue value = { 0, };
-
-  do
-  {
-    gtk_tree_model_get_value (model, iter, 5, &value);
-    test_block = (gcode_block_t *) g_value_get_pointer (&value);
-    g_value_unset (&value);
-
-    if (block == test_block)
-    {
-      *found_iter = *iter;
-      return;
-    }
-
-    if (gtk_tree_model_iter_children (model, &child_iter, iter))
-      find_tree_row_iter_with_block_recursion (gui, model, &child_iter, found_iter, block);
-
-  } while (gtk_tree_model_iter_next (model, iter));
-}
-
-
-void
-set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
-{
-  GtkTreeModel *model;
-  GtkTreeIter iter, found_iter;
-
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-
-  gtk_tree_model_get_iter_first (model, &iter);
-
-  find_tree_row_iter_with_block_recursion (gui, model, &iter, &found_iter, block);
-
-  gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (model, &found_iter));
-
-  gtk_tree_selection_select_iter (gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview)), &found_iter);
-
-  gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW (gui->gcode_block_treeview), gtk_tree_model_get_path (model, &found_iter), NULL, TRUE, 0.0, 0.0);
-
-  update_menu_options (gui, block);
-
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, block);
-}
-
-
-void
-update_block_tree_order_recursion (gui_t *gui, GtkTreeModel *model, GtkTreeIter *iter)
+gui_renumber_subtree_of (gui_t *gui, GtkTreeIter *iter)
 {
   gcode_block_t *block;
+  GtkTreeModel *model;
   GtkTreeIter child_iter;
   GValue value = { 0, };
   int i = 1;
 
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
   do
   {
     gtk_tree_model_get_value (model, iter, 5, &value);
-    block = (gcode_block_t *) g_value_get_pointer (&value);
+    block = (gcode_block_t *)g_value_get_pointer (&value);
     g_value_unset (&value);
 
     if (block->type == GCODE_TYPE_EXTRUSION)
@@ -635,87 +669,282 @@ update_block_tree_order_recursion (gui_t *gui, GtkTreeModel *model, GtkTreeIter 
     }
 
     if (gtk_tree_model_iter_children (model, &child_iter, iter))
-      update_block_tree_order_recursion (gui, model, &child_iter);
+      gui_renumber_subtree_of (gui, &child_iter);
 
   } while (gtk_tree_model_iter_next (model, iter));
 }
 
+/**
+ * Regenerate the 'order numbering' of the entire GUI GTK tree by calling a
+ * recursive 'gui_renumber_subtree_of()' for the first iter of the GTK tree;
+ */
 
 void
-update_block_tree_order (gui_t *gui)
+gui_renumber_whole_tree (gui_t *gui)
 {
   GtkTreeModel *model;
   GtkTreeIter iter;
 
   model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
 
-  gtk_tree_model_get_iter_first (model, &iter);
-  update_block_tree_order_recursion (gui, model, &iter);
+  if (gtk_tree_model_get_iter_first (model, &iter))
+    gui_renumber_subtree_of (gui, &iter);
 }
 
+/**
+ * Recursively crawl the list of 'block' and add any new tools to the tool list
+ */
 
 void
-project_menu_options (gui_t *gui, uint8_t state)
+gui_collect_endmills_of (gui_t *gui, gcode_block_t *block)
 {
-    uint8_t mode;
+  gcode_block_t *index_block;
+  gcode_tool_t *tool;
 
-    gui->project_state = state;
+  if (block)
+    index_block = block->listhead;
+  else
+    index_block = gui->gcode.listhead;
 
-    mode = gui->project_state == PROJECT_OPEN ? TRUE : FALSE;
-
-    /* Widgets to display when project is open */
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/New"), !mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Load"), !mode);
-
-    /* Widgets to display when project is closed */
-    if (!mode)
+  while (index_block)
+  {
+    if (index_block->type == GCODE_TYPE_TOOL)
     {
-      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 0);
+      tool = (gcode_tool_t *)index_block->pdata;
+
+      if (!gui_endmills_find (&gui->endmills, tool->label, FALSE))
+        gui_endmills_tack (&gui->endmills, tool->number, tool->diameter, gui->gcode.units, tool->label);
     }
 
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save As"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Close"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import GCAM"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Gerber (RS274X)"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import STL"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Export"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), mode);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), mode);
+    gui_collect_endmills_of (gui, index_block);
+
+    index_block = index_block->next;
+  }
 }
 
+/**
+ * Recursively crawl the GTK tree until the iter associated with 'block' is found
+ */
+
+static void
+find_tree_row_iter_with_block (gui_t *gui, GtkTreeModel *model, GtkTreeIter *iter, GtkTreeIter *found_iter, gcode_block_t *block)
+{
+  gcode_block_t *test_block;
+  GtkTreeIter child_iter;
+  GValue value = { 0, };
+
+  do
+  {
+    gtk_tree_model_get_value (model, iter, 5, &value);
+    test_block = (gcode_block_t *)g_value_get_pointer (&value);
+    g_value_unset (&value);
+
+    if (block == test_block)
+    {
+      *found_iter = *iter;
+      return;
+    }
+
+    if (gtk_tree_model_iter_children (model, &child_iter, iter))
+      find_tree_row_iter_with_block (gui, model, &child_iter, found_iter, block);
+
+  } while (gtk_tree_model_iter_next (model, iter));
+}
+
+/**
+ * Find and return the block currently selected in the GUI as both the tree 
+ * block 'selected_block' and the GTK tree iterator 'iter';
+ */
 
 void
-update_menu_options (gui_t *gui, gcode_block_t *selected_block)
+get_selected_block (gui_t *gui, gcode_block_t **block, GtkTreeIter *iter)
+{
+  GtkTreeModel *model;
+  GtkTreeSelection *selection;
+  GValue value = { 0, };
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  *block = NULL;
+
+  if (gtk_tree_selection_get_selected (selection, NULL, iter))
+  {
+    gtk_tree_model_get_value (model, iter, 5, &value);                          // Using the iter, we can fetch the content of the fifth column of that row,
+    *block = (gcode_block_t *)g_value_get_pointer (&value);                     // to retrieve the pointer to the associated block;
+    g_value_unset (&value);
+  }
+}
+
+/**
+ * Make a specific GTK tree row 'selected' by its associated iter
+ */
+
+void
+set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
+{
+  GtkTreeModel *model;
+  GtkTreeSelection *selection;
+  GValue value = { 0, };
+  gcode_block_t *block;
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gtk_tree_model_get_value (model, iter, 5, &value);                            // Using the iter, we can fetch the content of the fifth column of that row,
+  block = (gcode_block_t *)g_value_get_pointer (&value);                        // to retrieve the pointer to the associated block;
+  g_value_unset (&value);
+
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gtk_tree_selection_select_iter (selection, iter);
+
+  update_menu_by_selected_item (gui, block);
+
+  gui->opengl.rebuild_view_display_list = 1;
+  gui_opengl_context_redraw (&gui->opengl, block);
+}
+
+/**
+ * Make a specific GTK tree row 'selected' by its associated block
+ */
+
+void
+set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
+{
+  GtkTreeModel *model;
+  GtkTreeSelection *selection;
+  GtkTreeIter iter, found_iter;
+
+  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gtk_tree_model_get_iter_first (model, &iter);
+
+  find_tree_row_iter_with_block (gui, model, &iter, &found_iter, block);
+
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+
+  gtk_tree_selection_select_iter (selection, &found_iter);
+
+  update_menu_by_selected_item (gui, block);
+
+  gui->opengl.rebuild_view_display_list = 1;
+  gui_opengl_context_redraw (&gui->opengl, block);
+}
+
+/**
+ * Update the window title by current project name and status (modified or not)
+ */
+
+void
+update_project_modified_flag (gui_t *gui, uint8_t modified)
+{
+  gui->modified = modified;
+
+  if (modified)
+  {
+    if (*gui->gcode.name)
+    {
+      sprintf (gui->title, "* GCAM Special Edition v%s - %s", VERSION, gui->gcode.name);
+    }
+    else
+    {
+      sprintf (gui->title, "* GCAM Special Edition v%s", VERSION);
+    }
+  }
+  else
+  {
+    if (*gui->gcode.name)
+    {
+      sprintf (gui->title, "GCAM Special Edition v%s - %s", VERSION, gui->gcode.name);
+    }
+    else
+    {
+      sprintf (gui->title, "GCAM Special Edition v%s", VERSION);
+    }
+  }
+
+  gtk_window_set_title (GTK_WINDOW (gui->window), gui->title);
+
+  if (gui->project_state == PROJECT_OPEN)                                       // Unrelated, but it has to go somewhere and 'modified' is a coinciding event;
+  {
+    if (*gui->filename)                                                         // The idea is that if there is a filename, the "Save" menu can be enabled;
+    {
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 1);
+    }
+  }
+}
+
+/**
+ * Enable/disable various GUI menu items based on project state (open/closed)
+ */
+
+void
+update_menu_by_project_state (gui_t *gui, uint8_t state)
+{
+  uint8_t open;
+
+  gui->project_state = state;
+
+  open = (state == PROJECT_OPEN) ? TRUE : FALSE;
+
+  /* Widgets to display when project is closed */
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/New"), !open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Open"), !open);
+
+  /* Widgets to disable when project is closed */
+  if (!open)
+  {
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 0);
+  }
+
+  /* Widgets to display when project is open */
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save As"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Close"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import GCAM"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Gerber (RS274X)"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Export"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), open);
+}
+
+/**
+ * Enable/disable various GUI menu items based on the currently selected block
+ */
+
+void
+update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
 {
   /* 
-  * This check is here incase a block is deleted right after a new block is inserted/duplicated
-  * and  the comment field is highlighted.
-  */
+   * This check is here in case a block is deleted right after a new block is
+   * inserted/duplicated and the comment field is highlighted.
+   */
   if (!selected_block)
     return;
 
-  /*
-  * Toggle menu items that should reflect actions available to the current selected block.
-  */
+  /**
+   * Toggle menu items that should reflect actions available to the current selected block.
+   */
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import GCAM"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Gerber (RS274X)"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import STL"), 0);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Remove"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Scale"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Previous"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Next"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Previous"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Next"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Pattern"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Template"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 1);
@@ -725,6 +954,7 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Drill Holes"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 1);
 
   /* FILLETING */
@@ -733,6 +963,7 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     gcode_block_t *connected;
 
     connected = gcode_sketch_prev_connected (selected_block);
+
     if (connected)
     {
       if (connected->type != GCODE_TYPE_LINE)
@@ -746,6 +977,7 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     }
 
     connected = gcode_sketch_next_connected (selected_block);
+
     if (connected)
     {
       if (connected->type != GCODE_TYPE_LINE)
@@ -765,7 +997,8 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
   }
 
   /* DRILL POINTS AND POINT */
-  if (selected_block->type != GCODE_TYPE_DRILL_HOLES && selected_block->type != GCODE_TYPE_POINT)
+  if ((selected_block->type != GCODE_TYPE_DRILL_HOLES) &&
+      (selected_block->type != GCODE_TYPE_POINT))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 0);
   }
@@ -781,7 +1014,6 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Drill Holes"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 0);
   }
-
 
   /* EXTRUSION */
   if (selected_block->parent)
@@ -801,52 +1033,88 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Remove"), 0);
   }
 
-  if (selected_block->type != GCODE_TYPE_SKETCH && selected_block->type != GCODE_TYPE_DRILL_HOLES)
+  if (selected_block->type != GCODE_TYPE_SKETCH)
   {
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Pattern"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 0);
   }
 
-  if (selected_block->type != GCODE_TYPE_ARC && selected_block->type != GCODE_TYPE_LINE)
+  if ((selected_block->type != GCODE_TYPE_SKETCH) &&
+      (selected_block->type != GCODE_TYPE_DRILL_HOLES))
+  {
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 0);
+  }
+
+  if ((selected_block->type != GCODE_TYPE_SKETCH) &&
+      (selected_block->type != GCODE_TYPE_ARC) &&
+      (selected_block->type != GCODE_TYPE_LINE))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 0);
   }
 
   /* LINE AND ARC */
-  if (selected_block->type == GCODE_TYPE_BEGIN ||
-      selected_block->type == GCODE_TYPE_END ||
-      selected_block->type == GCODE_TYPE_TOOL ||
-      selected_block->type == GCODE_TYPE_TEMPLATE ||
-      selected_block->type == GCODE_TYPE_BOLT_HOLES ||
-      selected_block->type == GCODE_TYPE_DRILL_HOLES ||
-      selected_block->type == GCODE_TYPE_IMAGE)
+  if ((selected_block->type == GCODE_TYPE_BEGIN) ||
+      (selected_block->type == GCODE_TYPE_END) ||
+      (selected_block->type == GCODE_TYPE_TOOL) ||
+      (selected_block->type == GCODE_TYPE_TEMPLATE) ||
+      (selected_block->type == GCODE_TYPE_BOLT_HOLES) ||
+      (selected_block->type == GCODE_TYPE_DRILL_HOLES) ||
+      (selected_block->type == GCODE_TYPE_IMAGE))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Line"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Arc"), 0);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Previous"), 0);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 0);
   }
 
-  /* JOIN NEXT and JOIN PREVIOUS */
-  if (selected_block->type == GCODE_TYPE_SKETCH || selected_block->type == GCODE_TYPE_EXTRUSION)
+  /* ATTRACT NEXT and ATTRACT PREVIOUS */
+  if ((selected_block->type == GCODE_TYPE_SKETCH) ||
+      (selected_block->type == GCODE_TYPE_EXTRUSION))
   {
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Previous"), 0);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Join Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 0);
   }
-
 
   /* DUPLICATE */
-  if (selected_block->type == GCODE_TYPE_BEGIN || selected_block->type == GCODE_TYPE_END || selected_block->type == GCODE_TYPE_EXTRUSION)
+  if ((selected_block->type == GCODE_TYPE_BEGIN) ||
+      (selected_block->type == GCODE_TYPE_END) ||
+      (selected_block->type == GCODE_TYPE_EXTRUSION))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 0);
   }
 
+  /* TRANSLATE AND ROTATE */
+  if ((selected_block->type != GCODE_TYPE_TEMPLATE) &&
+      (selected_block->type != GCODE_TYPE_SKETCH) &&
+      (selected_block->type != GCODE_TYPE_BOLT_HOLES) &&
+      (selected_block->type != GCODE_TYPE_DRILL_HOLES) &&
+      (selected_block->type != GCODE_TYPE_POINT) &&
+      (selected_block->type != GCODE_TYPE_LINE) &&
+      (selected_block->type != GCODE_TYPE_ARC) &&
+      (selected_block->type != GCODE_TYPE_STL))
+  {
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 0);
+  }
+
   /* SCALE */
-  if (selected_block->type != GCODE_TYPE_TEMPLATE && selected_block->type != GCODE_TYPE_SKETCH &&
-      selected_block->type != GCODE_TYPE_BOLT_HOLES && selected_block->type != GCODE_TYPE_DRILL_HOLES &&
-      selected_block->type != GCODE_TYPE_LINE && selected_block->type != GCODE_TYPE_ARC &&
-      selected_block->type != GCODE_TYPE_IMAGE && selected_block->type != GCODE_TYPE_STL)
+  if ((selected_block->type != GCODE_TYPE_TEMPLATE) &&
+      (selected_block->type != GCODE_TYPE_SKETCH) &&
+      (selected_block->type != GCODE_TYPE_BOLT_HOLES) &&
+      (selected_block->type != GCODE_TYPE_DRILL_HOLES) &&
+      (selected_block->type != GCODE_TYPE_LINE) &&
+      (selected_block->type != GCODE_TYPE_ARC) &&
+      (selected_block->type != GCODE_TYPE_IMAGE) &&
+      (selected_block->type != GCODE_TYPE_STL))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Scale"), 0);
+  }
+
+  /* POLYGON ASSISTANT */
+  if ((selected_block->type != GCODE_TYPE_TOOL) &&
+      (selected_block->type != GCODE_TYPE_TEMPLATE) &&
+      (selected_block->type != GCODE_TYPE_SKETCH))
+  {
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 0);
   }
 
   /* End - Nothing allowed to be inserted or pasted */
@@ -856,7 +1124,6 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Gerber (RS274X)"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), 0);
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import STL"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Bolt Holes"), 0);
@@ -867,9 +1134,9 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 0);
   }
 
-  if (selected_block->type == GCODE_TYPE_LINE ||
-      selected_block->type == GCODE_TYPE_ARC ||
-      selected_block->type == GCODE_TYPE_EXTRUSION)
+  if ((selected_block->type == GCODE_TYPE_LINE) ||
+      (selected_block->type == GCODE_TYPE_ARC) ||
+      (selected_block->type == GCODE_TYPE_EXTRUSION))
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 0);
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 0);
@@ -880,39 +1147,52 @@ update_menu_options (gui_t *gui, gcode_block_t *selected_block)
   }
 }
 
+/**
+ * Recreate the main tree view based on the underlying block tree, select the
+ * "tool" row, declare the project state "open", update the left tab and also 
+ * enable / disable menu items accordingly, then repaint the rendering;
+ * Once a new project is created or loaded, this is the routine to call.
+ */
 
 void
-gui_menu_util_modified (gui_t *gui, int mod)
+gui_show_project (gui_t *gui)
 {
-  if (mod)
-  {
-    if (gui->project_state == PROJECT_OPEN)
-      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 1);
+  GtkTreeSelection *selection;
+  GtkTreePath *path;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
 
-    if (gui->gcode.name[0])
-    {
-      sprintf (gui->title, "* GCAM v%s - %s", VERSION, gui->gcode.name);
-    }
-    else
-    {
-      sprintf (gui->title, "* GCAM v%s", VERSION);
-    }
-  }
-  else
-  {
-    if (gui->project_state == PROJECT_OPEN)
-      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 0);
+  /* Refresh G-Code Block Tree */
+  gui_recreate_whole_tree (gui);
 
-    if (gui->gcode.name[0])
-    {
-      sprintf (gui->title, "GCAM v%s - %s", VERSION, gui->gcode.name);
-    }
-    else
-    {
-      sprintf (gui->title, "GCAM v%s", VERSION);
-    }
-  }
+  /* Highlight the Tool block */
+  path = gtk_tree_path_new_from_string ("1");
+  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
 
-  gtk_window_set_title (GTK_WINDOW (gui->window), gui->title);
-  gui->modified = mod;
+  gtk_tree_selection_select_path (selection, path);
+  get_selected_block (gui, &selected_block, &selected_iter);
+  gui_tab_display (gui, selected_block, 0);
+
+  gtk_tree_path_free (path);
+
+  update_menu_by_project_state (gui, PROJECT_OPEN);
+  update_menu_by_selected_item (gui, selected_block);
+
+  gui->opengl.ready = 1;
+  gui->first_render = 1;
+
+  gui_opengl_context_prep (&gui->opengl);
+
+  gui->opengl.rebuild_view_display_list = 1;
+  gui_opengl_context_redraw (&gui->opengl, selected_block);
+}
+
+/**
+ * Full-on Dalek mode: Engage! Burn the land, boil the sea and all that jazz...
+ */
+
+void
+gui_destroy (void)
+{
+  gtk_main_quit ();
 }

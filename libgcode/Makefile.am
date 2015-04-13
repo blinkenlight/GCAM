@@ -1,7 +1,10 @@
 ########################################################################
 #  Makefile.am
 #  Source code file for G-Code generation, simulation, and visualization
-#  library. This software is Copyright (C) 2006 by Justin Shumaker
+#  library.
+#
+#  Copyright (C) 2006 - 2010 by Justin Shumaker
+#  Copyright (C) 2014 by Asztalos Attila Oszkár
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -16,7 +19,9 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
-lib_LTLIBRARIES = libgcode.la
+
+noinst_LTLIBRARIES = libgcode.la
+
 libgcode_la_SOURCES = \
 	gcode.c \
 	gcode_arc.c \
@@ -43,7 +48,8 @@ libgcode_la_SOURCES = \
 	gcode_util.c
 
 AM_CFLAGS = \
-	@GTKGLEXT_CFLAGS@
+	@GTKGLEXT_CFLAGS@ \
+  -I${top_srcdir}/libgui
 
 include_HEADERS = \
 	gcode.h \

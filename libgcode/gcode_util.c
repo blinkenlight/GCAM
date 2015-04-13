@@ -1,66 +1,146 @@
-/*
-*  gcode_util.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gcode_util.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gcode_util.h"
 #include <inttypes.h>
 #include "gcode.h"
 #include "gcode_arc.h"
 #include "gcode_line.h"
 
+int
+gcode_util_xml_safelen (char *string)
+{
+  char *pscan;
+  int safelen = strlen (string) + 1;
+
+  for (pscan = string; *pscan; pscan++)
+  {
+    switch (*pscan)
+    {
+      case '<':
+        safelen += 3;
+        break;
+
+      case '>':
+        safelen += 3;
+        break;
+
+      case '&':
+        safelen += 4;
+        break;
+
+      case '\'':
+        safelen += 5;
+        break;
+
+      case '"':
+        safelen += 5;
+        break;
+    }
+  }
+
+  return safelen;
+}
+
+void
+gcode_util_xml_cpysafe (char *safestring, char *string)
+{
+  char *pscansrc, *pscandst;
+
+  for (pscansrc = string, pscandst = safestring; *pscansrc; pscansrc++, pscandst++)
+  {
+    switch (*pscansrc)
+    {
+      case '<':
+        strcpy (pscandst, "&lt;");
+        pscandst += 3;
+        break;
+
+      case '>':
+        strcpy (pscandst, "&gt;");
+        pscandst += 3;
+        break;
+
+      case '&':
+        strcpy (pscandst, "&amp;");
+        pscandst += 4;
+        break;
+
+      case '\'':
+        strcpy (pscandst, "&apos;");
+        pscandst += 5;
+        break;
+
+      case '"':
+        strcpy (pscandst, "&quot;");
+        pscandst += 5;
+        break;
+
+      default:
+        *pscandst = *pscansrc;
+    }
+  }
+
+  *pscandst = '\0';
+}
 
 int
 gcode_util_qsort_compare_asc (const void *a, const void *b)
 {
   gfloat_t x, y;
 
-  x = *(gfloat_t *) a;
-  y = *(gfloat_t *) b;
+  x = *(gfloat_t *)a;
+  y = *(gfloat_t *)b;
 
-  if (fabs (x-y) < GCODE_PRECISION)
+  if (fabs (x - y) < GCODE_PRECISION)
     return (0);
 
   return (x < y ? -1 : 1);
 }
 
-
 void
 gcode_util_remove_spaces (char *string)
 {
-  uint32_t i, n;
+  uint32_t i, j;
 
-  i = 0;
+  i = j = 0;
 
-  while (i < strlen (string))
+  while (string[j] != '\0')
   {
-    if (string[i] == ' ')
+    if (string[j] != ' ')
     {
-      for (n = i; n < strlen (string); n++)
+      if (j > i)
       {
-        string[n] = string[n+1];
+        string[i] = string[j];
       }
-    }
-    else
-    {
+
       i++;
     }
-  }
-}
 
+    j++;
+  }
+
+  string[i] = '\0';
+}
 
 void
 gcode_util_remove_comment (char *string)
@@ -68,11 +148,39 @@ gcode_util_remove_comment (char *string)
   uint32_t i;
 
   i = 0;
-  while (string[i] != '\0' && string[i] != ';')
+
+  while ((string[i] != '\0') && (string[i] != ';') && (string[i] != '('))
     i++;
-  string[i] = 0;
+
+  string[i] = '\0';
 }
 
+void
+gcode_util_filter_newlines (char *string)
+{
+  uint32_t i, j;
+
+  i = j = 0;
+
+  while (string[j] != '\0')                                                     // Only loop as long as string[j] is not the terminating null;
+  {                                                                             // If so, string[j+1] must still be part of the string, null included;
+    if ((string[j] == '\n') && (string[j + 1] == '\n'))                         // If both string[j] and string[j+1] are newlines, are there more?
+    {                                                                           // If so, string[j+2] must ALSO be part of the string, null included;
+      while (string[j + 2] == '\n')                                             // That means we may test it, and as long as there are further newlines
+        j++;                                                                    // past the first two, we keep dropping chars - that means when we stop
+    }                                                                           // skipping there will be exactly two newlines left to copy, not more;
+
+    if (j > i)
+    {
+      string[i] = string[j];
+    }
+
+    i++;
+    j++;
+  }
+
+  string[i] = '\0';
+}
 
 void
 gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num)
@@ -80,45 +188,61 @@ gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num)
   int32_t i, j, num2;
 
   num2 = *num;
-  for (i = 0; i < num2-1; i++)
+
+  for (i = 0; i < num2 - 1; i++)
   {
-    if (fabs (array[i+1] - array[i]) < GCODE_PRECISION)
+    if (fabs (array[i + 1] - array[i]) < GCODE_PRECISION)
     {
-      for (j = i; j < num2-1; j++)
+      for (j = i; j < num2 - 1; j++)
       {
-        array[j] = array[j+1];
+        array[j] = array[j + 1];
       }
+
       num2--;
     }
   }
+
   *num = num2;
 }
 
+/**
+ * "Quick & Dirty" bounding box for arcs and lines - not a correct bounding box
+ * but a faster one that is guaranteed to be LARGER than the real bounding box,
+ * useful to quickly filter out blocks that CANNOT POSSIBLY intersect, so only
+ * the remaining ones are getting intersected in an "each-with-each" scenario;
+ * NOTE: this does NOT take offsets into account - use it only when offsets are
+ * not involved
+ */
+
 void
-gcode_util_duplicate_list (gcode_block_t *start_block, gcode_block_t *end_block, gcode_block_t **duplicate_list)
+gcode_util_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 {
-  gcode_block_t *duplicate_block, *last_block;
-
-  *duplicate_list = NULL;
-
-  while (start_block != end_block)
+  switch (block->type)
   {
-    start_block->duplicate (start_block, &duplicate_block);
+    case GCODE_TYPE_LINE:
 
-    if (*duplicate_list)
-    {
-      gcode_list_insert (&last_block, duplicate_block);
-    }
-    else
-    {
-      gcode_list_insert (duplicate_list, duplicate_block);
-    }
+      gcode_line_qdbb (block, min, max);
 
-    last_block = duplicate_block;
-    start_block = start_block->next;
+      break;
+
+    case GCODE_TYPE_ARC:
+
+      gcode_arc_qdbb (block, min, max);
+
+      break;
+
+    default:
+
+      GCODE_MATH_VEC2D_SET (min, DBL_MIN, DBL_MIN);
+      GCODE_MATH_VEC2D_SET (max, DBL_MAX, DBL_MAX);
   }
 }
 
+/**
+ * Calculate and return the points where a line segments and an arc intersect
+ * NOTE: valid points have to actually lie between the segment's/arc's endpoints
+ * NOTE: the calculations are done taking each block's offset into account
+ */
 
 static int
 line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_vec2d_t ip_array[2], int *ip_num)
@@ -129,54 +253,45 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
   gfloat_t arc_radius, line_dx, line_dy, line_dr, line_dr_inv, line_d, line_sgn, line_disc, arc_start_angle, angle;
   int p0_test, p1_test;
 
-
   *ip_num = 0;
 
-  line = (gcode_line_t *) line_block->pdata;
-  arc = (gcode_arc_t *) arc_block->pdata;
+  line = (gcode_line_t *)line_block->pdata;
+  arc = (gcode_arc_t *)arc_block->pdata;
 
   gcode_arc_with_offset (arc_block, arc_origin, arc_center, arc_p0, &arc_radius, &arc_start_angle);
+
   if (arc_radius <= GCODE_PRECISION)
     return (1);
 
   gcode_line_with_offset (line_block, line_p0, line_p1, line_normal);
 
-/* printf ("line: %s, %.12f,%.12f %.12f,%.12f  normal: %.12f,%.12f  arc: %s, radius: %.12f, center: %.12f,%.12f\n", line_block->comment, line_p0[0], line_p0[1], line_p1[0], line_p1[1], line_normal[0], line_normal[1], arc_block->comment, arc_radius, arc_center[0], arc_center[1]); */
-
-  /*
-  * Circle-Line Intersection from Wolfram MathWorld.
-  * Subtract circle center from line points to represent circle center as 0,0.
-  */
+  /**
+   * Circle-Line Intersection from Wolfram MathWorld.
+   * Subtract circle center from line points to represent circle center as 0,0.
+   */
 
   line_p0[0] -= arc_center[0];
   line_p0[1] -= arc_center[1];
   line_p1[0] -= arc_center[0];
   line_p1[1] -= arc_center[1];
 
-
   line_dx = line_p1[0] - line_p0[0];
   line_dy = line_p1[1] - line_p0[1];
 
-  line_dr = sqrt (line_dx*line_dx + line_dy*line_dy);
-  line_d = line_p0[0]*line_p1[1] - line_p1[0]*line_p0[1];
+  line_dr = sqrt (line_dx * line_dx + line_dy * line_dy);
+  line_d = line_p0[0] * line_p1[1] - line_p1[0] * line_p0[1];
 
-/* printf ("line: %.12f,%.12f %.12f,%.12f\n", line_p0[0], line_p0[1], line_p1[0], line_p1[1]); */
-/* printf ("line_disc: %.12f * %.12f - %.12f\n", arc_radius, line_dr, line_d); */
   line_disc = arc_radius * arc_radius * line_dr * line_dr - line_d * line_d;
 
   /* Prevent floating fuzz from turning the zero discriminant into an imaginary number. */
-/* printf ("line_disc: %.12f, arc_pos: %f,%f\n", line_disc, arc->pos[0], arc->pos[1]); */
-  if (line_disc < 0.0 && line_disc > -GCODE_PRECISION*GCODE_PRECISION)
+  if ((line_disc < 0.0) && (line_disc > -GCODE_PRECISION * GCODE_PRECISION))
     line_disc = 0.0;
 
   if (line_disc < 0.0)
-  {
-/*    printf ("no intersection: %.12f\n", line_disc); */
     return (1);
-  }
 
-  line_disc = sqrt (line_disc); /* optimization */
-  line_dr *= line_dr; /* optimization */
+  line_disc = sqrt (line_disc);                                                 /* optimization */
+  line_dr *= line_dr;                                                           /* optimization */
   line_dr_inv = 1.0 / line_dr;
   line_sgn = line_dy < 0.0 ? -1.0 : 1.0;
 
@@ -202,34 +317,37 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
     min[1] = line->p1[1];
     max[1] = line->p0[1];
   }
+
   min[0] -= GCODE_PRECISION;
   min[1] -= GCODE_PRECISION;
   max[0] += GCODE_PRECISION;
   max[1] += GCODE_PRECISION;
 
-
-
   arc_p0[0] = arc_center[0] + (line_d * line_dy + line_sgn * line_dx * line_disc) * line_dr_inv;
   arc_p0[1] = arc_center[1] + (-line_d * line_dx + fabs (line_dy) * line_disc) * line_dr_inv;
+
   /* Check that the point falls within the bounds of the line segment */
   p0_test = 0;
-  if (arc_p0[0] >= min[0] && arc_p0[0] <= max[0] && arc_p0[1] >= min[1] && arc_p0[1] <= max[1])
+
+  if ((arc_p0[0] >= min[0]) && (arc_p0[0] <= max[0]) && (arc_p0[1] >= min[1]) && (arc_p0[1] <= max[1]))
   {
-    gcode_math_xy_to_angle (arc_center, arc_radius, arc_p0[0], arc_p0[1], &angle);
-    p0_test = gcode_math_angle_within_arc (arc_start_angle, arc->sweep, angle) ? 0 : 1;
+    gcode_math_xy_to_angle (arc_center, arc_p0, &angle);
+    p0_test = gcode_math_angle_within_arc (arc_start_angle, arc->sweep_angle, angle) ? 0 : 1;
   }
 
   arc_p1[0] = arc_center[0] + (line_d * line_dy - line_sgn * line_dx * line_disc) * line_dr_inv;
   arc_p1[1] = arc_center[1] + (-line_d * line_dx - fabs (line_dy) * line_disc) * line_dr_inv;
+
   p1_test = 0;
-  if (arc_p1[0] >= min[0] && arc_p1[0] <= max[0] && arc_p1[1] >= min[1] && arc_p1[1] <= max[1])
+
+  if ((arc_p1[0] >= min[0]) && (arc_p1[0] <= max[0]) && (arc_p1[1] >= min[1]) && (arc_p1[1] <= max[1]))
   {
-    gcode_math_xy_to_angle (arc_center, arc_radius, arc_p1[0], arc_p1[1], &angle);
-    p1_test = gcode_math_angle_within_arc (arc_start_angle, arc->sweep, angle) ? 0 : 1;
+    gcode_math_xy_to_angle (arc_center, arc_p1, &angle);
+    p1_test = gcode_math_angle_within_arc (arc_start_angle, arc->sweep_angle, angle) ? 0 : 1;
   }
 
-
-  if (p0_test && line_disc > GCODE_PRECISION) /* Handles Tangent case where the discriminant equals 0.0 */
+  /* Handle Tangent case where the discriminant equals 0.0 */
+  if (p0_test && (line_disc > GCODE_PRECISION))
   {
     ip_array[*ip_num][0] = arc_p0[0];
     ip_array[*ip_num][1] = arc_p0[1];
@@ -243,120 +361,143 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
     (*ip_num)++;
   }
 
-#if 0
-if (*ip_num)
-{
-/*  printf ("** ipnum: %d\n", *ip_num); */
-  printf ("** line_d: %.12f, line_dy: %.12f, line_sgn: %.12f, line_dx: %.12f, line_disc: %.12f, line_dr: %.12f\n", line_d, line_dy, line_sgn, line_dx, line_disc, line_dr);
-  printf ("** line: %.12f,%.12f %.12f,%.12f  normal: %.12f,%.12f  arc: %s, radius: %.12f, center: %.12f,%.12f\n", line->p0[0], line->p0[1], line->p1[0], line->p1[1], line_normal[0], line_normal[1], arc_block->comment, arc_radius, arc_center[0], arc_center[1]);
-}
-#endif
-
   return (*ip_num ? 0 : 1);
 }
 
+/**
+ * Calculate and return the points where two line segments intersect
+ * NOTE: valid points have to actually lie between each segment's endpoints
+ * NOTE: the calculations are done taking each block's offset into account
+ */
 
 static int
 line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode_vec2d_t ip_array[2], int *ip_num)
 {
   gcode_line_t *line1;
   gcode_line_t *line2;
-  gcode_vec2d_t line1_p0, line1_p1, line1_normal, line2_p0, line2_p1, line2_normal;
+  gcode_vec2d_t line1_p0, line1_p1, line1_normal, line2_p0, line2_p1, line2_normal, ip;
   gfloat_t det[4];
+  gfloat_t eps;
 
+  eps = GCODE_PRECISION;
 
   *ip_num = 0;
 
-  line1 = (gcode_line_t *) line1_block->pdata;
-  line2 = (gcode_line_t *) line2_block->pdata;
+  line1 = (gcode_line_t *)line1_block->pdata;
+  line2 = (gcode_line_t *)line2_block->pdata;
 
   gcode_line_with_offset (line1_block, line1_p0, line1_p1, line1_normal);
   gcode_line_with_offset (line2_block, line2_p0, line2_p1, line2_normal);
 
-  /*
-  * Line-Line Intersection from Wolfram MathWorld.
-  * Solved using determinants with bound checking.
-  */
-
-  det[3] = ((line1_p0[0] - line1_p1[0])*(line2_p0[1] - line2_p1[1])) - ((line1_p0[1] - line1_p1[1])*(line2_p0[0] - line2_p1[0]));
-
-/* printf ("line_line:\n"); */
-  if (fabs (det[3]) < GCODE_PRECISION)
+  if ((GCODE_MATH_2D_MANHATTAN (line2_p0, line1_p1) < eps) ||
+      (GCODE_MATH_2D_MANHATTAN (line2_p0, line1_p0) < eps))
   {
-    /*
-    * Lines may be parallel and may not intersect,
-    * if they are parallel then return the p0 of line2.
-    */
-#if 0
-    if (line
-    p[0] = line2_p0[0];
-    p[1] = line2_p0[1];
-#endif
-    return (1);
+    ip_array[0][0] = line2_p0[0];
+    ip_array[0][1] = line2_p0[1];
+
+    *ip_num = 1;
+
+    return (0);                                                                 // Unless we test for it first, straight continuity gets missed as "parallels";
   }
 
-  det[0] = line1_p0[0]*line1_p1[1] - line1_p0[1]*line1_p1[0];
-  det[1] = line2_p0[0]*line2_p1[1] - line2_p0[1]*line2_p1[0];
+  if ((GCODE_MATH_2D_MANHATTAN (line2_p1, line1_p1) < eps) ||
+      (GCODE_MATH_2D_MANHATTAN (line2_p1, line1_p0) < eps))
+  {
+    ip_array[0][0] = line2_p1[0];
+    ip_array[0][1] = line2_p1[1];
+
+    *ip_num = 1;
+
+    return (0);                                                                 // The most likely got tested first, but there are 2 x 2 possibilities...
+  }
+
+  /**
+   * Line-Line Intersection from Wolfram MathWorld.
+   * Solved using determinants with bound checking.
+   */
+
+  det[3] = ((line1_p0[0] - line1_p1[0]) * (line2_p0[1] - line2_p1[1])) - ((line1_p0[1] - line1_p1[1]) * (line2_p0[0] - line2_p1[0]));
+
+  if (fabs (det[3]) < eps)                                                      // Lines may be parallel and may not intersect
+    return (1);
+
+  det[0] = line1_p0[0] * line1_p1[1] - line1_p0[1] * line1_p1[0];
+  det[1] = line2_p0[0] * line2_p1[1] - line2_p0[1] * line2_p1[0];
 
   det[2] = (det[0] * (line2_p0[0] - line2_p1[0])) - ((line1_p0[0] - line1_p1[0]) * det[1]);
-  ip_array[*ip_num][0] = det[2] / det[3];
+  ip_array[0][0] = ip[0] = det[2] / det[3];
 
   det[2] = (det[0] * (line2_p0[1] - line2_p1[1])) - ((line1_p0[1] - line1_p1[1]) * det[1]);
-  ip_array[*ip_num][1] = det[2] / det[3];
+  ip_array[0][1] = ip[1] = det[2] / det[3];
 
-
-/*  printf ("line_line x: %.12f, y: %.12f .. %.12f,%.12f  %.12f,%.12f  %.12f,%.12f  %.12f,%.12f\n", ip_array[*ip_num][0], ip_array[*ip_num][1], line1_p0[0], line1_p0[1], line1_p1[0], line1_p1[1], line2_p0[0], line2_p0[1], line2_p1[0], line2_p1[1]); */
   /* intersection point must lie within each line segment */
-  if (((ip_array[*ip_num][0] >= line1_p0[0]-GCODE_PRECISION && ip_array[*ip_num][0] <= line1_p1[0]+GCODE_PRECISION) || (ip_array[*ip_num][0] >= line1_p1[0]-GCODE_PRECISION && ip_array[*ip_num][0] <= line1_p0[0]+GCODE_PRECISION)) &&
-      ((ip_array[*ip_num][1] >= line1_p0[1]-GCODE_PRECISION && ip_array[*ip_num][1] <= line1_p1[1]+GCODE_PRECISION) || (ip_array[*ip_num][1] >= line1_p1[1]-GCODE_PRECISION && ip_array[*ip_num][1] <= line1_p0[1]+GCODE_PRECISION)) &&
-      ((ip_array[*ip_num][0] >= line2_p0[0]-GCODE_PRECISION && ip_array[*ip_num][0] <= line2_p1[0]+GCODE_PRECISION) || (ip_array[*ip_num][0] >= line2_p1[0]-GCODE_PRECISION && ip_array[*ip_num][0] <= line2_p0[0]+GCODE_PRECISION)) &&
-      ((ip_array[*ip_num][1] >= line2_p0[1]-GCODE_PRECISION && ip_array[*ip_num][1] <= line2_p1[1]+GCODE_PRECISION) || (ip_array[*ip_num][1] >= line2_p1[1]-GCODE_PRECISION && ip_array[*ip_num][1] <= line2_p0[1]+GCODE_PRECISION)))
-  {
-    *ip_num = 1;
-    return (0);
-  }
 
-  return (1);
+  if (((ip[0] < line1_p0[0] - eps) && (ip[0] < line1_p1[0] - eps)) ||
+      ((ip[0] > line1_p0[0] + eps) && (ip[0] > line1_p1[0] + eps)))
+    return (1);                                                                 // If (x<a and x<b) or (x>a and x>b), x cannot belong to [a b];
+
+  if (((ip[0] < line2_p0[0] - eps) && (ip[0] < line2_p1[0] - eps)) ||
+      ((ip[0] > line2_p0[0] + eps) && (ip[0] > line2_p1[0] + eps)))
+    return (1);                                                                 // If (x<c and x<d) or (x>c and x>d), x cannot belong to [c d];
+
+  /* Since ip is ON EACH LINE these are technically redundant */
+
+  if (((ip[1] < line1_p0[1] - eps) && (ip[1] < line1_p1[1] - eps)) ||
+      ((ip[1] > line1_p0[1] + eps) && (ip[1] > line1_p1[1] + eps)))
+    return (1);                                                                 // If (y<a and y<b) or (y>a and y>b), y cannot belong to [a b];
+
+  if (((ip[1] < line2_p0[1] - eps) && (ip[1] < line2_p1[1] - eps)) ||
+      ((ip[1] > line2_p0[1] + eps) && (ip[1] > line2_p1[1] + eps)))
+    return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d];
+
+  *ip_num = 1;                                                                  // Oh, still here? Ok, one intersection point it is then...
+
+  return (0);
 }
 
+/**
+ * Calculate and return the points where two arcs intersect
+ * NOTE: valid points have to actually lie between each arc's endpoints
+ * NOTE: the calculations are done taking each block's offset into account
+ */
 
 static int
 arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_vec2d_t ip_array[2], int *ip_num)
 {
   gcode_arc_t *arc1;
   gcode_arc_t *arc2;
+  gcode_vec2d_t arc_ip;
   gcode_vec2d_t arc1_origin, arc1_center, arc1_p0;
   gcode_vec2d_t arc2_origin, arc2_center, arc2_p0;
   gfloat_t arc1_radius, arc1_start_angle, arc2_radius, arc2_start_angle;
   gfloat_t dx, dy, d, a, h, x2, y2, rx, ry, angle1, angle2;
   int miss;
 
-
   *ip_num = 0;
 
-  arc1 = (gcode_arc_t *) arc1_block->pdata;
-  arc2 = (gcode_arc_t *) arc2_block->pdata;
+  arc1 = (gcode_arc_t *)arc1_block->pdata;
+  arc2 = (gcode_arc_t *)arc2_block->pdata;
 
   gcode_arc_with_offset (arc1_block, arc1_origin, arc1_center, arc1_p0, &arc1_radius, &arc1_start_angle);
   gcode_arc_with_offset (arc2_block, arc2_origin, arc2_center, arc2_p0, &arc2_radius, &arc2_start_angle);
 
-  /*
-  * Circle-Circle intersection code derrived from 3/26/2005 Tim Voght.
-  * http://local.wasp.uwa.edu.au/~pbourke/geometry/2circle/tvoght.c
-  */
+  /**
+   * Circle-Circle intersection code derrived from 3/26/2005 Tim Voght.
+   * http://local.wasp.uwa.edu.au/~pbourke/geometry/2circle/tvoght.c
+   */
 
-  /*
-  * dx and dy are the vertical and horizontal distances between the circle centers.
-  */
+  /**
+   * dx and dy are the vertical and horizontal distances between the circle centers.
+   */
   dx = arc2_center[0] - arc1_center[0];
   dy = arc2_center[1] - arc1_center[1];
 
   /* Determine the distance between the centers. */
-  d = sqrt ((dy*dy) + (dx*dx));
+  d = sqrt ((dy * dy) + (dx * dx));
 
   /* Check for solvability. */
-  if (fabs (d - (arc1_radius+arc2_radius)) < GCODE_PRECISION)
-    d = arc1_radius+arc2_radius;
+  if (fabs (d - (arc1_radius + arc2_radius)) < GCODE_PRECISION)
+    d = arc1_radius + arc2_radius;
 
   if (d < GCODE_PRECISION)
   {
@@ -376,75 +517,69 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
     return 1;
   }
 
-  /*
-  * 'point 2' is the point where the line through the circle
-  * intersection points crosses the line between the circle
-  * centers.  
-  */
+  /**
+   * 'point 2' is the point where the line through the circle
+   * intersection points crosses the line between the circle
+   * centers.  
+   */
 
   /* Determine the distance from point 0 to point 2. */
-  a = ((arc1_radius*arc1_radius) - (arc2_radius*arc2_radius) + (d*d)) / (2.0 * d);
+  a = ((arc1_radius * arc1_radius) - (arc2_radius * arc2_radius) + (d * d)) / (2.0 * d);
 
   /* Determine the coordinates of point 2. */
-  x2 = arc1_center[0] + (dx * a/d);
-  y2 = arc1_center[1] + (dy * a/d);
+  x2 = arc1_center[0] + (dx * a / d);
+  y2 = arc1_center[1] + (dy * a / d);
 
-  /*
-  * Determine the distance from point 2 to either of the intersection points.
-  */
-  h = arc1_radius*arc1_radius - a*a;
-  if (h < 0.0 && h > -GCODE_PRECISION)
+  /**
+   * Determine the distance from point 2 to either of the intersection points.
+   */
+  h = arc1_radius * arc1_radius - a * a;
+
+  if ((h < 0.0) && (h > -GCODE_PRECISION))
     h = 0.0;
+
   h = sqrt (h);
 
-  /*
-  * Now determine the offsets of the intersection points from point 2.
-  */
-  rx = -dy * (h/d);
-  ry = dx * (h/d);
+  /**
+   * Now determine the offsets of the intersection points from point 2.
+   */
+  rx = -dy * (h / d);
+  ry = dx * (h / d);
 
   /* Determine the absolute intersection points. */
-/*  printf ("x0_int: %.12f, y0_int: %.12f, x1_int: %.12f, y1_int: %.12f\n", x2+rx, y2+ry, x2-rx, y2-ry); */
 
-  /*
-  * If the intersection point lies within the both arcs then an intersection of the arcs has taken place.
-  * There should never be 2 intersections of arcs because this would mean the sketch has bad continuity.
-  */
+  /**
+   * If the intersection point lies within the both arcs then an intersection of the arcs has taken place.
+   * There should never be 2 intersections of arcs because this would mean the sketch has bad continuity.
+   */
   miss = 1;
 
+  arc_ip[0] = x2 + rx;
+  arc_ip[1] = y2 + ry;
 
-  gcode_math_xy_to_angle (arc1_center, arc1_radius, (x2+rx), (y2+ry), &angle1);
-  gcode_math_xy_to_angle (arc2_center, arc2_radius, (x2+rx), (y2+ry), &angle2);
+  gcode_math_xy_to_angle (arc1_center, arc_ip, &angle1);
+  gcode_math_xy_to_angle (arc2_center, arc_ip, &angle2);
 
-#if 0
-printf ("arc1_block: %s, arc2_block: %s\n", arc1_block->comment, arc2_block->comment);
-printf ("  arc1_angle2: %.12f, arc2_angle2: %.12f, valid: %d\n", angle1, angle2, 
-!gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep, angle1) & !gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep, angle2));
-printf ("  %.12f, %.12f, %.12f ... %.12f %.12f %.12f\n", arc1_start_angle, arc1->sweep, angle1, arc2_start_angle, arc2->sweep, angle2);
-#endif
-
-  if (!gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep, angle1) & !gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep, angle2))
+  if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
+      (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_num][0] = x2+rx;
-    ip_array[*ip_num][1] = y2+ry;
+    ip_array[*ip_num][0] = arc_ip[0];
+    ip_array[*ip_num][1] = arc_ip[1];
     (*ip_num)++;
     miss = 0;
   }
 
-  gcode_math_xy_to_angle (arc1_center, arc1_radius, (x2-rx), (y2-ry), &angle1);
-  gcode_math_xy_to_angle (arc2_center, arc2_radius, (x2-rx), (y2-ry), &angle2);
+  arc_ip[0] = x2 - rx;
+  arc_ip[1] = y2 - ry;
 
-#if 0
-printf ("arc1_block: %s, arc2_block: %s\n", arc1_block->comment, arc2_block->comment);
-printf ("  arc1_angle2: %.12f, arc2_angle2: %.12f, valid: %d\n", angle1, angle2, 
-!gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep, angle1) & !gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep, angle2));
-printf ("  %.12f, %.12f, %.12f ... %.12f %.12f %.12f\n", arc1_start_angle, arc1->sweep, angle1, arc2_start_angle, arc2->sweep, angle2);
-#endif
+  gcode_math_xy_to_angle (arc1_center, arc_ip, &angle1);
+  gcode_math_xy_to_angle (arc2_center, arc_ip, &angle2);
 
-  if (!gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep, angle1) & !gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep, angle2))
+  if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
+      (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_num][0] = x2-rx;
-    ip_array[*ip_num][1] = y2-ry;
+    ip_array[*ip_num][0] = arc_ip[0];
+    ip_array[*ip_num][1] = arc_ip[1];
     (*ip_num)++;
     miss = 0;
   }
@@ -452,307 +587,54 @@ printf ("  %.12f, %.12f, %.12f ... %.12f %.12f %.12f\n", arc1_start_angle, arc1-
   return (miss);
 }
 
+/**
+ * Calculate and return the points where two primitives intersect
+ * NOTE: valid points have to actually lie between each primitive's endpoints
+ * NOTE: the calculations are done taking each block's offset into account
+ */
 
 int
 gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip_array[2], int *ip_num)
 {
-/*  printf ("INTERSECT: %s and %s\n", block_a->comment, block_b->comment); */
-  if (block_a->type == GCODE_TYPE_LINE && block_b->type == GCODE_TYPE_LINE)
+  if ((block_a->type == GCODE_TYPE_LINE) && (block_b->type == GCODE_TYPE_LINE))
     return line_line_intersect (block_a, block_b, ip_array, ip_num);
 
-  if (block_a->type == GCODE_TYPE_ARC && block_b->type == GCODE_TYPE_ARC)
+  if ((block_a->type == GCODE_TYPE_ARC) && (block_b->type == GCODE_TYPE_ARC))
     return arc_arc_intersect (block_a, block_b, ip_array, ip_num);
 
-  if (block_a->type == GCODE_TYPE_LINE && block_b->type == GCODE_TYPE_ARC)
+  if ((block_a->type == GCODE_TYPE_LINE) && (block_b->type == GCODE_TYPE_ARC))
     return line_arc_intersect (block_a, block_b, ip_array, ip_num);
 
-  if (block_a->type == GCODE_TYPE_ARC && block_b->type == GCODE_TYPE_LINE)
-     return line_arc_intersect (block_b, block_a, ip_array, ip_num);
+  if ((block_a->type == GCODE_TYPE_ARC) && (block_b->type == GCODE_TYPE_LINE))
+    return line_arc_intersect (block_b, block_a, ip_array, ip_num);
 
   return -1;
 }
 
-
-void
-gcode_util_push_offset (gcode_block_t *list)
-{
-  gcode_block_t *working_index_block, *next_block, *next_next_block, *prev_block, *prev_prev_block, *last_block;
-  gcode_block_t *duplicate_list, *index_block;
-  gcode_vec2d_t ip_array[2];
-  int miss, ip_num, ip_ind;
-  gcode_offset_t *zero_offset;
-
-  /*
-  * Synopsis: 2 lists, one that is left alone (the copy), and one that gets modified (the input).
-  * The copy is done after the input list gets the offset 'pushed' and zero_offset applied.
-  * Walk through each block and intersect / truncate etc.
-  */
-
-  zero_offset = (gcode_offset_t *) malloc (sizeof (gcode_offset_t));
-  zero_offset->side = list->offset->side;
-  zero_offset->tool = 0.0;
-  zero_offset->eval = 0.0;
-  zero_offset->origin[0] = 0.0;
-  zero_offset->origin[1] = 0.0;
-  zero_offset->rotation = 0.0;
-
-  /*
-  * Push Offset
-  */
-  index_block = list;
-  while (index_block)
-  {
-    switch (index_block->type)
-    {
-      case GCODE_TYPE_LINE:
-      {
-        gcode_line_t *line;
-        gcode_vec2d_t line_p0, line_p1, line_normal;
-
-        line = (gcode_line_t *) index_block->pdata;
-        gcode_line_with_offset (index_block, line_p0, line_p1, line_normal);
-
-        line->p0[0] = line_p0[0];
-        line->p0[1] = line_p0[1];
-
-        line->p1[0] = line_p1[0];
-        line->p1[1] = line_p1[1];
-      }
-      break;
-
-      case GCODE_TYPE_ARC:
-      {
-        gcode_arc_t *arc;
-        gcode_vec2d_t arc_origin, arc_center, arc_p0;
-        gfloat_t arc_radius, arc_start_angle;
-
-        arc = (gcode_arc_t *) index_block->pdata;
-        gcode_arc_with_offset (index_block, arc_origin, arc_center, arc_p0, &arc_radius, &arc_start_angle);
-
-        arc->radius = arc_radius;
-        arc->pos[0] = arc_origin[0];
-        arc->pos[1] = arc_origin[1];
-        arc->start_angle = arc_start_angle;
-      }
-      break;
-    }
-
-    index_block->offset = zero_offset;
-    index_block = index_block->next;
-  }
-
-  /*
-  * If dealing with a single block then just return
-  */
-  if (!list->next)
-    return;
-
-  /*
-  * Duplicate the pushed list into 'duplicate_list'.
-  */
-  index_block = list;
-  while (index_block)
-    index_block = index_block->next;
-  gcode_util_duplicate_list (list, index_block, &duplicate_list);
-
-  /*
-  * Intersect and Truncate
-  */
-  last_block = duplicate_list;
-  while (last_block->next)
-    last_block = last_block->next;
-
-  index_block = duplicate_list;
-  working_index_block = list;
-  while (index_block)
-  {
-    /*
-    * Because certain blocks are used to create continuity between two discontinuous blocks,
-    * such as a 0 radius circle, it will be the case that this block intersects nothing and
-    * should be skipped.  This can only happen once right now.
-    *
-    * Assign the immediate next and previous blocks as well as secondary next and previous blocks.
-    */
-    next_block = index_block->next;
-    prev_block = index_block->prev;
-    if (prev_block == NULL)
-      prev_block = last_block;
-    if (next_block == NULL)
-      next_block = duplicate_list;
-
-    next_next_block = next_block->next;
-    prev_prev_block = prev_block->prev;
-    if (prev_prev_block == NULL)
-      prev_prev_block = last_block;
-    if (next_next_block == NULL)
-      next_next_block = duplicate_list;
-
-
-    switch (index_block->type)
-    {
-      case GCODE_TYPE_LINE:
-      {
-        gcode_line_t *working_line, *line;
-
-        working_line = (gcode_line_t *) working_index_block->pdata;
-        line = (gcode_line_t *) index_block->pdata;
-
-        miss = gcode_util_intersect (index_block, prev_block, ip_array, &ip_num);
-        if (miss)
-          miss = gcode_util_intersect (index_block, prev_prev_block, ip_array, &ip_num);
-/* printf ("linep0_miss: %d\n", miss); */
-        /* assign p as first point */
-        if (!miss)
-        {
-          ip_ind = 0;
-          if (ip_num == 2)
-          {
-            if ((line->p0[0]-ip_array[1][0])*(line->p0[0]-ip_array[1][0]) + (line->p0[1]-ip_array[1][1])*(line->p0[1]-ip_array[1][1]) <
-                (line->p0[0]-ip_array[0][0])*(line->p0[0]-ip_array[0][0]) + (line->p0[1]-ip_array[0][1])*(line->p0[1]-ip_array[0][1]))
-            ip_ind = 1;
-          }
-          working_line->p0[0] = ip_array[ip_ind][0];
-          working_line->p0[1] = ip_array[ip_ind][1];
-/*          printf ("assign p0: %.12f,%.12f, %s\n", p[0], p[1], working_index_block->comment); */
-        }
-
-        miss = gcode_util_intersect (index_block, next_block, ip_array, &ip_num);
-        if (miss)
-          miss = gcode_util_intersect (index_block, next_next_block, ip_array, &ip_num);
-/* printf ("linep1_miss: %d\n", miss); */
-        /* assign p as last point */
-        if (!miss)
-        {
-          ip_ind = 0;
-          if (ip_num == 2)
-          {
-            if ((line->p1[0]-ip_array[1][0])*(line->p1[0]-ip_array[1][0]) + (line->p1[1]-ip_array[1][1])*(line->p1[1]-ip_array[1][1]) <
-                (line->p1[0]-ip_array[0][0])*(line->p1[0]-ip_array[0][0]) + (line->p1[1]-ip_array[0][1])*(line->p1[1]-ip_array[0][1]))
-            ip_ind = 1;
-          }
-          working_line->p1[0] = ip_array[ip_ind][0];
-          working_line->p1[1] = ip_array[ip_ind][1];
-/*          printf ("assign p1: %.12f,%.12f, %s\n", p[0], p[1], working_index_block->comment); */
-        }
-      }
-      break;
-
-      case GCODE_TYPE_ARC:
-      {
-        gcode_arc_t *working_arc, *arc;
-        gcode_vec2d_t arc_origin, arc_center, arc_p0, end_pos;
-        gfloat_t arc_radius, arc_start_angle, angle;
-
-        gcode_arc_with_offset (index_block, arc_origin, arc_center, arc_p0, &arc_radius, &arc_start_angle);
-
-        working_arc = (gcode_arc_t *) working_index_block->pdata;
-        arc = (gcode_arc_t *) index_block->pdata;
-
-        if (working_arc->radius <= 0.0)
-          break;
-
-        miss = gcode_util_intersect (index_block, prev_block, ip_array, &ip_num);
-        if (miss)
-          miss = gcode_util_intersect (index_block, prev_prev_block, ip_array, &ip_num);
-        /* adjust arc start position */
-        if (!miss)
-        {
-/* printf ("UPDATING ARC POSITION: %s to %.12f,%.12f\n", working_index_block->comment, p[0], p[1]); */
-          ip_ind = 0;
-          if (ip_num == 2)
-          {
-            if ((arc->pos[0]-ip_array[1][0])*(arc->pos[0]-ip_array[1][0]) + (arc->pos[1]-ip_array[1][1])*(arc->pos[1]-ip_array[1][1]) <
-                (arc->pos[0]-ip_array[0][0])*(arc->pos[0]-ip_array[0][0]) + (arc->pos[1]-ip_array[0][1])*(arc->pos[1]-ip_array[0][1]))
-            ip_ind = 1;
-          }
-          working_arc->pos[0] = ip_array[ip_ind][0];
-          working_arc->pos[1] = ip_array[ip_ind][1];
-
-          /* Update start angle too */
-          gcode_math_xy_to_angle (arc_center, arc_radius, ip_array[ip_ind][0], ip_array[ip_ind][1], &working_arc->start_angle);
-        }
-
-        end_pos[0] = arc_center[0] + arc_radius * cos (GCODE_DEG2RAD * (arc->start_angle + arc->sweep));
-        end_pos[1] = arc_center[1] + arc_radius * sin (GCODE_DEG2RAD * (arc->start_angle + arc->sweep));
-
-        miss = gcode_util_intersect (index_block, next_block, ip_array, &ip_num);
-        if (miss)
-          miss = gcode_util_intersect (index_block, next_next_block, ip_array, &ip_num);
-
-        /* adjust sweep angle */
-        if (!miss)
-        {
-          ip_ind = 0;
-          if (ip_num == 2)
-          {
-            if ((end_pos[0]-ip_array[1][0])*(end_pos[0]-ip_array[1][0]) + (end_pos[1]-ip_array[1][1])*(end_pos[1]-ip_array[1][1]) <
-                (end_pos[0]-ip_array[0][0])*(end_pos[0]-ip_array[0][0]) + (end_pos[1]-ip_array[0][1])*(end_pos[1]-ip_array[0][1]))
-            ip_ind = 1;
-          }
-          gcode_math_xy_to_angle (arc_center, arc_radius, ip_array[ip_ind][0], ip_array[ip_ind][1], &angle);
-
-          /* Difference must take place in the direction of the sweep. */
-          if (working_arc->sweep < 0.0)
-          {
-            working_arc->sweep = fmodf ((angle - 360.0) - working_arc->start_angle, 360.0);
-          }
-          else
-          {
-            /*
-            * Due to precision isues there may arbitrarily be a resulting 359.9+ and 0.0+ result
-            * stored in "angle" from gcode_math_xy_to_angle (), which determines a positive or
-            * negative sweep angle.  Since the sweep angle is defined to be positive correct
-            * if necessary by adding 360.0 to angle.
-            */
-            if (angle < working_arc->start_angle)
-              angle += 360.0;
-            working_arc->sweep = angle - working_arc->start_angle;
-          }
-
-/*          printf ("++ adjust sweep angle: %s .. %.12f .. %.12f,%.12f\n", index_block->comment, angle, p[0], p[1]); */
-/*          printf ("++ start_angle: %.12f, sweep_angle: %.12f\n", arc->start_angle, arc->sweep); */
-        }
-        else
-        {
-          /* Adjust the sweep by the difference in Start angles */
-          working_arc->sweep = fmod (working_arc->sweep + (arc->start_angle - working_arc->start_angle), 360.0);
-        }
-      }
-      break;
-    }
-
-/*    printf ("index_block: %p\n", index_block); */
-    index_block = index_block->next;
-    working_index_block = working_index_block->next;
-  }
-/*  printf ("\n"); */
-
-  gcode_list_free (&duplicate_list);
-}
-
-
-void
+int
 gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode_block_t *fillet_arc_block, gfloat_t radius)
 {
   gcode_line_t *line1, *line2;
   gcode_arc_t *fillet_arc;
-  gcode_vec2d_t vec1_u, vec2_u, vec;
-  gfloat_t magnitude1, magnitude2, dot, offset, test1_angle, test2_angle;
+  gcode_vec2d_t pt1, pt2, vec1_u, vec2_u, vec;
+  gfloat_t magnitude1, magnitude2, test1_angle, test2_angle;
+  gfloat_t dot, offset, eps;
 
+  eps = GCODE_PRECISION;
 
-  line1 = (gcode_line_t *) line1_block->pdata;
-  line2 = (gcode_line_t *) line2_block->pdata;
-  fillet_arc = (gcode_arc_t *) fillet_arc_block->pdata;
+  line1 = (gcode_line_t *)line1_block->pdata;
+  line2 = (gcode_line_t *)line2_block->pdata;
+  fillet_arc = (gcode_arc_t *)fillet_arc_block->pdata;
 
-  /*
-  * Assuming the end points meet at the same point then compute the slope
-  * of each line and scale the end point of the current line back and push
-  * the start point of the next line forward.
-  * Start angle and Sweep of the fillet arc will be computed by line slopes.
-  */
+  /**
+   * Assuming the end points meet at the same point then compute the slope
+   * of each line and scale the end point of the current line back and push
+   * the start point of the next line forward.
+   * Start angle and Sweep of the fillet arc will be computed by line slopes.
+   */
 
   /* Current Line */
-  GCODE_MATH_VEC2D_SUB (vec1_u, line1->p0, line1->p1); /* Flipped for calculating the dot product */
+  GCODE_MATH_VEC2D_SUB (vec1_u, line1->p0, line1->p1);                          /* Flipped for calculating the dot product */
   GCODE_MATH_VEC2D_MAG (magnitude1, vec1_u);
   GCODE_MATH_VEC2D_UNITIZE (vec1_u);
 
@@ -761,16 +643,19 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   GCODE_MATH_VEC2D_MAG (magnitude2, vec2_u);
   GCODE_MATH_VEC2D_UNITIZE (vec2_u);
 
-  /*
-  * To understand how this works take 2 intersecting lines that are tangent to a circle
-  * of the filleting radius.  The arc midpt is along the half angle formed by the 2 lines.
-  * A right triangle is formed from the arc center, tangent intersection pt, and intersection
-  * of both lines.  You know one angle is 90, the other is the half angle, and the third angle
-  * is known since the (3) must add to 180 degrees.  The tangent is opposite over adjacent, so using
-  * the dot product to get the angle between the lines and arc tangent you can solve for the offset.
-  */
+  /**
+   * To understand how this works take 2 intersecting lines that are tangent to a circle
+   * of the filleting radius.  The arc midpt is along the half angle formed by the 2 lines.
+   * A right triangle is formed from the arc center, tangent intersection pt, and intersection
+   * of both lines.  You know one angle is 90, the other is the half angle, and the third angle
+   * is known since the (3) must add to 180 degrees.  The tangent is opposite over adjacent, so using
+   * the dot product to get the angle between the lines and arc tangent you can solve for the offset.
+   */
   GCODE_MATH_VEC2D_DOT (dot, vec1_u, vec2_u);
   offset = radius * tan (GCODE_HPI - 0.5 * acos (dot));
+
+  if (GCODE_MATH_IS_EQUAL (fabs (dot), 1.0))                                    // If the dot product of two unit vectors is +1.0 or -1.0, they are parallel;
+    return (1);                                                                 // Therefore, somewhat hard to "fillet" in any meaningful way. So don't bother.
 
   /* Used by Arc */
   GCODE_MATH_VEC2D_SUB (vec1_u, line1->p1, line1->p0);
@@ -779,19 +664,44 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   /* Shorten Current Line */
   GCODE_MATH_VEC2D_SUB (vec, line1->p1, line1->p0);
   GCODE_MATH_VEC2D_SCALE (vec, (1.0 - (offset / magnitude1)));
-  GCODE_MATH_VEC2D_ADD (line1->p1, vec, line1->p0);
+  GCODE_MATH_VEC2D_ADD (pt1, vec, line1->p0);
 
   /* Shorten Next Line */
   GCODE_MATH_VEC2D_SUB (vec, line2->p1, line2->p0);
   GCODE_MATH_VEC2D_SCALE (vec, (1.0 - (offset / magnitude2)));
-  GCODE_MATH_VEC2D_SUB (line2->p0, line2->p1, vec);
+  GCODE_MATH_VEC2D_SUB (pt2, line2->p1, vec);
+
+  /* New endpoints must lie within the current line segment */
+
+  if (((pt1[0] < line1->p0[0] - eps) && (pt1[0] < line1->p1[0] - eps)) ||
+      ((pt1[0] > line1->p0[0] + eps) && (pt1[0] > line1->p1[0] + eps)))
+    return (1);                                                                 // If (x<a and x<b) or (x>a and x>b), x cannot belong to [a b];
+
+  if (((pt2[0] < line2->p0[0] - eps) && (pt2[0] < line2->p1[0] - eps)) ||
+      ((pt2[0] > line2->p0[0] + eps) && (pt2[0] > line2->p1[0] + eps)))
+    return (1);                                                                 // If (x<c and x<d) or (x>c and x>d), x cannot belong to [c d];
+
+  /* Since ptx is ON LINE X these are technically redundant */
+
+  if (((pt1[1] < line1->p0[1] - eps) && (pt1[1] < line1->p1[1] - eps)) ||
+      ((pt1[1] > line1->p0[1] + eps) && (pt1[1] > line1->p1[1] + eps)))
+    return (1);                                                                 // If (y<a and y<b) or (y>a and y>b), y cannot belong to [a b];
+
+  if (((pt2[1] < line2->p0[1] - eps) && (pt2[1] < line2->p1[1] - eps)) ||
+      ((pt2[1] > line2->p0[1] + eps) && (pt2[1] > line2->p1[1] + eps)))
+    return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d]; 
+
+  /* If we're still here, we should apply the new endpoints */
+  GCODE_MATH_VEC2D_COPY (line1->p1, pt1);
+  GCODE_MATH_VEC2D_COPY (line2->p0, pt2);
 
   /* Fillet Arc */
-  fillet_arc->pos[0] = line1->p1[0];
-  fillet_arc->pos[1] = line1->p1[1];
+  fillet_arc->p[0] = line1->p1[0];
+  fillet_arc->p[1] = line1->p1[1];
   fillet_arc->radius = radius;
+
   /* Sweep angle is supplemental to dot product.  dot and -dot are supplementary */
-  fillet_arc->sweep = GCODE_RAD2DEG * acos (-dot);
+  fillet_arc->sweep_angle = GCODE_RAD2DEG * acos (-dot);
 
   GCODE_MATH_VEC3D_ANGLE (fillet_arc->start_angle, vec1_u[0], vec1_u[1]);
   fillet_arc->start_angle *= GCODE_RAD2DEG;
@@ -799,7 +709,6 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   /* Flip Test - If Line2 > 180 degrees in clockwise direction */
   GCODE_MATH_VEC3D_ANGLE (test1_angle, vec1_u[0], vec1_u[1]);
   GCODE_MATH_VEC3D_ANGLE (test2_angle, vec2_u[0], vec2_u[1]);
-
 
   if (fabs (test1_angle - test2_angle) > GCODE_PI)
   {
@@ -820,170 +729,429 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
   else
   {
     fillet_arc->start_angle += 90.0;
-    fillet_arc->sweep *= -1.0;
+    fillet_arc->sweep_angle *= -1.0;
   }
+
+  return (0);
 }
 
-
-static void
-flip_direction (gcode_block_t *block)
-{
-  if (block->type == GCODE_TYPE_LINE)
-  {
-    gcode_line_flip_direction (block);
-  }
-  else if (block->type == GCODE_TYPE_ARC)
-  {
-    gcode_arc_flip_direction (block);
-  }
-}
-
-
-/*
-* Correct the orientation and sequence of all blocks in the list.
-*/
+/**
+ * Flip the direction of a line, arc or an entire sketch (by flipping each child
+ * and also flipping their order in the list - the first child becomes the last)
+ */
 void
-gcode_util_order_list (gcode_block_t *list)
+gcode_util_flip_direction (gcode_block_t *block)
 {
-  gcode_block_t *index1_block, *index2_block, *free_list;
-  gcode_vec2d_t e0[2], e1[2], e2[2];
-  gfloat_t dist[8];
-  int match;
+  gcode_block_t *index_block, *next_block;
 
-
-  if (list == NULL)
+  if (!block)                                                                   // If we're just going to assume 'block' exists, we'd better do it EXPLICITLY;
     return;
 
-  free_list = list->next;
-  free_list->prev = NULL;
-
-  list->next = NULL; /* anchored list */
-
-  /* While there exists blocks in the free list. */
-  while (free_list)
+  switch (block->type)
   {
-    /* compare each anchored block to all of the free blocks to see if there is an adjacent block. */
-    index1_block = list;
+    case GCODE_TYPE_LINE:                                                       // Flip a single line;
 
-    while (index1_block)
-    {
-      index1_block->ends (index1_block, e0[0], e0[1], GCODE_GET);
-      index2_block = free_list;
-      match = 0;
+      gcode_line_flip_direction (block);
 
-      while (index2_block && !match)
+      break;
+
+    case GCODE_TYPE_ARC:                                                        // Flip a single arc;
+
+      gcode_arc_flip_direction (block);
+
+      break;
+
+    case GCODE_TYPE_SKETCH:                                                     // Flip (and reverse the list of) an entire sketch;
+
+      index_block = block->listhead;                                            // Start with the first child;
+
+      while (index_block)                                                       // Crawl the list of 'block' one child at a time;
       {
-        index2_block->ends (index2_block, e1[0], e1[1], GCODE_GET);
+        next_block = index_block->next;                                         // We need to remember who was next ORIGINALLY or we'll keep looping forever;
 
-        /* index1_block NEXT check */
-        dist[0] = sqrt ((e0[0][0] - e1[0][0])*(e0[0][0] - e1[0][0]) + (e0[0][1] - e1[0][1])*(e0[0][1] - e1[0][1]));
-        dist[1] = sqrt ((e0[0][0] - e1[1][0])*(e0[0][0] - e1[1][0]) + (e0[0][1] - e1[1][1])*(e0[0][1] - e1[1][1]));
-        dist[2] = sqrt ((e0[1][0] - e1[0][0])*(e0[1][0] - e1[0][0]) + (e0[1][1] - e1[0][1])*(e0[1][1] - e1[0][1]));
-        dist[3] = sqrt ((e0[1][0] - e1[1][0])*(e0[1][0] - e1[1][0]) + (e0[1][1] - e1[1][1])*(e0[1][1] - e1[1][1]));
+        gcode_util_flip_direction (index_block);                                // Flip the block itself;
 
-        /* Is there adjacency between the two blocks */
-        if (dist[0] < GCODE_PRECISION || dist[1] < GCODE_PRECISION || dist[2] < GCODE_PRECISION || dist[3] < GCODE_PRECISION)
+        gcode_splice_list_around (index_block);                                 // Remove the block from the list then re-insert it as the first
+        gcode_insert_as_listhead (block, index_block);                          // - this effectively flips the order of the blocks in the list;
+
+        index_block = next_block;                                               // Continue with the block that USED TO come after 'index_block';
+      }
+
+      break;
+  }
+}
+
+/**
+ * Create a copy of the chain of blocks between 'start_block' and 'end_block' -
+ * including both - and point 'listhead' to the first block of the copied chain;
+ * NOTE: the resulting snapshot is meaningfully different from a list of clones
+ * of the original - clones are meant to be valid blocks on their own that can
+ * be inserted anywhere and used further freely; snapshots on the other hand are
+ * meant to be used as identical work-copies of the originals and as such they
+ * keep their original's 'name' field, 'pretending' to be the original block;
+ * NOTE: 'start_block' and 'end_block' should belong to the same list, in this
+ * order; if they don't, simply everything after 'start_block' is returned;
+ * NOTE: while strictly speaking copying an entire list would mean passing the
+ * first and last block of the list as parameters, the implementation specifics
+ * make it possible to just pass 'NULL' as the second block for the same effect;
+ */
+
+int
+gcode_util_get_sublist_snapshot (gcode_block_t **listhead, gcode_block_t *start_block, gcode_block_t *end_block)
+{
+  gcode_block_t *index_block, *new_block, *last_block;
+
+  *listhead = NULL;
+
+  if (!start_block)
+    return (1);
+
+  index_block = start_block;
+
+  while (index_block)
+  {
+    index_block->clone (&new_block, index_block->gcode, index_block);
+
+    new_block->name = index_block->name;
+
+    if (*listhead)
+    {
+      gcode_insert_after_block (last_block, new_block);
+    }
+    else
+    {
+      *listhead = new_block;
+    }
+
+    if (index_block == end_block)
+      break;
+
+    last_block = new_block;
+    index_block = index_block->next;
+  }
+
+  return (0);
+}
+
+int
+gcode_util_remove_null_sections (gcode_block_t **listhead)
+{
+  gcode_block_t *index_block, *next_block;
+
+  if (!(*listhead))
+    return (1);
+
+  index_block = *listhead;
+
+  while (index_block)
+  {
+    switch (index_block->type)
+    {
+      case GCODE_TYPE_LINE:
+      {
+        gcode_line_t *line;
+
+        line = (gcode_line_t *)index_block->pdata;
+
+        if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) >= GCODE_PRECISION)
         {
-          /* index1_block is adjacent to index2_block */
-          match = 1;
-
-          /*
-          * if index1_block and index1_block->next are adjacent then link index2_block to index1_block->prev,
-          * otherwise link index2_block to index1_block->next.
-          */
-          if (index1_block->next)
-          {
-            index1_block->next->ends (index1_block->next, e2[0], e2[1], GCODE_GET);
-
-            dist[4] = sqrt ((e0[0][0] - e2[0][0])*(e0[0][0] - e2[0][0]) + (e0[0][1] - e2[0][1])*(e0[0][1] - e2[0][1]));
-            dist[5] = sqrt ((e0[0][0] - e2[1][0])*(e0[0][0] - e2[1][0]) + (e0[0][1] - e2[1][1])*(e0[0][1] - e2[1][1]));
-            dist[6] = sqrt ((e0[1][0] - e2[0][0])*(e0[1][0] - e2[0][0]) + (e0[1][1] - e2[0][1])*(e0[1][1] - e2[0][1]));
-            dist[7] = sqrt ((e0[1][0] - e2[1][0])*(e0[1][0] - e2[1][0]) + (e0[1][1] - e2[1][1])*(e0[1][1] - e2[1][1]));
-          }
-
-          if (index1_block->next && (dist[4] < GCODE_PRECISION || dist[5] < GCODE_PRECISION || dist[6] < GCODE_PRECISION || dist[7] < GCODE_PRECISION))
-          {
-            /*
-            * INSERT AS PREV BLOCK
-            * Take care of linking prev and next blocks up from free list as well as inserting
-            * a new block into the anchored list and linking up prev and next pointers.
-            */
-            if (index2_block == free_list)
-            {
-              free_list = index2_block->next;
-              if (free_list)
-                free_list->prev = NULL;
-            }
-
-            if (index2_block->prev)
-              index2_block->prev->next = index2_block->next;
-            if (index2_block->next)
-              index2_block->next->prev = index2_block->prev;
-
-            index2_block->prev = index1_block->prev;
-            index2_block->next = index1_block;
-            if (index1_block->prev)
-              index1_block->prev->next = index2_block;
-            index1_block->prev = index2_block;
-
-            if (dist[2] > GCODE_PRECISION)
-              flip_direction (index2_block);
-          }
-          else
-          {
-            /*
-            * INSERT AS NEXT BLOCK
-            * Take care of linking prev and next blocks up from free list as well as inserting
-            * a new block into the anchored list and linking up prev and next pointers.
-            */
-            if (index2_block == free_list)
-            {
-              free_list = index2_block->next;
-              if (free_list)
-                free_list->prev = NULL;
-            }
-
-            if (index2_block->prev)
-              index2_block->prev->next = index2_block->next;
-            if (index2_block->next)
-              index2_block->next->prev = index2_block->prev;
-
-            index2_block->prev = index1_block;
-            index2_block->next = index1_block->next;
-            if (index1_block->next)
-              index1_block->next->prev = index2_block;
-            index1_block->next = index2_block;
-
-            if (dist[2] > GCODE_PRECISION)
-              flip_direction (index2_block);
-          }
+          index_block = index_block->next;
+          continue;
         }
 
-        /*
-        * It doesn't matter that index2_block may now have different prev/next pointers because the loop will
-        * terminate as a result of match being equal to 1.
-        */
-        index2_block = index2_block->next;
+        break;
       }
 
-
-      if (!match && !index1_block->next && free_list)
+      case GCODE_TYPE_ARC:
       {
-        gcode_block_t *temp_block;
+        gcode_arc_t *arc;
 
-        temp_block = free_list->next;
+        arc = (gcode_arc_t *)index_block->pdata;
 
-        /* Insert free_list head onto the end of the index1_block list. */
-        free_list->prev = index1_block;
-        free_list->next = index1_block->next; /* should always be NULL */
-        index1_block->next = free_list;
+        if (arc->radius >= GCODE_PRECISION)
+        {
+          index_block = index_block->next;
+          continue;
+        }
 
-        free_list = temp_block;
-        if (free_list)
-          free_list->prev = NULL;
+        break;
+      }
+    }
+
+    next_block = index_block->next;
+
+    if (index_block->next)
+      index_block->next->prev = index_block->prev;
+
+    if (index_block->prev)
+      index_block->prev->next = index_block->next;
+
+    if (*listhead == index_block)
+      *listhead = next_block;
+
+    index_block->free (&index_block);
+
+    index_block = next_block;
+  }
+
+  return (0);
+}
+
+/**
+ * Rearrange and/or flip the blocks in the list that starts with 'listhead' in a
+ * way that results in the longest contiguous fragments possible, then return 1
+ * if the resulting contour is a closed one or 0 if it is not. If open fragments
+ * are unavoidable then 'listhead' will point to one of the ends of one of them,
+ * otherwise an attempt is made to retain the original starting point as well as
+ * the original direction the majority of the blocks in the list are facing in;
+ * NOTE: this will return 1 even if multiple unconnected fragments are found, as
+ * long as each one is closed;
+ * NOTE: although practical observed performance (speed) of this function seems 
+ * quite adequate in ordinary conditions, it could slow down significantly for
+ * inconveniently ordered large lists; the best bet to avoid that is keeping 
+ * lists correctly ordered in the first place thereby reducing the amount of 
+ * processing involved from quadratic to linear in relation to list size;
+ */
+
+int
+gcode_util_merge_list_fragments (gcode_block_t **listhead)
+{
+  gcode_block_t *prev_edge_block, *next_edge_block, *index_block;
+  gcode_vec2d_t e, pe, ne, e0, e1;
+  int closed, block_count, flip_count, break_count;
+
+  if (!(*listhead))                                                             // Nothing to sort at all...? Oh great - we're done!
+    return (1);
+
+  if (!(*listhead)->next)                                                       // A single, lonely block...? Well... see if it's closed, THEN we're done.
+  {
+    (*listhead)->ends (*listhead, e0, e1, GCODE_GET);
+
+    if (GCODE_MATH_2D_DISTANCE (e0, e1) < GCODE_TOLERANCE)
+      return (1);
+    else
+      return (0);
+  }
+
+  closed = 1;                                                                   // Okay, crunch time; the list is 'closed' until proven guil... erm, 'open'.
+
+  block_count = 1;                                                              // Block count starts from 1 because the loop runs 'n-1' times, not 'n';
+  flip_count = 0;                                                               // The rest of the counters start from zero as all well-behaved counters do.
+  break_count = 0;
+
+  prev_edge_block = *listhead;                                                  // These two shall keep track of the edges of the last contiguous fragment;
+  next_edge_block = *listhead;
+
+  while (next_edge_block->next)                                                 // As long there are blocks PAST the 'next' edge, keep looping (hence 'n-1');
+  {
+    prev_edge_block->ends (prev_edge_block, pe, e, GCODE_GET);                  // Get hold of the edge endpoints of the current fragment, as 'pe' and 'ne';
+    next_edge_block->ends (next_edge_block, e, ne, GCODE_GET);
+
+    index_block = next_edge_block->next;                                        // Start looking for match candidates starting right after the sorted edge;
+
+    while (index_block)                                                         // Keep looping (and looking for matches) until the list ends;
+    {
+      index_block->ends (index_block, e0, e1, GCODE_GET);                       // Obtain the two endpoints of the current block, as 'e0' and 'e1';
+
+      if (GCODE_MATH_2D_DISTANCE (e0, ne) < GCODE_TOLERANCE)                    // If the current block fits right after the current 'next' edge...
+      {
+        if (next_edge_block->next != index_block)                               // ...but it's not actually the block next to it,
+          gcode_place_block_behind (next_edge_block, index_block);              // MAKE IT be the block next to the edge (slide it within the list);
+
+        next_edge_block = index_block;                                          // Once that's done, this block becomes the new edge;
+
+        break;                                                                  // Since a match was found, abandon the search and move on to the next block;
       }
 
-      index1_block = index1_block->next;
+      if (GCODE_MATH_2D_DISTANCE (e1, ne) < GCODE_TOLERANCE)                    // If the current block would fit after the current 'next' edge IF FLIPPED...
+      {
+        flip_count++;                                                           // ...do just that: flip it - but count each time a block gets flipped;
+
+        gcode_util_flip_direction (index_block);
+
+        if (next_edge_block->next != index_block)                               // Anyway, if the block is not actually next to the edge,
+          gcode_place_block_behind (next_edge_block, index_block);              // MAKE IT be the block next to the edge (slide it within the list);
+
+        next_edge_block = index_block;                                          // Once that's done, this block becomes the new edge;
+
+        break;                                                                  // Since a match was found, abandon the search and move on to the next block;
+      }
+
+      if (GCODE_MATH_2D_DISTANCE (e1, pe) < GCODE_TOLERANCE)                    // If the current block fits right before the current 'prev' edge...
+      {
+        if (prev_edge_block->prev != index_block)                               // ...but it's not actually the block next to it,
+          gcode_place_block_before (prev_edge_block, index_block);              // MAKE IT be the block next to the edge (slide it within the list);
+
+        prev_edge_block = index_block;                                          // Once that's done, this block becomes the new edge;
+
+        break;                                                                  // Since a match was found, abandon the search and move on to the next block;
+      }
+
+      if (GCODE_MATH_2D_DISTANCE (e0, pe) < GCODE_TOLERANCE)                    // If the current block would fit before the current 'prev' edge IF FLIPPED...
+      {
+        flip_count++;                                                           // ...do just that: flip it - but count each time a block gets flipped;
+
+        gcode_util_flip_direction (index_block);
+
+        if (prev_edge_block->prev != index_block)                               // Anyway, if the block is not actually next to the edge,
+          gcode_place_block_before (prev_edge_block, index_block);              // MAKE IT be the block next to the edge (slide it within the list);
+
+        prev_edge_block = index_block;                                          // Once that's done, this block becomes the new edge;
+
+        break;
+      }
+
+      index_block = index_block->next;                                          // If there's no way the current block fits anywhere, try the next one;
     }
+
+    if (!index_block)                                                           // If 'index_block' got to become NULL, we ran out of blocks without a match;
+    {
+      break_count++;                                                            // That means whatever is left is part of one or more unconnected fragments;
+
+      if (GCODE_MATH_2D_DISTANCE (ne, pe) > GCODE_TOLERANCE)                    // We still want to know whether the CURRENT fragment is closed, though:
+        closed = 0;                                                             // if the endpoints of its edges aren't the same, then it clearly isn't.
+
+      next_edge_block = next_edge_block->next;                                  // Either way, start a new fragment by appointing the first block
+      prev_edge_block = next_edge_block;                                        // past the 'next' edge as both the new 'prev' and 'next' edge;
+    }
+
+    block_count++;                                                              // And while we're at it, remember to count the number of blocks in the list;
   }
+
+  /* The list is now sorted into as few fragments as possible */
+
+  prev_edge_block->ends (prev_edge_block, pe, e, GCODE_GET);                    // The sorting is done, but the last fragment was not yet checked for closure;
+  next_edge_block->ends (next_edge_block, e, ne, GCODE_GET);                    // The endpoints are potentially outdated by now - we have to get them again;
+
+  if (GCODE_MATH_2D_DISTANCE (ne, pe) > GCODE_TOLERANCE)                        // If they are apart, the fragment isn't closed (hence neither is the list);
+    closed = 0;
+
+  while (prev_edge_block->prev)                                                 // But the current 'edges' only delimit the last fragment; to find the actual
+    prev_edge_block = prev_edge_block->prev;                                    // edges of the list, we have to expand them along the list as far as they go;
+
+  while (next_edge_block->next)
+    next_edge_block = next_edge_block->next;
+
+  prev_edge_block->ends (prev_edge_block, pe, e, GCODE_GET);                    // Now that we found the edges of the entire list, get the THOSE endpoints;
+  next_edge_block->ends (next_edge_block, e, ne, GCODE_GET);                    // The list may well be sorted, but the listhead might no longer be valid.
+
+  /* Convenience feature: try to keep the original listhead if possible */
+
+  if (GCODE_MATH_2D_DISTANCE (ne, pe) < GCODE_TOLERANCE)                        // So we could just appoint the 'prev' edge as the new head of the list, but...
+  {
+    prev_edge_block->prev = next_edge_block;                                    // ...if the list is closed, the old listhead is just as good as any new one;
+    next_edge_block->next = prev_edge_block;                                    // So we try keeping it by first connecting the current list edges together...
+
+    (*listhead)->prev->next = NULL;                                             // ...then sectioning the now-circular list right before the old listhead;
+    (*listhead)->prev = NULL;
+  }
+  else                                                                          // Yeah, or we could just appoint the 'prev' edge as the new head of the list.
+  {
+    *listhead = prev_edge_block;
+  }
+
+  /* Convenience feature: try to keep the direction of the majority of blocks */
+
+  if (flip_count > block_count / 2)                                             // If more than half of all blocks have been flipped, flip all blocks again;
+  {
+    prev_edge_block = *listhead;                                                // This will keep track of the current 'first' at all times;
+
+    gcode_util_flip_direction (prev_edge_block);                                // Flip the first block;
+
+    index_block = prev_edge_block->next;                                        // Start with the SECOND block - we cannot move the first one before itself;
+
+    while (index_block)                                                         // Crawl along the list one block at a time;
+    {
+      next_edge_block = index_block->next;                                      // We need to remember who was next ORIGINALLY or we'll keep looping forever;
+
+      gcode_util_flip_direction (index_block);                                  // Flip the block itself;
+
+      gcode_place_block_before (prev_edge_block, index_block);                  // Remove the block from the list then re-insert it before the first one;
+
+      prev_edge_block = index_block;                                            // The moved block is now therefore effectively the new first one;
+      index_block = next_edge_block;                                            // Continue with the block that USED TO come after 'index_block';
+    }
+
+    /* Convenience feature: try to keep the listhead even after a full flip */
+
+    if ((break_count == 0) && closed)                                           // Since the list is flipped, we need to update the listhead:
+      gcode_place_block_before (prev_edge_block, *listhead);                    // either bring it back from the tail to the head of the list
+    else                                                                        // (if the list is closed and 'rolling it over' is possible),
+      *listhead = prev_edge_block;                                              // or else we change the listhead to point to the new head...
+  }
+
+  return (closed);
+}
+
+/**
+ * Take each block in the list starting with 'listhead' and apply to it whatever 
+ * offset it is linked to; in other words, calculate how the linked offset would
+ * change each primitive and update each with the new data, then re-link it to
+ * the same (newly created) zero-offset record that should eventually be freed 
+ * when the list itself is disposed of;
+ */
+
+int
+gcode_util_convert_to_no_offset (gcode_block_t *listhead)
+{
+  gcode_offset_t *zero_offset;
+  gcode_block_t *index_block;
+
+  if (!listhead)
+    return (1);
+
+  zero_offset = malloc (sizeof (gcode_offset_t));
+  zero_offset->side = listhead->offset->side;
+  zero_offset->tool = 0.0;
+  zero_offset->eval = 0.0;
+  zero_offset->origin[0] = 0.0;
+  zero_offset->origin[1] = 0.0;
+  zero_offset->rotation = 0.0;
+
+  index_block = listhead;
+
+  while (index_block)
+  {
+    switch (index_block->type)
+    {
+      case GCODE_TYPE_LINE:
+      {
+        gcode_line_t *line;
+        gcode_vec2d_t p0, p1, normal;
+
+        line = (gcode_line_t *)index_block->pdata;
+        gcode_line_with_offset (index_block, p0, p1, normal);
+
+        line->p0[0] = p0[0];
+        line->p0[1] = p0[1];
+
+        line->p1[0] = p1[0];
+        line->p1[1] = p1[1];
+
+        break;
+      }
+
+      case GCODE_TYPE_ARC:
+      {
+        gcode_arc_t *arc;
+        gcode_vec2d_t p0, p1, center;
+        gfloat_t radius, start_angle;
+
+        arc = (gcode_arc_t *)index_block->pdata;
+        gcode_arc_with_offset (index_block, p0, center, p1, &radius, &start_angle);
+
+        arc->radius = radius;
+        arc->p[0] = p0[0];
+        arc->p[1] = p0[1];
+        arc->start_angle = start_angle;
+
+        break;
+      }
+    }
+
+    index_block->offset = zero_offset;
+    index_block = index_block->next;
+  }
+
+  return (0);
 }

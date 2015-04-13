@@ -1,187 +1,276 @@
-/*
-*  gui_machines.c
-*  Source code file for G-Code generation, simulation, and visualization
-*  library. This software is Copyright (C) 2006 by Justin Shumaker
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ *  gui_machines.c
+ *  Source code file for G-Code generation, simulation, and visualization
+ *  library.
+ *
+ *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "gui_machines.h"
+#include "gui_define.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <expat.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 void
 gui_machines_init (gui_machine_list_t *machine_list)
 {
-  machine_list->num = 0;
+  machine_list->number = 0;
   machine_list->machine = NULL;
 }
-
 
 void
 gui_machines_free (gui_machine_list_t *machine_list)
 {
-  machine_list->num = 0;
+  machine_list->number = 0;
   free (machine_list->machine);
   machine_list->machine = NULL;
 }
 
-
 static void
-start (void *data, const char *el, const char **attr)
+start (void *data, const char *xmlelem, const char **xmlattr)
 {
   gui_machine_list_t *machine_list;
+  gui_machine_t *new_machine;
+  char tag[256], name[256];
+  char *value;
   int i;
 
+  machine_list = (gui_machine_list_t *)data;
 
-  machine_list = (gui_machine_list_t *) data;
+  strncpy (tag, xmlelem, sizeof (tag));
 
-  if (!strcmp ("machine", el))
+  tag[sizeof (tag) - 1] = '\0';
+
+  strswp (tag, '_', '-');
+
+  if (strcmp (tag, GCODE_XML_TAG_MACHINE) == 0)
   {
-    machine_list->machine = realloc (machine_list->machine, (machine_list->num+1) * sizeof (gui_machine_t));
-    strcpy (machine_list->machine[machine_list->num].name, "");
+    machine_list->machine = realloc (machine_list->machine, (machine_list->number + 1) * sizeof (gui_machine_t));
 
-    machine_list->machine[machine_list->num].travel[0] = 0.0;
-    machine_list->machine[machine_list->num].travel[1] = 0.0;
-    machine_list->machine[machine_list->num].travel[2] = 0.0;
+    new_machine = &machine_list->machine[machine_list->number];
 
-    machine_list->machine[machine_list->num].maxipm[0] = 0.0;
-    machine_list->machine[machine_list->num].maxipm[1] = 0.0;
-    machine_list->machine[machine_list->num].maxipm[2] = 0.0;
+    strcpy (new_machine->name, "");
 
-    machine_list->machine[machine_list->num].options = 0;
+    new_machine->travel[0] = 0.0;
+    new_machine->travel[1] = 0.0;
+    new_machine->travel[2] = 0.0;
 
-    if (!strcmp ("name", attr[0]))
-      strcpy (machine_list->machine[machine_list->num].name, attr[1]);
+    new_machine->maxipm[0] = 0.0;
+    new_machine->maxipm[1] = 0.0;
+    new_machine->maxipm[2] = 0.0;
+
+    new_machine->options = 0;
+
+    for (i = 0; xmlattr[i]; i += 2)
+    {
+      strncpy (name, xmlattr[i], sizeof (name));
+
+      name[sizeof (name) - 1] = '\0';
+
+      strswp (name, '_', '-');
+
+      value = (char *)xmlattr[i + 1];
+
+      if (strcmp (name, GCODE_XML_ATTR_MACHINE_NAME) == 0)
+      {
+        strncpy (new_machine->name, value, sizeof (new_machine->name));
+
+        new_machine->name[sizeof (new_machine->name) - 1] = '\0';
+      }
+    }
   }
 
-  if (!strcmp("setting", el))
+  if ((strcmp (tag, GCODE_XML_TAG_MACHINE_SETTING) == 0) ||
+      (strcmp (tag, GCODE_XML_TAG_MACHINE_PROPERTY) == 0))
   {
-    for (i = 0; attr[i]; i+= 2)
+    new_machine = &machine_list->machine[machine_list->number];
+
+    for (i = 0; xmlattr[i]; i += 2)
     {
-      if (!strcmp ("travel_x", attr[i]))
-        machine_list->machine[machine_list->num].travel[0] = atof (attr[i+1]);
+      strncpy (name, xmlattr[i], sizeof (name));
 
-      if (!strcmp ("travel_y", attr[i]))
-        machine_list->machine[machine_list->num].travel[1] = atof (attr[i+1]);
+      name[sizeof (name) - 1] = '\0';
 
-      if (!strcmp ("travel_z", attr[i]))
-        machine_list->machine[machine_list->num].travel[2] = atof (attr[i+1]);
+      strswp (name, '_', '-');
 
-      if (!strcmp ("max_ipm_x", attr[i]))
-        machine_list->machine[machine_list->num].maxipm[0] = atof (attr[i+1]);
+      value = (char *)xmlattr[i + 1];
 
-      if (!strcmp ("max_ipm_y", attr[i]))
-        machine_list->machine[machine_list->num].maxipm[1] = atof (attr[i+1]);
-
-      if (!strcmp ("max_ipm_z", attr[i]))
-        machine_list->machine[machine_list->num].maxipm[2] = atof (attr[i+1]);
-
-      if (!strcmp ("spindle_control", attr[i]))
+      if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_X) == 0)
       {
-        if (!strcmp (attr[i+1], "yes"))
-          machine_list->machine[machine_list->num].options |= GCODE_MACHINE_OPTION_SPINDLE_CONTROL;
+        new_machine->travel[0] = atof (value);
       }
-
-      if (!strcmp ("tool_change", attr[i]))
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_Y) == 0)
       {
-        if (!strcmp (attr[i+1], "auto"))
-          machine_list->machine[machine_list->num].options |= GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE;
+        new_machine->travel[1] = atof (value);
       }
-
-      if (!strcmp ("home_switches", attr[i]))
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TRAVEL_Z) == 0)
       {
-        if (!strcmp (attr[i+1], "yes"))
-          machine_list->machine[machine_list->num].options |= GCODE_MACHINE_OPTION_HOME_SWITCHES;
+        new_machine->travel[2] = atof (value);
       }
-
-      if (!strcmp ("coolant", attr[i]))
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_X) == 0)
       {
-        if (!strcmp (attr[i+1], "yes"))
-          machine_list->machine[machine_list->num].options |= GCODE_MACHINE_OPTION_COOLANT;
+        new_machine->maxipm[0] = atof (value);
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_Y) == 0)
+      {
+        new_machine->maxipm[1] = atof (value);
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_MAX_IPM_Z) == 0)
+      {
+        new_machine->maxipm[2] = atof (value);
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_SPINDLE_CONTROL) == 0)
+      {
+        if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
+          new_machine->options |= GCODE_MACHINE_OPTION_SPINDLE_CONTROL;
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_TOOL_CHANGE) == 0)
+      {
+        if (strcmp (value, GCODE_XML_VAL_PROPERTY_AUTO) == 0)
+          new_machine->options |= GCODE_MACHINE_OPTION_AUTOMATIC_TOOL_CHANGE;
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_HOME_SWITCHES) == 0)
+      {
+        if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
+          new_machine->options |= GCODE_MACHINE_OPTION_HOME_SWITCHES;
+      }
+      else if (strcmp (name, GCODE_XML_ATTR_PROPERTY_COOLANT) == 0)
+      {
+        if (strcmp (value, GCODE_XML_VAL_PROPERTY_YES) == 0)
+          new_machine->options |= GCODE_MACHINE_OPTION_COOLANT;
       }
     }
   }
 }
 
-
 static void
-end (void *data, const char *el)
+end (void *data, const char *xmlelem)
 {
   gui_machine_list_t *machine_list;
+  char tag[256];
 
-  machine_list = (gui_machine_list_t *) data;
+  machine_list = (gui_machine_list_t *)data;
 
-  if (!strcmp ("machine", el))
-    machine_list->num++;
+  strncpy (tag, xmlelem, sizeof (tag));
+
+  tag[sizeof (tag) - 1] = '\0';
+
+  strswp (tag, '_', '-');
+
+  if (strcmp (tag, GCODE_XML_TAG_MACHINE) == 0)
+    machine_list->number++;
 }
-
 
 int
 gui_machines_read (gui_machine_list_t *machine_list)
 {
-  XML_Parser p = XML_ParserCreate ("US-ASCII");
-  FILE *fh;
-  int len;
-  char machines_file[256], *buffer;
+  FILE *fh = NULL;
+  int length, nomore;
+  char fullpath[256], *filename, *buffer;
 
+  filename = (char *)GCODE_XML_MACHINES_FILENAME;
 
-  machine_list->num = 0;
+  XML_Parser parser = XML_ParserCreate ("UTF-8");
 
-  if (!p)
+  machine_list->number = 0;
+
+  if (!parser)
   {
-    fprintf (stderr, "Couldn't allocate memory for parser\n");
+    REMARK ("Failed to allocate memory for XML parser\n");
     return (1);
   }
 
-  XML_SetElementHandler (p, start, end);
-  XML_SetUserData (p, machine_list);
+  XML_SetElementHandler (parser, start, end);
+  XML_SetUserData (parser, machine_list);
 
-  /* Read in machines.xml file */
-  sprintf (machines_file, "%s%s", SHARE_PREFIX, "machines.xml");
-  fh = fopen (machines_file, "r");
+  /* Open and read the file 'machines.xml' */
 
-  /* Try to open from current working directory */
-  if (!fh)
+#ifdef WIN32
+  GetModuleFileName (NULL, fullpath, 230);                                      // Try to open from where the executable runs;
+  sprintf (fullpath, "%s\\share\\%s", dirname (fullpath), filename);
+#else
+  sprintf (fullpath, "%s%s", SHARE_PREFIX, filename);                           // Try to open from formal Linux install path;
+#endif
+
+  fh = fopen (fullpath, "r");
+
+  if (!fh)                                                                      // Try to open from current working directory;
   {
-    getcwd (machines_file, 255);
-    sprintf (machines_file, "%s/share/%s", machines_file, "machines.xml");
-    fh = fopen (machines_file, "r");
+    getcwd (fullpath, 230);
+
+#ifdef WIN32
+    sprintf (fullpath, "%s\\share\\%s", fullpath, filename);                    // Rather astonishingly this isn't actually necessary: forward slashes work ok,
+#else
+    sprintf (fullpath, "%s/share/%s", fullpath, filename);                      // even in WIN32; but that doesn't mean we shouldn't act in a civilized manner.
+#endif
+
+    fh = fopen (fullpath, "r");
   }
 
-  if (!fh)
+  if (!fh)                                                                      // Shiver me timbers! Plan C - proceed to panic at flank speed, aaaarrrrrgh...!
   {
-    XML_ParserFree (p);
+    REMARK ("Failed to open file '%s'\n", filename);
+    XML_ParserFree (parser);
     return (1);
   }
 
   fseek (fh, 0, SEEK_END);
-  len = ftell (fh);
-  buffer = (char *) malloc (len);
+  length = ftell (fh);
+  buffer = malloc (length);
   fseek (fh, 0, SEEK_SET);
-  fread (buffer, len, 1, fh);
+  nomore = fread (buffer, 1, length, fh);
 
-  if (XML_Parse (p, buffer, len, 1) == XML_STATUS_ERROR)
+  if (XML_Parse (parser, buffer, nomore, 1) == XML_STATUS_ERROR)
   {
-    fprintf(stderr, "Parse error at line %d:\n%s\n", (int) XML_GetCurrentLineNumber(p), XML_ErrorString(XML_GetErrorCode(p)));
+    REMARK ("XML parse error in file '%s' at line %d: %s\n", filename, (int)XML_GetCurrentLineNumber (parser), XML_ErrorString (XML_GetErrorCode (parser)));
+    XML_ParserFree (parser);
+    free (buffer);
+    fclose (fh);
     return (1);
   }
 
-  fclose (fh);
+  XML_ParserFree (parser);
   free (buffer);
-  XML_ParserFree (p);
+  fclose (fh);
 
   return (0);
+}
+
+gui_machine_t *
+gui_machines_find (gui_machine_list_t *machine_list, char *machine_name, uint8_t fallback)
+{
+  int i;
+
+  for (i = 0; i < machine_list->number; i++)
+  {
+    if (strcmp (machine_name, machine_list->machine[i].name) == 0)
+    {
+      return (&machine_list->machine[i]);
+    }
+  }
+
+  if (fallback)
+    return (&machine_list->machine[0]);
+
+  return (NULL);
 }
