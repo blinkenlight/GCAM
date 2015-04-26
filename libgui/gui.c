@@ -62,11 +62,8 @@ gcode_tree_row_collapsed_event (GtkTreeView *tree_view, GtkTreeIter *iter, GtkTr
   if (!selected_block)                                                          // If the previously selected path was a descendant of the one just collapsed,
   {                                                                             // 'selected_block' comes back as NULL since the old selection is now invalid;
     set_selected_row_with_iter (&gui, iter);                                    // So in order to avoid a rather awkward "nothing is selected" situation, we
-    get_selected_block (&gui, &selected_block, &selected_iter);                 // use the supplied iter pointing to the collapsed row to select that instead;
-    gui_tab_display (&gui, selected_block, 0);
-    update_menu_by_selected_item (&gui, selected_block);
-  }
-}
+  }                                                                             // use the supplied iter pointing to the collapsed row to select that instead;
+}                                                                               // Updating the menu and the tab is done automatically by 'set_selected_row'.
 
 static void
 opengl_context_expose_event (GtkWidget *widget, gpointer data)

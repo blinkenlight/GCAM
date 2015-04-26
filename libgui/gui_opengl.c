@@ -832,17 +832,16 @@ gui_opengl_pick (gui_opengl_t *opengl, int x, int y)
   hits = glRenderMode (GL_RENDER);
 
   /**
-   * For now, take the first hit and search the entire block treeview for the block ptr whose value
+   * For now, take the first hit and search the entire block treeview for the block whose value
    * matches the name value from the first hit in the list.  Once located, highlight that row.
    */
   if (hits > 0)
   {
-    gcode_block_t *ptr;
+    gcode_block_t *block;
 
-    ptr = (gcode_block_t *)((((intptr_t)buff[3]) << 3) + (intptr_t)opengl->gcode);
+    block = (gcode_block_t *)((((intptr_t)buff[3]) << 3) + (intptr_t)opengl->gcode);
 
-    set_selected_row_with_block (opengl->gcode->gui, ptr);
-    gui_tab_display (opengl->gcode->gui, ptr, 0);
+    set_selected_row_with_block (opengl->gcode->gui, block);
   }
 }
 
