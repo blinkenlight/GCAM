@@ -146,13 +146,13 @@ gcode_drill_holes_make (gcode_block_t *block)
 
   if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
   {
-    if (drill_holes->increment <= GCODE_PRECISION)                              // Start of peck drilling cycle (G83);
+    if (drill_holes->increment <= GCODE_PRECISION)                              // Start of peck drilling cycle (G83 or G81 if peck depth is zero);
     {
-      GCODE_DRILL (block, "G83", target_z, tool->feed * tool->plunge_ratio, safe_z);
+      GCODE_DRILL (block, target_z, tool->feed * tool->plunge_ratio, safe_z);
     }
     else
     {
-      GCODE_Q_DRILL (block, "G83", target_z, tool->feed * tool->plunge_ratio, safe_z, drill_holes->increment);
+      GCODE_PECK_DRILL (block, target_z, tool->feed * tool->plunge_ratio, safe_z, drill_holes->increment);
     }
   }
 
