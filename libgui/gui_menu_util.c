@@ -962,6 +962,9 @@ update_project_modified_flag (gui_t *gui, uint8_t modified)
 
 /**
  * Enable/disable various GUI menu items based on project state (open/closed)
+ * NOTE: always-enabled and strictly project-state-dependent widgets are fully
+ * handled; selection-dependent ones are only disabled whenever the project is 
+ * closed, further handling being left to the selection-based menu update;
  */
 
 void
@@ -973,7 +976,19 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
 
   open = (state == PROJECT_OPEN) ? TRUE : FALSE;
 
-  /* Widgets to display when project is closed */
+  /* Widgets to enable always */
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Quit"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu/Manual"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu/About"), 1);
+
+  /* Widgets to enable when project is closed, disable when project is open */
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/New"), !open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Open"), !open);
 
@@ -981,9 +996,39 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
   if (!open)
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Remove"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Scale"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Template"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Arc"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Line"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Bolt Holes"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Drill Holes"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
   }
 
-  /* Widgets to display when project is open */
+  /* Widgets to enable when project is open, disable when project is closed */
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save As"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Close"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import GCAM"), open);
@@ -991,15 +1036,12 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Export"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Project Settings"), open);
 }
 
 /**
- * Enable/disable various GUI menu items based on the currently selected block
+ * Enable/disable various GUI menu items based on the currently selected block;
+ * NOTE: being selection-based, actions taken here assume the project is open.
  */
 
 void
@@ -1029,8 +1071,8 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Previous"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Next"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Template"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 1);
@@ -1041,7 +1083,14 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 1);
 
   /* FILLETING */
   if (selected_block->type == GCODE_TYPE_LINE)
@@ -1105,12 +1154,26 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   if (selected_block->parent)
     if (selected_block->parent->type == GCODE_TYPE_EXTRUSION)
     {
-      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
     }
 
   if (selected_block->type == GCODE_TYPE_EXTRUSION)
   {
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
   }
 
   /* EDIT MENU */
