@@ -87,6 +87,9 @@
 #define GCODE_DRILLING_CANNED         0x00
 #define GCODE_DRILLING_SIMPLE         0x01
 
+#define GCODE_POCKETING_TRADITIONAL   0x00
+#define GCODE_POCKETING_ALTERNATE_1   0x01
+
 /* *INDENT-OFF* */
 
 enum
@@ -335,6 +338,7 @@ typedef struct gcode_s
   uint8_t machine_options;
 
   uint8_t drilling_motion;
+  uint8_t pocketing_style;
 
   uint32_t decimals;                                                            // Number of decimal places to print
 
