@@ -4,6 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
+ *  Copyright (C) 2014 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,23 +30,26 @@
 
 typedef struct gcode_pocket_row_s
 {
-  int line_num;
+  int line_count;
   gcode_vec2d_t *line_array;
   gfloat_t y;
 } gcode_pocket_row_t;
 
 typedef struct gcode_pocket_s
 {
-  int row_num;
-  int seg_num;
+  int row_count;
+  int seg_count;
+  gcode_tool_t *tool;
+  gcode_block_t *target;
+  gcode_block_t *first_block;
+  gcode_block_t *final_block;
   gcode_pocket_row_t *row_array;
-  gfloat_t resolution;
 } gcode_pocket_t;
 
-void gcode_pocket_init (gcode_pocket_t *pocket, gfloat_t resolution);
+void gcode_pocket_init (gcode_pocket_t *pocket, gcode_block_t *target, gcode_tool_t *tool);
 void gcode_pocket_free (gcode_pocket_t *pocket);
-void gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *start_block, gcode_block_t *end_block);
-void gcode_pocket_make (gcode_pocket_t *pocket, gcode_block_t *code_block, gfloat_t depth, gfloat_t rapid_depth, gcode_tool_t *tool);
+void gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *first_block, gcode_block_t *final_block);
+void gcode_pocket_make (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z);
 void gcode_pocket_subtract (gcode_pocket_t *pocket_a, gcode_pocket_t *pocket_b);
 
 #endif

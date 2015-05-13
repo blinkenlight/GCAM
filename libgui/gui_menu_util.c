@@ -43,7 +43,6 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
   gui_t *gui;
   GtkWidget **wlist;
   GtkSpinButton *spinner;
-  gcode_block_t *index_block;
   gfloat_t value;
   gfloat_t min, max;
   gfloat_t step, page;
@@ -247,6 +246,25 @@ set_tangent_to_previous (gcode_block_t *block)
 }
 
 /**
+ * This is the TreeView equivalent of 'gtk_ctree_node_is_visible' that GTK+ did
+ * not see fit to include, apparently to much confusion of those who needed it;
+ */
+
+static int
+tree_path_is_visible (GtkTreeView *tree_view, GtkTreePath *path)
+{
+  GdkRectangle view_rect, cell_rect;
+
+  gtk_tree_view_get_visible_rect (tree_view, &view_rect);
+  gtk_tree_view_get_cell_area (tree_view, path, NULL, &cell_rect);
+
+  if ((cell_rect.y >= 0) && (cell_rect.y + cell_rect.height <= view_rect.height))
+    return (1);
+
+  return (0);
+}
+
+/**
  * Insert 'block' into both the block tree after/under 'selected_block' and the
  * GUI GTK tree after/under 'iter', depending on 'insert_spot' - which, notably,
  * can combine BOTH 'after or under', which will try to insert 'after' then (if
@@ -265,7 +283,8 @@ set_tangent_to_previous (gcode_block_t *block)
 GtkTreeIter
 insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block, GtkTreeIter *target_iter, int insert_spot)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreePath *path;
   GtkTreeIter parent_iter, new_iter;
 
@@ -275,7 +294,9 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
   if (!target_block)                                                            // If 'target_block' is null, abort - a selected target must already exist;
     return new_iter;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));  // Retrieve a reference to the tree model - we'll need it later;
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);                             // Retrieve a reference to the tree model - we'll need it later;
 
   if (insert_spot & GUI_INSERT_AFTER)                                           // If the request contains "insert after", find the would-be parent;
   {
@@ -317,7 +338,7 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
       {
         GtkTreeIter child_iter;
 
-        gtk_tree_model_iter_children (model, &child_iter, target_iter);         // Get an iter to that extrusion as the first child of 'target_iter',
+        gtk_tree_model_iter_children (tree_model, &child_iter, target_iter);    // Get an iter to that extrusion as the first child of 'target_iter',
 
         new_iter = gui_insert_after_iter (gui, &child_iter, block);             // then insert a new iter (new row) based on 'block' AFTER that iter;
       }
@@ -352,11 +373,11 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
     if (insert_spot & GUI_INSERT_WITH_TANGENCY)
       set_tangent_to_previous (block);
 
-    if (gtk_tree_model_iter_parent (model, &parent_iter, &new_iter))
+    if (gtk_tree_model_iter_parent (tree_model, &parent_iter, &new_iter))
     {
-      path = gtk_tree_model_get_path (model, &parent_iter);
+      path = gtk_tree_model_get_path (tree_model, &parent_iter);
 
-      gtk_tree_view_expand_to_path (GTK_TREE_VIEW (gui->gcode_block_treeview), path);
+      gtk_tree_view_expand_to_path (tree_view, path);
 
       gtk_tree_path_free (path);
     }
@@ -365,7 +386,7 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
 
     set_selected_row_with_iter (gui, &new_iter);
 
-    gui->modified = 1;
+    update_project_modified_flag (gui, 1);
   }
 
   return new_iter;
@@ -379,12 +400,15 @@ insert_primitive (gui_t *gui, gcode_block_t *block, gcode_block_t *target_block,
 void
 remove_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *iter)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
 
   gcode_splice_list_around (block);
-  gtk_tree_store_remove (GTK_TREE_STORE (model), iter);
+  gtk_tree_store_remove (GTK_TREE_STORE (tree_model), iter);
 }
 
 /**
@@ -395,12 +419,15 @@ remove_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *iter)
 void
 remove_and_destroy_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *iter)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
 
   gcode_remove_and_destroy (block);
-  gtk_tree_store_remove (GTK_TREE_STORE (model), iter);
+  gtk_tree_store_remove (GTK_TREE_STORE (tree_model), iter);
 }
 
 /**
@@ -418,7 +445,6 @@ remove_and_destroy_primitive (gui_t *gui, gcode_block_t *block, GtkTreeIter *ite
 GtkTreeIter
 gui_insert_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
 {
-  uint16_t index;
   GtkTreeIter new_iter;
   gcode_block_t *index_block;
 
@@ -471,7 +497,6 @@ gui_insert_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
 GtkTreeIter
 gui_append_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
 {
-  uint16_t index;
   GtkTreeIter new_iter;
   gcode_block_t *index_block;
 
@@ -524,9 +549,7 @@ gui_append_under_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
 GtkTreeIter
 gui_insert_after_iter (gui_t *gui, GtkTreeIter *iter, gcode_block_t *block)
 {
-  uint16_t index;
-  GtkTreeModel *model;
-  GtkTreeIter new_iter, prev_iter;
+  GtkTreeIter new_iter;
   gcode_block_t *index_block;
 
   if (!block)
@@ -575,21 +598,24 @@ void
 gui_recreate_subtree_of (gui_t *gui, GtkTreeIter *iter)
 {
   gcode_block_t *block, *index_block;
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeIter child_iter;
   GValue value = { 0, };
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));  // Get a reference to the tree model we're supposed to be working on;
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
 
-  gtk_tree_model_get_value (model, iter, 5, &value);                            // Using 'iter', get a reference to the block it's based on;
+  tree_model = gtk_tree_view_get_model (tree_view);                             // Get a reference to the tree model we're supposed to be working on;
+
+  gtk_tree_model_get_value (tree_model, iter, 5, &value);                       // Using 'iter', get a reference to the block it's based on;
   block = (gcode_block_t *)g_value_get_pointer (&value);
   g_value_unset (&value);
 
   if (!block->listhead && !block->extruder)                                     // If the block has neither extruder nor children there's nothing to recreate;
     return;
 
-  if (gtk_tree_model_iter_children (model, &child_iter, iter))                  // Otherwise, get an iter to the first child of 'iter',
-    while (gtk_tree_store_remove (GTK_TREE_STORE (model), &child_iter));        // and mercilessly get rid of every single one of them;
+  if (gtk_tree_model_iter_children (tree_model, &child_iter, iter))             // Otherwise, get an iter to the first child of 'iter',
+    while (gtk_tree_store_remove (GTK_TREE_STORE (tree_model), &child_iter));   // and mercilessly get rid of every single one of them;
 
   if (block->extruder)                                                          // If the block has an extruder, add it back as the first child of 'iter';
     gui_append_under_iter (gui, iter, block->extruder);
@@ -603,7 +629,7 @@ gui_recreate_subtree_of (gui_t *gui, GtkTreeIter *iter)
     index_block = index_block->next;
   }
 
-  if (gtk_tree_model_iter_children (model, &child_iter, iter))                  // Slight deja-vu here, but get an iter to the first child of 'iter' AGAIN;
+  if (gtk_tree_model_iter_children (tree_model, &child_iter, iter))             // Slight deja-vu here, but get an iter to the first child of 'iter' AGAIN;
     gui_renumber_subtree_of (gui, &child_iter);                                 // Remember, remember the fifth of No... ugh, no - the NEED TO RENUMBER. Right!
 }
 
@@ -645,16 +671,19 @@ void
 gui_renumber_subtree_of (gui_t *gui, GtkTreeIter *iter)
 {
   gcode_block_t *block;
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeIter child_iter;
   GValue value = { 0, };
   int i = 1;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
 
   do
   {
-    gtk_tree_model_get_value (model, iter, 5, &value);
+    gtk_tree_model_get_value (tree_model, iter, 5, &value);
     block = (gcode_block_t *)g_value_get_pointer (&value);
     g_value_unset (&value);
 
@@ -668,10 +697,10 @@ gui_renumber_subtree_of (gui_t *gui, GtkTreeIter *iter)
       i++;
     }
 
-    if (gtk_tree_model_iter_children (model, &child_iter, iter))
+    if (gtk_tree_model_iter_children (tree_model, &child_iter, iter))
       gui_renumber_subtree_of (gui, &child_iter);
 
-  } while (gtk_tree_model_iter_next (model, iter));
+  } while (gtk_tree_model_iter_next (tree_model, iter));
 }
 
 /**
@@ -682,12 +711,15 @@ gui_renumber_subtree_of (gui_t *gui, GtkTreeIter *iter)
 void
 gui_renumber_whole_tree (gui_t *gui)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeIter iter;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
 
-  if (gtk_tree_model_get_iter_first (model, &iter))
+  tree_model = gtk_tree_view_get_model (tree_view);
+
+  if (gtk_tree_model_get_iter_first (tree_model, &iter))
     gui_renumber_subtree_of (gui, &iter);
 }
 
@@ -759,18 +791,22 @@ find_tree_row_iter_with_block (gui_t *gui, GtkTreeModel *model, GtkTreeIter *ite
 void
 get_selected_block (gui_t *gui, gcode_block_t **block, GtkTreeIter *iter)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeSelection *selection;
   GValue value = { 0, };
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
-  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
+
+  tree_model = gtk_tree_view_get_model (tree_view);
+
+  selection = gtk_tree_view_get_selection (tree_view);
 
   *block = NULL;
 
   if (gtk_tree_selection_get_selected (selection, NULL, iter))
   {
-    gtk_tree_model_get_value (model, iter, 5, &value);                          // Using the iter, we can fetch the content of the fifth column of that row,
+    gtk_tree_model_get_value (tree_model, iter, 5, &value);                     // Using the iter, we can fetch the content of the fifth column of that row,
     *block = (gcode_block_t *)g_value_get_pointer (&value);                     // to retrieve the pointer to the associated block;
     g_value_unset (&value);
   }
@@ -783,25 +819,50 @@ get_selected_block (gui_t *gui, gcode_block_t **block, GtkTreeIter *iter)
 void
 set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeSelection *selection;
+  GtkTreePath *path;
   GValue value = { 0, };
   gcode_block_t *block;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
 
-  gtk_tree_model_get_value (model, iter, 5, &value);                            // Using the iter, we can fetch the content of the fifth column of that row,
+  tree_model = gtk_tree_view_get_model (tree_view);
+
+  gtk_tree_model_get_value (tree_model, iter, 5, &value);                       // Using the iter, we can fetch the content of the fifth column of that row,
   block = (gcode_block_t *)g_value_get_pointer (&value);                        // to retrieve the pointer to the associated block;
   g_value_unset (&value);
 
-  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  path = gtk_tree_model_get_path (tree_model, iter);                            // Get the path corresponding to the iter to be selected;
+
+  if (gtk_tree_path_get_depth (path) > 1)                                       // If the depth is larger than "1", a valid non-null parent path HAS to exist;
+  {
+    GtkTreePath *parent_path;
+
+    parent_path = gtk_tree_path_copy (path);                                    // Make a copy of the path to be selected: we need the original path later on;
+
+    gtk_tree_path_up (parent_path);                                             // Obtain the parent of the path to be selected (return value broken, ignore);
+
+    gtk_tree_view_expand_to_path (tree_view, parent_path);                      // Expand the parent, since a path can only be selected if it's not collapsed;
+
+    gtk_tree_path_free (parent_path);                                           // Free the parent path once it's no longer needed;
+  }
+
+  selection = gtk_tree_view_get_selection (tree_view);                          // Get a reference to the selection and use it to select the desired tree row;
 
   gtk_tree_selection_select_iter (selection, iter);
 
-  update_menu_by_selected_item (gui, block);
+  if (!tree_path_is_visible (tree_view, path))                                  // As a convenience, scroll the selected row into view if it was not visible;
+  {
+    gtk_tree_view_scroll_to_cell (tree_view, path, NULL, FALSE, 0.0, 0.0);
+  }
 
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, block);
+  update_menu_by_selected_item (gui, block);                                    // Post-selection housekeeping: update the menu according to the new selection
+
+  gui_tab_display (gui, block, 0);                                              // and make sure the left tab displays the properties of the selected item too;
+
+  gtk_tree_path_free (path);                                                    // Free the selection path once it's no longer needed;
 }
 
 /**
@@ -811,24 +872,49 @@ set_selected_row_with_iter (gui_t *gui, GtkTreeIter *iter)
 void
 set_selected_row_with_block (gui_t *gui, gcode_block_t *block)
 {
-  GtkTreeModel *model;
+  GtkTreeView *tree_view;
+  GtkTreeModel *tree_model;
   GtkTreeSelection *selection;
   GtkTreeIter iter, found_iter;
+  GtkTreePath *path;
 
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
 
-  gtk_tree_model_get_iter_first (model, &iter);
+  tree_model = gtk_tree_view_get_model (tree_view);
 
-  find_tree_row_iter_with_block (gui, model, &iter, &found_iter, block);
+  gtk_tree_model_get_iter_first (tree_model, &iter);
 
-  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  find_tree_row_iter_with_block (gui, tree_model, &iter, &found_iter, block);   // Look up the iter corresponding to the block to be selected;
+
+  path = gtk_tree_model_get_path (tree_model, &found_iter);                     // Get the path corresponding to the iter to be selected;
+
+  if (gtk_tree_path_get_depth (path) > 1)                                       // If the depth is larger than "1", a valid non-null parent path HAS to exist;
+  {
+    GtkTreePath *parent_path;
+
+    parent_path = gtk_tree_path_copy (path);                                    // Make a copy of the path to be selected: we need the original path later on;
+
+    gtk_tree_path_up (parent_path);                                             // Obtain the parent of the path to be selected (return value broken, ignore);
+
+    gtk_tree_view_expand_to_path (tree_view, parent_path);                      // Expand the parent, since a path can only be selected if it's not collapsed;
+
+    gtk_tree_path_free (parent_path);                                           // Free the parent path once it's no longer needed;
+  }
+
+  selection = gtk_tree_view_get_selection (tree_view);                          // Get a reference to the selection and use it to select the desired tree row;
 
   gtk_tree_selection_select_iter (selection, &found_iter);
 
-  update_menu_by_selected_item (gui, block);
+  if (!tree_path_is_visible (tree_view, path))                                  // As a convenience, scroll the selected row into view if it was not visible;
+  {
+    gtk_tree_view_scroll_to_cell (tree_view, path, NULL, FALSE, 0.0, 0.0);
+  }
 
-  gui->opengl.rebuild_view_display_list = 1;
-  gui_opengl_context_redraw (&gui->opengl, block);
+  update_menu_by_selected_item (gui, block);                                    // Post-selection housekeeping: update the menu according to the new selection
+
+  gui_tab_display (gui, block, 0);                                              // and make sure the left tab displays the properties of the selected item too;
+
+  gtk_tree_path_free (path);                                                    // Free the selection path once it's no longer needed;
 }
 
 /**
@@ -876,6 +962,9 @@ update_project_modified_flag (gui_t *gui, uint8_t modified)
 
 /**
  * Enable/disable various GUI menu items based on project state (open/closed)
+ * NOTE: always-enabled and strictly project-state-dependent widgets are fully
+ * handled; selection-dependent ones are only disabled whenever the project is 
+ * closed, further handling being left to the selection-based menu update;
  */
 
 void
@@ -887,7 +976,19 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
 
   open = (state == PROJECT_OPEN) ? TRUE : FALSE;
 
-  /* Widgets to display when project is closed */
+  /* Widgets to enable always */
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Quit"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu/Manual"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/HelpMenu/About"), 1);
+
+  /* Widgets to enable when project is closed, disable when project is open */
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/New"), !open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Open"), !open);
 
@@ -895,9 +996,39 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
   if (!open)
   {
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Remove"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Duplicate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Translate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Rotate"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Scale"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Attract Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Previous"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Next"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Template"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Arc"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Line"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Bolt Holes"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Drill Holes"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
   }
 
-  /* Widgets to display when project is open */
+  /* Widgets to enable when project is open, disable when project is closed */
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Save As"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Close"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import GCAM"), open);
@@ -905,15 +1036,12 @@ update_menu_by_project_state (gui_t *gui, uint8_t state)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import Excellon Drill Holes"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Import SVG Paths"), open);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/FileMenu/Export"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), open);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu"), open);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Project Settings"), open);
 }
 
 /**
- * Enable/disable various GUI menu items based on the currently selected block
+ * Enable/disable various GUI menu items based on the currently selected block;
+ * NOTE: being selection-based, actions taken here assume the project is open.
  */
 
 void
@@ -943,8 +1071,8 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Previous"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Fillet Next"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Flip Direction"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Optimize Order"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/EditMenu/Generate Pattern"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Tool Change"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Template"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Sketch"), 1);
@@ -955,7 +1083,14 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Point"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/InsertMenu/Image"), 1);
   gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/AssistantMenu/Polygon"), 1);
-  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 1);
+  gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 1);
 
   /* FILLETING */
   if (selected_block->type == GCODE_TYPE_LINE)
@@ -1019,12 +1154,26 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
   if (selected_block->parent)
     if (selected_block->parent->type == GCODE_TYPE_EXTRUSION)
     {
-      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+      gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
     }
 
   if (selected_block->type == GCODE_TYPE_EXTRUSION)
   {
-    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Perspective"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Orthographic"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Top"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Left"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Right"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Front"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/ViewMenu/Back"), 0);
+    gtk_action_set_sensitive (gtk_ui_manager_get_action (gui->ui_manager, "/MainMenu/RenderMenu/FinalPart"), 0);
   }
 
   /* EDIT MENU */
@@ -1157,17 +1306,20 @@ update_menu_by_selected_item (gui_t *gui, gcode_block_t *selected_block)
 void
 gui_show_project (gui_t *gui)
 {
+  GtkTreeView *tree_view;
   GtkTreeSelection *selection;
   GtkTreePath *path;
   GtkTreeIter selected_iter;
   gcode_block_t *selected_block;
+
+  tree_view = GTK_TREE_VIEW (gui->gcode_block_treeview);
 
   /* Refresh G-Code Block Tree */
   gui_recreate_whole_tree (gui);
 
   /* Highlight the Tool block */
   path = gtk_tree_path_new_from_string ("1");
-  selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (gui->gcode_block_treeview));
+  selection = gtk_tree_view_get_selection (tree_view);
 
   gtk_tree_selection_select_path (selection, path);
   get_selected_block (gui, &selected_block, &selected_iter);

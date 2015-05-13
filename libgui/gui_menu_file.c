@@ -811,6 +811,19 @@ export_gcode_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   g_free (text_field);
 
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[4]));
+
+  if (strstr (text_field, "Traditional"))
+  {
+    gui->gcode.pocketing_style = GCODE_POCKETING_TRADITIONAL;
+  }
+  else if (strstr (text_field, "Serpentine"))
+  {
+    gui->gcode.pocketing_style = GCODE_POCKETING_ALTERNATE_1;
+  }
+
+  g_free (text_field);
+
   dialog = gtk_file_chooser_dialog_new ("Export G-Code",
                                         GTK_WINDOW (gui->window),
                                         GTK_FILE_CHOOSER_ACTION_SAVE,
@@ -890,6 +903,7 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
   GtkWidget *export_format_combo;
   GtkWidget *project_number_spin;
   GtkWidget *drilling_motion_combo;
+  GtkWidget *pocketing_style_combo;
   GtkWidget **wlist;
   GdkPixbuf *pixbuf;
 
@@ -897,7 +911,7 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
 
   gui = (gui_t *)wlist[0];
 
-  table = gtk_table_new (3, 2, TRUE);
+  table = gtk_table_new (4, 2, TRUE);
   gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
   gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
@@ -942,9 +956,28 @@ export_gcode_create_page1 (GtkWidget *assistant, gpointer data)
     gtk_combo_box_set_active (GTK_COMBO_BOX (drilling_motion_combo), 1);
   }
 
+  label = gtk_label_new ("Pocketing Strategy");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 3, 4);
+
+  pocketing_style_combo = gtk_combo_box_new_text ();
+  gtk_combo_box_append_text (GTK_COMBO_BOX (pocketing_style_combo), "Traditional (3D raster)");
+  gtk_combo_box_append_text (GTK_COMBO_BOX (pocketing_style_combo), "Serpentine (2D raster)");
+  gtk_combo_box_set_active (GTK_COMBO_BOX (pocketing_style_combo), 0);
+  gtk_table_attach (GTK_TABLE (table), pocketing_style_combo, 1, 2, 3, 4, GTK_FILL | GTK_EXPAND, 0, 0, 0);
+
+  if (gui->gcode.pocketing_style == GCODE_POCKETING_TRADITIONAL)
+  {
+    gtk_combo_box_set_active (GTK_COMBO_BOX (pocketing_style_combo), 0);
+  }
+  else if (gui->gcode.pocketing_style == GCODE_POCKETING_ALTERNATE_1)
+  {
+    gtk_combo_box_set_active (GTK_COMBO_BOX (pocketing_style_combo), 1);
+  }
+
   wlist[1] = export_format_combo;
   wlist[2] = project_number_spin;
   wlist[3] = drilling_motion_combo;
+  wlist[4] = pocketing_style_combo;
 
   gtk_widget_set_sensitive (project_number_spin, 0);
 
@@ -984,7 +1017,7 @@ gui_menu_file_export_gcode_menuitem_callback (GtkWidget *widget, gpointer data)
   gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
 
   /* Setup Global Widgets */
-  wlist = malloc (4 * sizeof (GtkWidget *));
+  wlist = malloc (5 * sizeof (GtkWidget *));
 
   wlist[0] = (void *)gui;
 

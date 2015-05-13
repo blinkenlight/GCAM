@@ -19,7 +19,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
-AC_INIT([GCAM], [2015.04.13])
+AC_INIT([GCAM], [2015.05.13])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([gcam.c])
 AC_CONFIG_MACRO_DIR([m4])

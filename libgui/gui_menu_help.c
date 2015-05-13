@@ -31,7 +31,9 @@ gui_menu_help_manual_menuitem_callback (GtkWidget *widget, gpointer data)
 
   gui = (gui_t *)data;
 
-  generic_dialog (gui, "\nVisit http://gcam.js.cx and click on Manual.\n");
+  generic_dialog (gui, "Visit http://gcam.js.cx and click on Manual,\n"
+                       "or take a look at the GCAM SE Wiki pages\n"
+                       "at http://github.com/blinkenlight/gcam/wiki.");
 }
 
 void

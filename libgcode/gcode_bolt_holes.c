@@ -183,7 +183,7 @@ gcode_bolt_holes_make (gcode_block_t *block)
   {
     if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
     {
-      GCODE_DRILL (block, "G81", z1, tool->feed * tool->plunge_ratio, safe_z);
+      GCODE_DRILL (block, z1, tool->feed * tool->plunge_ratio, safe_z);
     }
   }
 
@@ -248,9 +248,9 @@ gcode_bolt_holes_make (gcode_block_t *block)
         {
           gcode_pocket_t pocket;
 
-          gcode_pocket_init (&pocket, tool_radius);                             // Create a pocket for 'offset_block';
+          gcode_pocket_init (&pocket, block, tool);                             // Create a pocket for 'offset_block';
           gcode_pocket_prep (&pocket, offset_block, NULL);                      // Create a raster of paths based on the contour;
-          gcode_pocket_make (&pocket, block, z, touch_z, tool);                 // Create the g-code from the pocket's path list;
+          gcode_pocket_make (&pocket, z, touch_z);                              // Create the g-code from the pocket's path list;
           gcode_pocket_free (&pocket);                                          // Dispose of the no longer needed pocket;
         }
 

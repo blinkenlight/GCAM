@@ -62,11 +62,8 @@ gcode_tree_row_collapsed_event (GtkTreeView *tree_view, GtkTreeIter *iter, GtkTr
   if (!selected_block)                                                          // If the previously selected path was a descendant of the one just collapsed,
   {                                                                             // 'selected_block' comes back as NULL since the old selection is now invalid;
     set_selected_row_with_iter (&gui, iter);                                    // So in order to avoid a rather awkward "nothing is selected" situation, we
-    get_selected_block (&gui, &selected_block, &selected_iter);                 // use the supplied iter pointing to the collapsed row to select that instead;
-    gui_tab_display (&gui, selected_block, 0);
-    update_menu_by_selected_item (&gui, selected_block);
-  }
-}
+  }                                                                             // use the supplied iter pointing to the collapsed row to select that instead;
+}                                                                               // Updating the menu and the tab is done automatically by 'set_selected_row'.
 
 static void
 opengl_context_expose_event (GtkWidget *widget, gpointer data)
@@ -849,6 +846,7 @@ gui_init (char *filename)
   GdkGLConfig *glconfig;
   GtkWidget *window_hbox;
   GtkWidget *window_vbox_main;
+  GtkWidget *window_vbox_minor;
   GtkWidget *window_vbox_right;
   GtkWidget *gl_context;
   char *fatal_message;
@@ -911,8 +909,8 @@ gui_init (char *filename)
   g_signal_connect (G_OBJECT (gui.window), "destroy", G_CALLBACK (gui_destroy), NULL);
 
   /* Create a vbox for the opengl context and code block tree */
-  window_vbox_main = gtk_vbox_new (FALSE, 1);
-  gtk_container_set_border_width (GTK_CONTAINER (window_vbox_main), 1);
+  window_vbox_main = gtk_vbox_new (FALSE, 0);
+  gtk_container_set_border_width (GTK_CONTAINER (window_vbox_main), 0);
   gtk_container_add (GTK_CONTAINER (gui.window), window_vbox_main);
 
   /* Create menu bar */
@@ -969,10 +967,15 @@ gui_init (char *filename)
     gtk_action_set_sensitive (gtk_ui_manager_get_action (gui.ui_manager, "/MainMenu/FileMenu/Save"), 0);
   }
 
+  /* Create a sub-vbox for the hbox and the progress bar */
+  window_vbox_minor = gtk_vbox_new (FALSE, 2);
+  gtk_container_set_border_width (GTK_CONTAINER (window_vbox_minor), 2);
+  gtk_box_pack_end (GTK_BOX (window_vbox_main), window_vbox_minor, TRUE, TRUE, 0);
+
   /* Create an hbox for left panel and opengl context */
   window_hbox = gtk_hbox_new (FALSE, 1);
-  gtk_container_set_border_width (GTK_CONTAINER (window_hbox), 1);
-  gtk_box_pack_start (GTK_BOX (window_vbox_main), window_hbox, TRUE, TRUE, 0);
+  gtk_container_set_border_width (GTK_CONTAINER (window_hbox), 0);
+  gtk_box_pack_start (GTK_BOX (window_vbox_minor), window_hbox, TRUE, TRUE, 0);
 
   /* Create a vbox for the Left Panel */
   gui.panel_vbox = gtk_vbox_new (FALSE, 1);
@@ -981,7 +984,7 @@ gui_init (char *filename)
   gtk_widget_set_size_request (GTK_WIDGET (gui.panel_vbox), PANEL_LEFT_W, 0);
 
   /* Create a vbox for the opengl context and block tree on the right side of the window */
-  window_vbox_right = gtk_vbox_new (FALSE, 1);
+  window_vbox_right = gtk_vbox_new (FALSE, 2);
   gtk_container_set_border_width (GTK_CONTAINER (window_vbox_right), 0);
   gtk_box_pack_end (GTK_BOX (window_hbox), window_vbox_right, TRUE, TRUE, 0);
 
@@ -1092,7 +1095,7 @@ gui_init (char *filename)
   /* Progress Bar */
   {
     gui.progress_bar = gtk_progress_bar_new ();
-    gtk_box_pack_end (GTK_BOX (window_vbox_main), gui.progress_bar, FALSE, FALSE, 0);
+    gtk_box_pack_end (GTK_BOX (window_vbox_minor), gui.progress_bar, FALSE, FALSE, 0);
   }
 
   gtk_widget_show_all (gui.window);

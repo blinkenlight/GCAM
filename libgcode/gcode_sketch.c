@@ -963,9 +963,9 @@ gcode_sketch_make (gcode_block_t *block)
           {
             gcode_pocket_t pocket;
 
-            gcode_pocket_init (&pocket, tool_radius);                           // Create a pocket for 'offset_listhead';
+            gcode_pocket_init (&pocket, block, tool);                           // Create a pocket for 'offset_listhead';
             gcode_pocket_prep (&pocket, offset_listhead, NULL);                 // Create a raster of paths based on the contour;
-            gcode_pocket_make (&pocket, block, z, touch_z, tool);               // Create the g-code from the pocket's path list;
+            gcode_pocket_make (&pocket, z, touch_z);                            // Create the g-code from the pocket's path list;
             gcode_pocket_free (&pocket);                                        // Dispose of the no longer needed pocket;
 
             break;
@@ -1005,14 +1005,14 @@ gcode_sketch_make (gcode_block_t *block)
 
               if (fabs (maximum_proffset - current_proffset) > tool->diameter)  // The thing is, if the current profile offset is less than a tool diameter
               {                                                                 // away from the maximum profile offset, there is no need to pocket at all;
-                gcode_pocket_init (&inner_pocket, tool_radius);                 // Create two pockets, one for the inner contour, one for the outer;
-                gcode_pocket_init (&outer_pocket, tool_radius);
+                gcode_pocket_init (&inner_pocket, block, tool);                 // Create two pockets, one for the inner contour, one for the outer;
+                gcode_pocket_init (&outer_pocket, block, tool);
 
                 gcode_pocket_prep (&inner_pocket, inner_offset_listhead, NULL); // Create the inner pocket from the current 'z' depth contour / list;
                 gcode_pocket_prep (&outer_pocket, outer_offset_listhead, NULL); // Create the outer pocket from the final 'z1' depth contour / list;
 
                 gcode_pocket_subtract (&outer_pocket, &inner_pocket);           // Subtract the inner pocket from the outer one,
-                gcode_pocket_make (&outer_pocket, block, z, touch_z, tool);     // and create the g-code resulting from what remains;
+                gcode_pocket_make (&outer_pocket, z, touch_z);                  // and create the g-code resulting from what remains;
 
                 gcode_pocket_free (&inner_pocket);                              // The two pockets are no longer needed and can be disposed of;
                 gcode_pocket_free (&outer_pocket);

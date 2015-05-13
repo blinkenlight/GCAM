@@ -87,6 +87,9 @@
 #define GCODE_DRILLING_CANNED         0x00
 #define GCODE_DRILLING_SIMPLE         0x01
 
+#define GCODE_POCKETING_TRADITIONAL   0x00
+#define GCODE_POCKETING_ALTERNATE_1   0x01
+
 /* *INDENT-OFF* */
 
 enum
@@ -335,6 +338,7 @@ typedef struct gcode_s
   uint8_t machine_options;
 
   uint8_t drilling_motion;
+  uint8_t pocketing_style;
 
   uint32_t decimals;                                                            // Number of decimal places to print
 
@@ -630,15 +634,15 @@ void strswp (char *target, char oldchar, char newchar);
 
 /* Canned cycle macros */
 
-#define GCODE_DRILL(_block, _code, _z, _f, _r) { \
+#define GCODE_DRILL(_block, _z, _f, _r) { \
         char _string[256]; \
-        gsprintf (_string, _block->gcode->decimals, "%s Z%z F%.3f R%z ", _code, _z, _f, _r); \
+        gsprintf (_string, _block->gcode->decimals, "G81 Z%z F%.3f R%z ", _z, _f, _r); \
         GCODE_APPEND (_block, _string); \
         _block->gcode->tool_zpos = FLT_MAX; }
 
-#define GCODE_Q_DRILL(_block, _code, _z, _f, _r, _q) { \
+#define GCODE_PECK_DRILL(_block, _z, _f, _r, _q) { \
         char _string[256]; \
-        gsprintf (_string, _block->gcode->decimals, "%s Z%z F%.3f R%z Q%z ", _code, _z, _f, _r, _q); \
+        gsprintf (_string, _block->gcode->decimals, "G83 Z%z F%.3f R%z Q%z ", _z, _f, _r, _q); \
         GCODE_APPEND (_block, _string); \
         _block->gcode->tool_zpos = FLT_MAX; }
 
