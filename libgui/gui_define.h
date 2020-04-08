@@ -60,13 +60,13 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 #define GUI_ADD_AFTER_OR_UNDER            7
 #define GUI_INSERT_WITH_TANGENCY          8
 
-#define WINDOW_W                          720
-#define WINDOW_H                          540
+#define WINDOW_W                          1000
+#define WINDOW_H                          700
 
-#define PANEL_LEFT_W                      280
+#define PANEL_LEFT_W                      350
 #define PANEL_LEFT_H                      (WINDOW_H - 80)                       /* Subtract away the menu and status bar */
 #define PANEL_LEFT_W_SW                   (PANEL_LEFT_W - 20)                   /* Left panel minus margins for scroll window */
-#define PANEL_BOTTOM_H                    260
+#define PANEL_BOTTOM_H                    300
 
 #define TABLE_SPACING                     3
 #define BORDER_WIDTH                      12
