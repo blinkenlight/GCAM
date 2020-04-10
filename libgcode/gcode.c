@@ -359,6 +359,8 @@ gcode_list_make (gcode_t *gcode)
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;
 
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while generating the g-code
+
   block_index = 0;
 
   index_block = gcode->listhead;
@@ -378,6 +380,8 @@ gcode_list_make (gcode_t *gcode)
 
   if (gcode->progress_callback)                                                 // Clean up the progress bar before we leave;
     gcode->progress_callback (gcode->gui, 0.0);
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 }
 
 void
@@ -959,6 +963,8 @@ gcode_save (gcode_t *gcode, char *filename)
     return (1);
   }
 
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while saving the project
+
   if (gcode->format == GCODE_FORMAT_TBD)                                        // If the file format is not determined yet, choose one based on the file extension
   {
     gcode->format = GCODE_FORMAT_BIN;                                           // Unless subsequently changed, set format to binary by default
@@ -1132,6 +1138,8 @@ gcode_save (gcode_t *gcode, char *filename)
     fseek (fh, sizeof (uint32_t), SEEK_SET);
     fwrite (&fsize, sizeof (uint32_t), 1, fh);
   }
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 
   fclose (fh);
 
@@ -1611,6 +1619,8 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
     line_count++;
   }
 
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while parsing the g-code
+
   /* Isolate each line */
   line_index = 0;
   sp = code;
@@ -1777,6 +1787,8 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
 
     line_index++;
   }
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 
   free (code);
 
