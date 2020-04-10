@@ -1451,7 +1451,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   gcode_template_init (&template_block, &gui->gcode, NULL);                     // Create a new template block to import things into;
 
-  sprintf (template_block->comment, "Gerber layer from '%s'", basename ((char *)filename));
+  snprintf (template_block->comment, sizeof (template_block->comment), "Gerber layer from '%s'", basename ((char *)filename));    // Create a block comment that mentions the filename;
 
   gcode_tool_init (&tool_block, &gui->gcode, template_block);                   // Create a new tool to perform the etching with,
 
@@ -2105,7 +2105,7 @@ gui_menu_file_import_excellon_menuitem_callback (GtkWidget *widget, gpointer dat
       return;
     }
 
-    sprintf (template_block->comment, "Excellon layer from '%s'", basename ((char *)filename)); // Create a block comment that mentions the filename;
+    snprintf (template_block->comment, sizeof (template_block->comment), "Excellon layer from '%s'", basename ((char *)filename));    // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 
@@ -2212,7 +2212,7 @@ gui_menu_file_import_svg_menuitem_callback (GtkWidget *widget, gpointer data)
       return;
     }
 
-    sprintf (template_block->comment, "SVG layer from '%s'", basename ((char *)filename));      // Create a block comment that mentions the filename;
+    snprintf (template_block->comment, sizeof (template_block->comment), "SVG layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 
@@ -2317,7 +2317,7 @@ gui_menu_file_import_stl_menuitem_callback (GtkWidget *widget, gpointer data)
       return;
     }
 
-    sprintf (stl_block->comment, "STL layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
+    snprintf (stl_block->comment, sizeof (stl_block->comment), "STL layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 
