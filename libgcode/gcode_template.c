@@ -41,6 +41,7 @@ gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *paren
   (*block)->aabb = gcode_template_aabb;
   (*block)->move = gcode_template_move;
   (*block)->spin = gcode_template_spin;
+  (*block)->flip = gcode_template_flip;
   (*block)->scale = gcode_template_scale;
   (*block)->parse = gcode_template_parse;
   (*block)->clone = gcode_template_clone;
@@ -459,6 +460,49 @@ gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
   {
     if (index_block->spin)
       index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_template_t *template;
+  gcode_block_t *index_block;
+  gcode_vec2d_t origin;
+
+  template = (gcode_template_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    template->position[1] -= datum[1];
+    template->position[1] = -template->position[1];
+    template->position[1] += datum[1];
+
+    template->rotation = 360 - template->rotation;                              // The reverse of the usual angle due to further mirroring inside the template
+    GCODE_MATH_WRAP_TO_360_DEGREES(template->rotation);
+
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    template->position[0] -= datum[0];
+    template->position[0] = -template->position[0];
+    template->position[0] += datum[0];
+
+    template->rotation = 360 - template->rotation;                              // The reverse of the usual angle due to further mirroring inside the template
+    GCODE_MATH_WRAP_TO_360_DEGREES(template->rotation);
+  }
+
+  GCODE_MATH_VEC2D_SET (origin, 0, 0);
+  
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->flip)
+      index_block->flip (index_block, origin, angle);
 
     index_block = index_block->next;
   }

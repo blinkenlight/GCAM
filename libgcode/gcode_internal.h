@@ -237,6 +237,7 @@ typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode
 typedef gfloat_t gcode_length_t (struct gcode_block_s *block);
 typedef void gcode_move_t (struct gcode_block_s *block, gcode_vec2d_t delta);
 typedef void gcode_spin_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);
+typedef void gcode_flip_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);
 typedef void gcode_scale_t (struct gcode_block_s *block, gfloat_t scale);
 typedef void gcode_parse_t (struct gcode_block_s *block, const char **xmlattr);
 typedef void gcode_clone_t (struct gcode_block_s **block, struct gcode_s *gcode, struct gcode_block_s *model);
@@ -296,6 +297,7 @@ typedef struct gcode_block_s
   gcode_length_t *length;
   gcode_move_t *move;
   gcode_spin_t *spin;
+  gcode_flip_t *flip;
   gcode_scale_t *scale;
   gcode_parse_t *parse;
   gcode_clone_t *clone;

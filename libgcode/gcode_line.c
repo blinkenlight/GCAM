@@ -44,6 +44,7 @@ gcode_line_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->length = gcode_line_length;
   (*block)->move = gcode_line_move;
   (*block)->spin = gcode_line_spin;
+  (*block)->flip = gcode_line_flip;
   (*block)->scale = gcode_line_scale;
   (*block)->parse = gcode_line_parse;
   (*block)->clone = gcode_line_clone;
@@ -524,6 +525,36 @@ gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
   GCODE_MATH_VEC2D_SUB (orgnl_pt, line->p1, datum);
   GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
   GCODE_MATH_VEC2D_ADD (line->p1, xform_pt, datum);
+}
+
+void
+gcode_line_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)     // Flips the line around an axis through a point, not the endpoints of the line
+{
+  gcode_line_t *line;
+
+  line = (gcode_line_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    line->p0[1] -= datum[1];
+    line->p0[1] = -line->p0[1];
+    line->p0[1] += datum[1];
+
+    line->p1[1] -= datum[1];
+    line->p1[1] = -line->p1[1];
+    line->p1[1] += datum[1];
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    line->p0[0] -= datum[0];
+    line->p0[0] = -line->p0[0];
+    line->p0[0] += datum[0];
+
+    line->p1[0] -= datum[0];
+    line->p1[0] = -line->p1[0];
+    line->p1[0] += datum[0];
+  }
 }
 
 void

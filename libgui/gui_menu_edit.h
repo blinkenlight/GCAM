@@ -29,6 +29,7 @@ void gui_menu_edit_remove_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data);
+void gui_menu_edit_flip_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_attract_previous_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data);

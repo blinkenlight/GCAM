@@ -45,6 +45,7 @@ gcode_bolt_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *par
   (*block)->aabb = gcode_bolt_holes_aabb;
   (*block)->move = gcode_bolt_holes_move;
   (*block)->spin = gcode_bolt_holes_spin;
+  (*block)->flip = gcode_bolt_holes_flip;
   (*block)->scale = gcode_bolt_holes_scale;
   (*block)->parse = gcode_bolt_holes_parse;
   (*block)->clone = gcode_bolt_holes_clone;
@@ -711,6 +712,47 @@ gcode_bolt_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle
 
   bolt_holes->offset_angle += angle;
   GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+
+  gcode_bolt_holes_rebuild (block);
+}
+
+void
+gcode_bolt_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_bolt_holes_t *bolt_holes;
+  gfloat_t delta;
+
+  bolt_holes = (gcode_bolt_holes_t *)block->pdata;
+  
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    delta = (bolt_holes->number[1] - 1) * bolt_holes->offset_distance;          // We need this because the origin of a bolt hole matrix is NOT in its center
+
+    bolt_holes->position[1] -= datum[1];
+    bolt_holes->position[1] = -bolt_holes->position[1];
+    bolt_holes->position[1] += datum[1];
+
+    if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)                       // Without this little trick the mirror will be correct but NOT what we wanted
+      bolt_holes->position[1] -= delta;
+
+    bolt_holes->offset_angle = 360 - bolt_holes->offset_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    delta = (bolt_holes->number[0] - 1) * bolt_holes->offset_distance;          // We need this because the origin of a bolt hole matrix is NOT in its center
+
+    bolt_holes->position[0] -= datum[0];
+    bolt_holes->position[0] = -bolt_holes->position[0];
+    bolt_holes->position[0] += datum[0];
+
+    if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)                       // Without this little trick the mirror will be correct but NOT what we wanted
+      bolt_holes->position[0] -= delta;
+
+    bolt_holes->offset_angle = 180 - bolt_holes->offset_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+  }
 
   gcode_bolt_holes_rebuild (block);
 }

@@ -51,6 +51,7 @@ void gcode_line_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max
 gfloat_t gcode_line_length (gcode_block_t *block);
 void gcode_line_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
+void gcode_line_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_line_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_line_parse (gcode_block_t *block, const char **xmlattr);
 void gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);

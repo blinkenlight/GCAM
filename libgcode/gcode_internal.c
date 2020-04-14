@@ -57,6 +57,7 @@ gcode_internal_init (gcode_block_t *block, gcode_t *gcode, gcode_block_t *parent
   block->length = NULL;
   block->move = NULL;
   block->spin = NULL;
+  block->flip = NULL;
   block->scale = NULL;
   block->parse = NULL;
   block->clone = NULL;

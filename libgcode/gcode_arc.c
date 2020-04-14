@@ -47,6 +47,7 @@ gcode_arc_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->length = gcode_arc_length;
   (*block)->move = gcode_arc_move;
   (*block)->spin = gcode_arc_spin;
+  (*block)->flip = gcode_arc_flip;
   (*block)->scale = gcode_arc_scale;
   (*block)->parse = gcode_arc_parse;
   (*block)->clone = gcode_arc_clone;
@@ -731,6 +732,36 @@ gcode_arc_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
 
   arc->start_angle += angle;
   GCODE_MATH_WRAP_TO_360_DEGREES (arc->start_angle);
+}
+
+void
+gcode_arc_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)      // Flips the arc around an axis through a point, not the endpoints of the arc
+{
+  gcode_arc_t *arc;
+
+  arc = (gcode_arc_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    arc->p[1] -= datum[1];
+    arc->p[1] = -arc->p[1];
+    arc->p[1] += datum[1];
+
+    arc->start_angle = 360 - arc->start_angle;
+    arc->sweep_angle = -arc->sweep_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES(arc->start_angle);
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    arc->p[0] -= datum[0];
+    arc->p[0] = -arc->p[0];
+    arc->p[0] += datum[0];
+
+    arc->start_angle = 180 - arc->start_angle;
+    arc->sweep_angle = -arc->sweep_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES(arc->start_angle);
+  }
 }
 
 void

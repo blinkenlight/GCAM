@@ -83,6 +83,7 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 
 #define GCAM_STOCK_EDIT_TRANSLATE         "gcam-edit-translate"
 #define GCAM_STOCK_EDIT_ROTATE            "gcam-edit-rotate"
+#define GCAM_STOCK_EDIT_MIRROR            "gcam-edit-mirror"
 #define GCAM_STOCK_EDIT_SCALE             "gcam-edit-scale"
 #define GCAM_STOCK_EDIT_ATTRACT_PREV      "gcam-edit-attract-prev"
 #define GCAM_STOCK_EDIT_ATTRACT_NEXT      "gcam-edit-attract-next"

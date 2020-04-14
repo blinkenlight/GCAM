@@ -512,6 +512,7 @@ gcode_sketch_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->aabb = gcode_sketch_aabb;
   (*block)->move = gcode_sketch_move;
   (*block)->spin = gcode_sketch_spin;
+  (*block)->flip = gcode_sketch_flip;
   (*block)->scale = gcode_sketch_scale;
   (*block)->parse = gcode_sketch_parse;
   (*block)->clone = gcode_sketch_clone;
@@ -1438,6 +1439,22 @@ gcode_sketch_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
   {
     if (index_block->spin)
       index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_sketch_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->flip)
+      index_block->flip (index_block, datum, angle);
 
     index_block = index_block->next;
   }

@@ -43,6 +43,7 @@ gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pa
   (*block)->aabb = gcode_drill_holes_aabb;
   (*block)->move = gcode_drill_holes_move;
   (*block)->spin = gcode_drill_holes_spin;
+  (*block)->flip = gcode_drill_holes_flip;
   (*block)->scale = gcode_drill_holes_scale;
   (*block)->parse = gcode_drill_holes_parse;
   (*block)->clone = gcode_drill_holes_clone;
@@ -682,6 +683,22 @@ gcode_drill_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angl
   {
     if (index_block->spin)
       index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_drill_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->flip)
+      index_block->flip (index_block, datum, angle);
 
     index_block = index_block->next;
   }

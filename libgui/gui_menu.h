@@ -52,6 +52,7 @@ static GtkActionEntry gui_menu_entries[] = {
   { "Duplicate",                   GTK_STOCK_COPY,                    "_Duplicate",                   "<control>D",        "Duplicate",                        G_CALLBACK (gui_menu_edit_duplicate_menuitem_callback) },
   { "Translate",                   GCAM_STOCK_EDIT_TRANSLATE,         "_Translate",                   "<alt><control>T",   "Translate",                        G_CALLBACK (gui_menu_edit_move_menuitem_callback) },
   { "Rotate",                      GCAM_STOCK_EDIT_ROTATE,            "_Rotate",                      "<alt><control>R",   "Rotate",                           G_CALLBACK (gui_menu_edit_spin_menuitem_callback) },
+  { "Mirror",                      GCAM_STOCK_EDIT_MIRROR,            "_Mirror",                      "<alt><control>M",   "Mirror",                           G_CALLBACK (gui_menu_edit_flip_menuitem_callback) },
   { "Scale",                       GCAM_STOCK_EDIT_SCALE,             "_Scale",                       "<alt><control>S",   "Scale",                            G_CALLBACK (gui_menu_edit_scale_menuitem_callback) },
   { "Attract Previous",            GCAM_STOCK_EDIT_ATTRACT_PREV,      "Attract _Previous",            "<alt><control>P",   "Attract Previous",                 G_CALLBACK (gui_menu_edit_attract_previous_menuitem_callback) },
   { "Attract Next",                GCAM_STOCK_EDIT_ATTRACT_NEXT,      "Attract _Next",                "<alt><control>N",   "Attract Next",                     G_CALLBACK (gui_menu_edit_attract_next_menuitem_callback) },
@@ -113,6 +114,7 @@ static const char *gui_menu_description =
 "      <separator/>"
 "      <menuitem action='Translate'/>"
 "      <menuitem action='Rotate'/>"
+"      <menuitem action='Mirror'/>"
 "      <menuitem action='Scale'/>"
 "      <separator/>"
 "      <menuitem action='Attract Previous'/>"

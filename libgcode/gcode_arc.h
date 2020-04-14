@@ -78,6 +78,7 @@ void gcode_arc_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 gfloat_t gcode_arc_length (gcode_block_t *block);
 void gcode_arc_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_arc_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
+void gcode_arc_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_arc_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_arc_parse (gcode_block_t *block, const char **xmlattr);
 void gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);

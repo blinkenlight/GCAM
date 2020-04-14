@@ -398,6 +398,211 @@ gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 static void
+flip_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
+{
+  GtkWidget **wlist;
+
+  wlist = (GtkWidget **)data;
+
+  gtk_widget_destroy (assistant);
+
+  free (wlist);
+}
+
+static void
+flip_on_assistant_apply (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget **wlist;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+  char *text_field;
+  gcode_vec2d_t datum;
+  gfloat_t angle;
+
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  gui = (gui_t *)wlist[0];                                                      // Using that, retrieve a reference to 'gui';
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+
+  if (selected_block->flip)
+  {
+    text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[1]));
+
+    if (strstr (text_field, "Vertical"))                                        // Set the mirror axis angle to either 90 degrees (vertical) or 0 degrees (horizontal)
+      angle = 90;
+    else
+      angle = 0;
+
+    datum[0] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[3]));
+    datum[1] = gtk_spin_button_get_value (GTK_SPIN_BUTTON (wlist[5]));
+
+    selected_block->flip (selected_block, datum, angle);
+
+    gui->opengl.rebuild_view_display_list = 1;
+    gui_opengl_context_redraw (&gui->opengl, selected_block);
+
+    update_project_modified_flag (gui, 1);
+
+    gui_tab_display (gui, selected_block, 1);
+  }
+}
+
+static void
+flip_on_axis_changed (GtkWidget *axis_combo, gpointer data)
+{
+  GtkWidget **wlist;
+  char *text_field;
+
+  wlist = (GtkWidget **)data;                                                   // Retrieve a reference to the GUI context;
+
+  text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (axis_combo));
+
+  if (strstr (text_field, "Vertical"))                                          // Show one set of widgets and hide the other set depending on the selected axis
+  {
+    gtk_widget_hide (wlist[4]);
+    gtk_widget_hide (wlist[5]);
+    gtk_widget_show (wlist[2]);
+    gtk_widget_show (wlist[3]);
+  }
+  else
+  {
+    gtk_widget_hide (wlist[2]);
+    gtk_widget_hide (wlist[3]);
+    gtk_widget_show (wlist[4]);
+    gtk_widget_show (wlist[5]);
+  }
+
+  g_free (text_field);
+}
+
+static void
+flip_create_page1 (GtkWidget *assistant, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *table;
+  GtkWidget *label;
+  GtkWidget *axis_combo;
+  GtkWidget *mirror_pointx_label;
+  GtkWidget *mirror_pointy_label;
+  GtkWidget *mirror_pointx_spin;
+  GtkWidget *mirror_pointy_spin;
+  GtkWidget **wlist;
+  GdkPixbuf *pixbuf;
+  GtkTreeIter selected_iter;
+  gcode_block_t *selected_block;
+  gcode_vec2d_t aabb_min, aabb_max;
+  gcode_vec2d_t mirror_point;
+
+  wlist = (GtkWidget **)data;
+
+  gui = (gui_t *)wlist[0];
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+
+  mirror_point[0] = 0.0;
+  mirror_point[1] = 0.0;
+
+  if (selected_block->aabb)
+  {
+    selected_block->aabb (selected_block, aabb_min, aabb_max);
+
+    if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
+    {
+      mirror_point[0] = (aabb_min[0] + aabb_max[0]) / 2;
+      mirror_point[1] = (aabb_min[1] + aabb_max[1]) / 2;
+    }
+  }
+
+  table = gtk_table_new (2, 2, TRUE);
+  gtk_table_set_col_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_table_set_row_spacings (GTK_TABLE (table), TABLE_SPACING);
+  gtk_container_set_border_width (GTK_CONTAINER (table), BORDER_WIDTH);
+
+  label = gtk_label_new ("Mirror Axis is");
+  gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+
+  axis_combo = gtk_combo_box_new_text ();
+  gtk_combo_box_append_text (GTK_COMBO_BOX (axis_combo), "Vertical");  
+  gtk_combo_box_append_text (GTK_COMBO_BOX (axis_combo), "Horizontal");  
+  gtk_combo_box_set_active (GTK_COMBO_BOX (axis_combo), 0);
+  gtk_table_attach_defaults (GTK_TABLE (table), axis_combo, 1, 2, 0, 1);
+
+  mirror_pointx_label = gtk_label_new ("Passing Through (X)");
+  gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointx_label, 0, 1, 1, 2);
+
+  mirror_pointx_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_X), SCALED_INCHES (MAX_DIM_X), SCALED_INCHES (0.01));
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (mirror_pointx_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (mirror_pointx_spin), mirror_point[0]);
+  gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointx_spin, 1, 2, 1, 2);
+
+  g_signal_connect_swapped (mirror_pointx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
+  mirror_pointy_label = gtk_label_new ("Passing Through (Y)");
+  gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointy_label, 0, 1, 1, 2);
+
+  mirror_pointy_spin = gtk_spin_button_new_with_range (SCALED_INCHES (-MAX_DIM_Y), SCALED_INCHES (MAX_DIM_Y), SCALED_INCHES (0.01));
+  gtk_spin_button_set_digits (GTK_SPIN_BUTTON (mirror_pointy_spin), 5);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (mirror_pointy_spin), mirror_point[1]);
+  gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointy_spin, 1, 2, 1, 2);
+
+  g_signal_connect_swapped (mirror_pointy_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
+
+  wlist[1] = axis_combo;                                                        // Unusually, the X and Y labels also go into the list because we need
+  wlist[2] = mirror_pointx_label;                                               // access to them to hide one of them whenever the mirror axis changes
+  wlist[3] = mirror_pointx_spin;
+  wlist[4] = mirror_pointy_label;
+  wlist[5] = mirror_pointy_spin;
+
+  g_signal_connect (axis_combo, "changed", G_CALLBACK (flip_on_axis_changed), wlist);
+
+  gtk_widget_show_all (table);
+
+  gtk_widget_hide (mirror_pointy_label);                                        // Because we have the X and Y widgets in the same table row, we need
+  gtk_widget_hide (mirror_pointy_spin);                                         // to hide one of the labels and one of the spin buttons at all times
+
+  gtk_assistant_append_page (GTK_ASSISTANT (assistant), table);
+  gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), table, "Mirror");
+  gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), table, GTK_ASSISTANT_PAGE_CONFIRM);
+  gtk_assistant_set_page_complete (GTK_ASSISTANT (assistant), table, TRUE);
+
+  pixbuf = gtk_widget_render_icon (assistant, GCAM_STOCK_EDIT_MIRROR, GTK_ICON_SIZE_LARGE_TOOLBAR, NULL);
+  gtk_assistant_set_page_header_image (GTK_ASSISTANT (assistant), table, pixbuf);
+  g_object_unref (pixbuf);
+}
+
+void
+gui_menu_edit_flip_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  gui_t *gui;
+  GtkWidget *assistant;
+  GtkWidget **wlist;
+
+  gui = (gui_t *)data;
+
+  assistant = gtk_assistant_new ();
+
+  gtk_window_set_title (GTK_WINDOW (assistant), "Mirror");
+  gtk_window_set_default_size (GTK_WINDOW (assistant), -1, -1);
+  gtk_window_set_screen (GTK_WINDOW (assistant), gtk_widget_get_screen (gui->window));
+  gtk_window_set_transient_for (GTK_WINDOW (assistant), GTK_WINDOW (gui->window));
+
+  /* Setup Global Widgets */
+  wlist = malloc (6 * sizeof (GtkWidget *));
+
+  wlist[0] = (void *)gui;
+
+  flip_create_page1 (assistant, wlist);
+
+  g_signal_connect (assistant, "cancel", G_CALLBACK (flip_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "close", G_CALLBACK (flip_on_assistant_close_cancel), wlist);
+  g_signal_connect (assistant, "apply", G_CALLBACK (flip_on_assistant_apply), wlist);
+
+  gtk_widget_show (assistant);
+}
+
+static void
 scale_on_assistant_close_cancel (GtkWidget *assistant, gpointer data)
 {
   GtkWidget **wlist;

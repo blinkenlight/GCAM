@@ -56,6 +56,7 @@ void gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected);
 void gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 void gcode_sketch_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_sketch_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
+void gcode_sketch_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_sketch_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_sketch_parse (gcode_block_t *block, const char **xmlattr);
 void gcode_sketch_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);
