@@ -121,13 +121,15 @@ gcode_excellon_import (gcode_block_t *template_block, char *filename)
       {
         case ';':                                                               // *** Looking for format clues in the comments;
 
-          if (sscanf (&buffer[index], "; FORMAT = { %*1d:%1d /", &number) == 1)
+          if (sscanf (&buffer[index], "; FORMAT = { %*1c:%1c /", &letter) == 1)
           {
-            if (number == 2)
+            if (letter == '-')                                                  // This is the KiCAD "decimal" mode ("-:-"), no scaling;
+              digit_guess = 1.0;
+            else if (letter == '2')
               digit_guess = 0.01;
-            else if (number == 3)
+            else if (letter == '3')
               digit_guess = 0.001;
-            else if (number == 4)
+            else if (letter == '4')
               digit_guess = 0.0001;
           }
 
@@ -135,16 +137,19 @@ gcode_excellon_import (gcode_block_t *template_block, char *filename)
 
         case 'I':                                                               // *** Looking for an "INCH,TZ" statement;
 
+          if (strncmp (&buffer[index], "INCH", 4) == 0)                         // If "INCH" is found, set the unit scale;
+          {
+            if (gcode->units == GCODE_UNITS_MILLIMETER)
+              unit_scale = GCODE_INCH2MM;
+            else
+              unit_scale = 1.0;
+          }
+
           if (sscanf (&buffer[index], "INCH , %cZ", &letter) == 1)
           {
-            if (letter == 'T')                                                  // If it is "TZ", set the digit and unit scales;
+            if (letter == 'T')                                                  // If "TZ" is found, set the digit scale;
             {
               digit_scale = 0.0001;                                             // The only inch format is supposed to be "00.0000";
-
-              if (gcode->units == GCODE_UNITS_MILLIMETER)
-                unit_scale = GCODE_INCH2MM;
-              else
-                unit_scale = 1.0;
             }
             else                                                                // If it's NOT "TZ", we're NOT happy;
             {
@@ -157,16 +162,19 @@ gcode_excellon_import (gcode_block_t *template_block, char *filename)
 
         case 'M':                                                               // *** Looking for a "METRIC,TZ" statement;
 
+          if (strncmp (&buffer[index], "METRIC", 6) == 0)                       // If "METRIC" is found, set the unit scale;
+          {
+            if (gcode->units == GCODE_UNITS_INCH)
+              unit_scale = GCODE_MM2INCH;
+            else
+              unit_scale = 1.0;
+          }
+
           if (sscanf (&buffer[index], "METRIC , %cZ", &letter) == 1)
           {
-            if (letter == 'T')                                                  // If it is "TZ", set the digit and unit scales;
+            if (letter == 'T')                                                  // If "TZ" is found, set the digit scale;
             {
               digit_scale = 0.001;                                              // The default metric format is allegedly "000.000";
-
-              if (gcode->units == GCODE_UNITS_INCH)
-                unit_scale = GCODE_MM2INCH;
-              else
-                unit_scale = 1.0;
             }
             else                                                                // If it's NOT "TZ", we're NOT happy;
             {
