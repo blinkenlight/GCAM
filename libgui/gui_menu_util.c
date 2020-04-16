@@ -60,10 +60,10 @@ base_unit_changed_callback (GtkWidget *widget, gpointer data)
 
   gtk_spin_button_get_range (GTK_SPIN_BUTTON (wlist[10]), NULL, &max_clr_z);
 
-  if (fabs (max_clr_z - MAX_CLR_Z) < GCODE_PRECISION)
-    unit_in_use = GCODE_UNITS_INCH;
-  else
-    unit_in_use = GCODE_UNITS_MILLIMETER;
+  if (fabs(max_clr_z) < fabs(MAX_CLR_Z * 10))                                   // Comparing a value that gets rounded for metric units
+    unit_in_use = GCODE_UNITS_INCH;                                             // too closely to its original value would be a mistake;
+  else                                                                          // All we need to decide is what 'max_clr_z' is close to,
+    unit_in_use = GCODE_UNITS_MILLIMETER;                                       // imperial 'MAX_CLR_Z' or metric '25.4 x MAX_CLR_Z'...
 
   text_field = gtk_combo_box_get_active_text (GTK_COMBO_BOX (wlist[2]));
 
