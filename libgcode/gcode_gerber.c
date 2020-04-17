@@ -673,7 +673,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
 
       index++;
     }
-    else if (buffer[index] == 'X' || buffer[index] == 'Y' || buffer[index] == 'I' || buffer[index] == 'J')
+    else if (buffer[index] == 'X' || buffer[index] == 'Y' || buffer[index] == 'I' || buffer[index] == 'J' || buffer[index] == 'D')
     {
       gfloat_t pos[2];
       int xy_mask;
@@ -840,7 +840,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
             insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], pos);
           }
         }
-        else if (xy_mask)                                                       /* And X or Y has occured - Uses previous aperture_cmd if a new one isn't present. */
+        else if (xy_mask)                                                       /* And X or Y has occurred - Uses previous aperture_cmd if a new one isn't present. */
         {
           if (aperture_cmd == 1)                                                /* Open Exposure - Trace (line) */
           {
