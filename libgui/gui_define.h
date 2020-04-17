@@ -79,7 +79,7 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 
 #define MAX_CLR_Z                         4.0                                   /* Maximum traverse / clearance Z height, Inches */
 
-#define DEF_UNITS                         GCODE_UNITS_INCH
+#define DEF_UNITS                         GCODE_UNITS_MILLIMETER
 
 #define GCAM_STOCK_EDIT_TRANSLATE         "gcam-edit-translate"
 #define GCAM_STOCK_EDIT_ROTATE            "gcam-edit-rotate"

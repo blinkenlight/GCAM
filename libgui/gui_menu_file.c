@@ -274,7 +274,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   material_sizex_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_X), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizex_spin), 3);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), DEFVAL_INCHES (3.0));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), DEFVAL_INCHES (4.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizex_spin, 1, 2, 3, 4);
 
   g_signal_connect_swapped (material_sizex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -288,7 +288,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   material_sizez_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizez_spin), 3);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), DEFVAL_INCHES (0.25));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), DEFVAL_INCHES (0.2));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizez_spin, 3, 4, 3, 4);
 
   g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -322,7 +322,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   ztraverse_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_CLR_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (ztraverse_spin), 2);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.05));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.4));
   gtk_table_attach (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);

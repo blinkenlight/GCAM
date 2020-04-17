@@ -898,7 +898,7 @@ gcode_init (gcode_t *gcode)
   strcpy (gcode->machine_name, "");
 
   gcode->drilling_motion = GCODE_DRILLING_CANNED;
-  gcode->pocketing_style = GCODE_POCKETING_TRADITIONAL;
+  gcode->pocketing_style = GCODE_POCKETING_ALTERNATE_1;
 
   gcode->machine_options = 0;
   gcode->decimals = 5;
