@@ -26,6 +26,7 @@
 
 void gui_menu_view_perspective_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_view_orthographic_menuitem_callback (GtkWidget *widget, gpointer data);
+void gui_menu_view_iso_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_view_top_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_view_left_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_view_right_menuitem_callback (GtkWidget *widget, gpointer data);

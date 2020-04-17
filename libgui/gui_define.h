@@ -107,6 +107,7 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 
 #define GCAM_STOCK_VIEW_PERSPECTIVE       "gcam-view-perspective"
 #define GCAM_STOCK_VIEW_ORTHOGRAPHIC      "gcam-view-orthographic"
+#define GCAM_STOCK_VIEW_ISO               "gcam-view-iso"
 #define GCAM_STOCK_VIEW_TOP               "gcam-view-top"
 #define GCAM_STOCK_VIEW_LEFT              "gcam-view-left"
 #define GCAM_STOCK_VIEW_RIGHT             "gcam-view-right"

@@ -77,11 +77,12 @@ static GtkActionEntry gui_menu_entries[] = {
   { "ViewMenu",                    NULL,                              "_View" },
   { "Perspective",                 GCAM_STOCK_VIEW_PERSPECTIVE,       "_Perspective",                 NULL,                "View Perspective",                 G_CALLBACK (gui_menu_view_perspective_menuitem_callback) },
   { "Orthographic",                GCAM_STOCK_VIEW_ORTHOGRAPHIC,      "_Orthographic",                NULL,                "View Orthographic",                G_CALLBACK (gui_menu_view_orthographic_menuitem_callback) },
-  { "Top",                         GCAM_STOCK_VIEW_TOP,               "_Top",                         NULL,                "View Top",                         G_CALLBACK (gui_menu_view_top_menuitem_callback) },
-  { "Left",                        GCAM_STOCK_VIEW_LEFT,              "_Left",                        NULL,                "View Left",                        G_CALLBACK (gui_menu_view_left_menuitem_callback) },
-  { "Right",                       GCAM_STOCK_VIEW_RIGHT,             "_Right",                       NULL,                "View Right",                       G_CALLBACK (gui_menu_view_right_menuitem_callback) },
-  { "Front",                       GCAM_STOCK_VIEW_FRONT,             "_Front",                       NULL,                "View Front",                       G_CALLBACK (gui_menu_view_front_menuitem_callback) },
-  { "Back",                        GCAM_STOCK_VIEW_BACK,              "_Back",                        NULL,                "View Back",                        G_CALLBACK (gui_menu_view_back_menuitem_callback) },
+  { "Iso",                         GCAM_STOCK_VIEW_ISO,               "_Iso",                         "<alt>0",            "View Iso",                         G_CALLBACK (gui_menu_view_iso_menuitem_callback) },
+  { "Top",                         GCAM_STOCK_VIEW_TOP,               "_Top",                         "<alt>1",            "View Top",                         G_CALLBACK (gui_menu_view_top_menuitem_callback) },
+  { "Left",                        GCAM_STOCK_VIEW_LEFT,              "_Left",                        "<alt>2",            "View Left",                        G_CALLBACK (gui_menu_view_left_menuitem_callback) },
+  { "Right",                       GCAM_STOCK_VIEW_RIGHT,             "_Right",                       "<alt>3",            "View Right",                       G_CALLBACK (gui_menu_view_right_menuitem_callback) },
+  { "Front",                       GCAM_STOCK_VIEW_FRONT,             "_Front",                       "<alt>4",            "View Front",                       G_CALLBACK (gui_menu_view_front_menuitem_callback) },
+  { "Back",                        GCAM_STOCK_VIEW_BACK,              "_Back",                        "<alt>5",            "View Back",                        G_CALLBACK (gui_menu_view_back_menuitem_callback) },
   { "RenderMenu",                  NULL,                              "_Render" },
   { "FinalPart",                   GTK_STOCK_EXECUTE,                 "_Final Part",                  "<control>F",        "Render Final Part",                G_CALLBACK (gui_menu_view_render_final_part_menuitem_callback) },
   { "HelpMenu",                    NULL,                              "_Help" },
@@ -154,6 +155,7 @@ static const char *gui_menu_description =
 "      <menuitem action='Perspective'/>"
 "      <menuitem action='Orthographic'/>"
 "      <separator/>"
+"      <menuitem action='Iso'/>"
 "      <menuitem action='Top'/>"
 "      <menuitem action='Left'/>"
 "      <menuitem action='Right'/>"

@@ -55,6 +55,23 @@ gui_menu_view_orthographic_menuitem_callback (GtkWidget *widget, gpointer data)
 }
 
 void
+gui_menu_view_iso_menuitem_callback (GtkWidget *widget, gpointer data)
+{
+  GtkTreeIter selected_iter;
+  gui_t *gui;
+  gcode_block_t *selected_block;
+
+  gui = (gui_t *)data;
+
+  GCODE_MATH_VEC3D_SET (gui->opengl.views[GUI_OPENGL_VIEW_REGULAR].pos, 0.0, 0.0, 0.0);
+  gui->opengl.views[GUI_OPENGL_VIEW_REGULAR].elev = 45.0;
+  gui->opengl.views[GUI_OPENGL_VIEW_REGULAR].azim = 45.0;
+
+  get_selected_block (gui, &selected_block, &selected_iter);
+  gui_opengl_context_redraw (&gui->opengl, selected_block);
+}
+
+void
 gui_menu_view_top_menuitem_callback (GtkWidget *widget, gpointer data)
 {
   GtkTreeIter selected_iter;
