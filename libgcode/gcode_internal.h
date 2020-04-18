@@ -377,6 +377,15 @@ void strswp (char *target, char oldchar, char newchar);
         fprintf (stderr, ## __VA_ARGS__); }
 
 /**
+ * Return the maximum number of elements in an array
+ * NOTE: this only works for LOCALLY DEFINED arrays!
+ * One received as a parameter would return RUBBISH!
+ */
+
+#define MAX_ELEMENTS(_array) \
+        (sizeof (_array) / sizeof (_array[0]))
+
+/**
  * Scale imperial defaults to relatively similar but cleanly rounded metric values if needed.
  * NOTE: the input value must ALWAYS be in INCHES (eg. numeric constants for default values);
  * One should NEVER USE THIS on variables already scaled to metric units in metric projects.

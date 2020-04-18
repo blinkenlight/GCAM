@@ -1160,7 +1160,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
  * PASS 2 - Insert "trace elbows" (full circles) at all trace segment endpoints
  */
 
-static void
+static int
 gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_vec3d_t *trace_elbow)
 {
   gcode_t *gcode;
@@ -1191,6 +1191,8 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_ve
     arc->start_angle = 90.0;
     arc->sweep_angle = -360.0;
   }
+
+  return (0);
 }
 
 /**
@@ -1200,7 +1202,7 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_ve
  * endpoint - the new segments end-to-end must match the old one they replace;
  */
 
-static void
+static int
 gcode_gerber_pass3 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1209,8 +1211,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   gcode_vec2d_t min1, max1, min2, max2;
   gcode_vec2d_t p0, p1;
   gcode_vec2d_t ip_array[2];
-  gcode_vec2d_t full_ip_array[256];
-  gcode_vec3d_t full_ip_sorted_array[256];
+  gcode_vec2d_t full_ip_array[1022];
+  gcode_vec3d_t full_ip_sorted_array[1024];                                     // This MUST always be at least two elements larger than 'full_ip_array';
   int ip_count, full_ip_count, full_ip_sorted_count;
   int block_count, block_index;
   gfloat_t progress;
@@ -1266,15 +1268,25 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
           {
             for (int i = 0; i < ip_count; i++)                                  // Examine every intersection point returned (if any):
             {
-              if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)   // Something touching one of the endpoints of 'index1_block', while technically
-                continue;                                                       // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
+              if (full_ip_count < MAX_ELEMENTS (full_ip_array))                 // Make sure we have more room to store intersection points;
+              {
+                if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)   // Something touching one of the endpoints of 'index1_block', while technically
+                  continue;                                                       // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
 
-              if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)   // Same with the other endpoint - if the only intersections found coincide with
-                continue;                                                       // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
+                if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)   // Same with the other endpoint - if the only intersections found coincide with
+                  continue;                                                       // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
 
-              GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);        // If we're here, this is a genuine intersection that will divide the block...
+                GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);        // If we're here, this is a genuine intersection that will divide the block...
 
-              full_ip_count++;                                                  // So save it into the full array and increase the total intersection count;
+                full_ip_count++;                                                // So save it into the full array and increase the total intersection count;
+              }
+              else
+              {
+                gcode_list_free (&original_listhead);                           // Free the original list of 'sketch_block' before bailing;
+
+                REMARK ("Intersection array size exceeded!\n");
+                return (1);
+              }
             }
           }
         }
@@ -1450,6 +1462,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   }
 
   gcode_list_free (&original_listhead);                                         // Free the original list of 'sketch_block', it's no longer needed;
+
+  return (0);
 }
 
 /**
@@ -1457,7 +1471,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
  * created in pass 3, remove all that fall within a trace or a within a pad;
  */
 
-static void
+static int
 gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_trace_t *trace_array, int exposure_count, gcode_gerber_exposure_t *exposure_array)
 {
   gcode_t *gcode;
@@ -1786,6 +1800,8 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
   line_block->free (&line_block);
   arc_block->free (&arc_block);
+
+  return (0);
 }
 
 /**
@@ -1794,7 +1810,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
  * not both.
  */
 
-static void
+static int
 gcode_gerber_pass5 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1867,13 +1883,15 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
 
     index1_block = index1_block->next;
   }
+
+  return (0);
 }
 
 /**
  * PASS 6 - Correct the orientation and sequence (continuity) of all segments.
  */
 
-static void
+static int
 gcode_gerber_pass6 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1888,13 +1906,15 @@ gcode_gerber_pass6 (gcode_block_t *sketch_block)
   if (gcode->progress_callback)
     for (progress = 0.0; progress < 1.0; progress += 0.01)
       gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_6, progress));
+
+  return (0);
 }
 
 /**
  * PASS 7 - Merge adjacent lines with matching slopes.
  */
 
-static void
+static int
 gcode_gerber_pass7 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1906,7 +1926,7 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
   gcode = (gcode_t *)sketch_block->gcode;
 
   if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
-    return;
+    return (0);
 
   block_count = 0;
 
@@ -1997,13 +2017,15 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
 
     index2_block = index1_block->next;                                          // Either way, block 2 is always the one following block 1;
   }
+
+  return (0);
 }
 
 /**
  * PASS 8 - Merge adjacent arcs with matching centers.
  */
 
-static void
+static int
 gcode_gerber_pass8 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -2017,7 +2039,7 @@ gcode_gerber_pass8 (gcode_block_t *sketch_block)
   gcode = (gcode_t *)sketch_block->gcode;
 
   if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
-    return;
+    return (0);
 
   block_count = 0;
 
@@ -2120,6 +2142,8 @@ gcode_gerber_pass8 (gcode_block_t *sketch_block)
       index1_block = index1_block->next;                                        // Increment the progress block count and point 'index1' to the next block.
     }
   }
+
+  return (0);
 }
 
 /**
@@ -2177,16 +2201,26 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
 
   fclose (fh);
 
-  if (!error)                                                                   // Only execute further passes if there was no error during the first;
-  {
-    gcode_gerber_pass2 (sketch_block, trace_elbow_count, trace_elbow_array);
-    gcode_gerber_pass3 (sketch_block);
-    gcode_gerber_pass4 (sketch_block, trace_count, trace_array, exposure_count, exposure_array);
-    gcode_gerber_pass5 (sketch_block);
-    gcode_gerber_pass6 (sketch_block);
-    gcode_gerber_pass7 (sketch_block);
-    gcode_gerber_pass8 (sketch_block);
-  }
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass2 (sketch_block, trace_elbow_count, trace_elbow_array);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass3 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass4 (sketch_block, trace_count, trace_array, exposure_count, exposure_array);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass5 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass6 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass7 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass8 (sketch_block);
 
   free (trace_array);
   free (trace_elbow_array);
