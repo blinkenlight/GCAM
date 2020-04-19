@@ -1826,24 +1826,39 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   {
+    gui_endmill_t *endmill;
+    gfloat_t tool_diameter;
+    gfloat_t min_diameter;
     char string[32];
-    int i;
+    int i, j, k;
 
     label = gtk_label_new ("End Mill");
     gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                 // 'hbox1' cell 1 <- label 'label'
 
     tool_combo = gtk_combo_box_new_text ();
 
-    for (i = 0; i < gui->endmills.number; i++)
+    for (i = j = k = 0; i < gui->endmills.number; i++)
     {
-      if (gui->endmills.endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      endmill = &(gui->endmills.endmill[i]);
+
+      if (endmill->origin == GUI_ENDMILL_INTERNAL)
       {
-        sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+        tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
+
+        if ( k == 0 || tool_diameter < min_diameter)
+        {
+          min_diameter = tool_diameter;
+          k = j;
+        }
+
+        sprintf (string, "T%.2d - %s", endmill->number, endmill->description);
         gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), string);
+
+        j++;
       }
     }
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), k);
     gtk_box_pack_start (GTK_BOX (hbox1), tool_combo, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'tool_combo'
   }
 
