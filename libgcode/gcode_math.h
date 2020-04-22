@@ -56,6 +56,9 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
 #define GCODE_MATH_IS_EQUAL(_a, _b) \
         (fabs (_a - _b) < GCODE_PRECISION)
 
+#define GCODE_MATH_DIFFERENCE(_a, _b) \
+        (fabs (_a - _b))
+
 #define GCODE_MATH_1D_DISTANCE(_a, _b) \
         (fabs (_a - _b))
 
