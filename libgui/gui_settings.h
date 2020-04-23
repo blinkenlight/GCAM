@@ -30,10 +30,12 @@ static const char *GCODE_XML_SETTINGS_FILENAME = "settings.xml";
 static const char *GCODE_XML_TAG_SETTING = "setting";
 
 static const char *GCODE_XML_ATTR_SETTING_VOXEL_RESOLUTION = "voxel-resolution";
+static const char *GCODE_XML_ATTR_SETTING_CURVE_SEGMENTS = "curve-segments";
 
 typedef struct gui_settings_s
 {
   int voxel_resolution;
+  int curve_segments;
 } gui_settings_t;
 
 void gui_settings_init (gui_settings_t *settings);

@@ -888,6 +888,8 @@ gcode_init (gcode_t *gcode)
 
   gcode->voxel_map = NULL;
 
+  gcode->curve_segments = 0;
+
   gcode->tool_xpos = FLT_MAX;
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;

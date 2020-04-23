@@ -328,6 +328,8 @@ typedef struct gcode_s
   uint16_t voxel_number[3];
   uint8_t *voxel_map;
 
+  uint16_t curve_segments;
+
   gfloat_t tool_xpos;
   gfloat_t tool_ypos;
   gfloat_t tool_zpos;

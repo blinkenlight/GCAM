@@ -1,3 +1,4 @@
 <list>
 	<setting voxel_resolution='768'/>
+	<setting curve_segments='50'/>
 </list>

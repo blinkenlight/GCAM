@@ -35,6 +35,7 @@ void
 gui_settings_init (gui_settings_t *settings)
 {
   settings->voxel_resolution = 250;
+  settings->curve_segments = 50;
 }
 
 void
@@ -73,6 +74,11 @@ start (void *data, const char *xmlelem, const char **xmlattr)
       if (strcmp (name, GCODE_XML_ATTR_SETTING_VOXEL_RESOLUTION) == 0)
       {
         settings->voxel_resolution = atoi (value);
+      }
+
+      if (strcmp (name, GCODE_XML_ATTR_SETTING_CURVE_SEGMENTS) == 0)
+      {
+        settings->curve_segments = atoi (value);
       }
     }
   }
