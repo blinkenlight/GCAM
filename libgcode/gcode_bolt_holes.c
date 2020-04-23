@@ -178,8 +178,6 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   safe_z = block->gcode->ztraverse;                                             // This is just a short-hand for the traverse z...
 
-  touch_z = block->gcode->material_origin[2];                                   // Track the depth the material begins at (gets lower after every pass);
-
   if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)      // Start of drill cycle (G81 - if the tool can create the holes by drilling);
   {
     if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
@@ -194,6 +192,8 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   while (index_block)                                                           // Keep looping as long as the list lasts, one hole per loop;
   {
+    touch_z = block->gcode->material_origin[2];                                 // Track the depth the material begins at (gets lower after every pass);
+
     if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)    // See if the hole can be created by drilling with this tool;
     {
       if (index_block->type == GCODE_TYPE_ARC)                                  // This should always be true - there can only be arcs here...
