@@ -524,32 +524,21 @@ gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_
 
     case GCODE_GET_TANGENT:
     {
-      gfloat_t angle;
+      gfloat_t enter_angle, leave_angle;
 
-      angle = arc->start_angle - 90.0;
+      enter_angle = arc->sweep_angle < 0 ? arc->start_angle - 90 : arc->start_angle + 90;
 
-      if (angle < 0.0)
-        angle += 360.0;
+      GCODE_MATH_WRAP_TO_360_DEGREES (enter_angle);
 
-      p0[0] = cos (GCODE_DEG2RAD * angle);
-      p0[1] = sin (GCODE_DEG2RAD * angle);
+      p0[0] = cos (GCODE_DEG2RAD * enter_angle);
+      p0[1] = sin (GCODE_DEG2RAD * enter_angle);
 
-      if (arc->sweep_angle > 0.0)
-        GCODE_MATH_VEC2D_SCALE (p0, -1.0);
+      leave_angle = enter_angle + arc->sweep_angle;
 
-      angle = arc->start_angle + arc->sweep_angle - 90.0;
+      GCODE_MATH_WRAP_TO_360_DEGREES (leave_angle);
 
-      if (angle < 0.0)
-        angle += 360.0;
-
-      if (angle > 360.0)
-        angle -= 360.0;
-
-      p1[0] = cos (GCODE_DEG2RAD * angle);
-      p1[1] = sin (GCODE_DEG2RAD * angle);
-
-      if (arc->sweep_angle > 0.0)
-        GCODE_MATH_VEC2D_SCALE (p1, -1.0);
+      p1[0] = cos (GCODE_DEG2RAD * leave_angle);
+      p1[1] = sin (GCODE_DEG2RAD * leave_angle);
 
       break;
     }

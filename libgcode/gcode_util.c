@@ -833,15 +833,20 @@ gcode_util_get_sublist_snapshot (gcode_block_t **listhead, gcode_block_t *start_
   return (0);
 }
 
-int
-gcode_util_remove_null_sections (gcode_block_t **listhead)
-{
-  gcode_block_t *index_block, *next_block;
+/**
+ * Crawl along the entire chain of blocks 'listhead' points at, and tag each one
+ * that is of zero size (ie. is reduced to a single point) using block flags
+ */
 
-  if (!(*listhead))
+int
+gcode_util_tag_null_size_blocks (gcode_block_t *listhead)
+{
+  gcode_block_t *index_block;
+
+  if (!listhead)
     return (1);
 
-  index_block = *listhead;
+  index_block = listhead;
 
   while (index_block)
   {
@@ -853,11 +858,10 @@ gcode_util_remove_null_sections (gcode_block_t **listhead)
 
         line = (gcode_line_t *)index_block->pdata;
 
-        if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) >= GCODE_PRECISION)
-        {
-          index_block = index_block->next;
-          continue;
-        }
+        if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
+          index_block->flags |= GCODE_FLAGS_TAGGED;
+        else
+          index_block->flags &= ~GCODE_FLAGS_TAGGED;
 
         break;
       }
@@ -868,31 +872,73 @@ gcode_util_remove_null_sections (gcode_block_t **listhead)
 
         arc = (gcode_arc_t *)index_block->pdata;
 
-        if (arc->radius >= GCODE_PRECISION)
-        {
-          index_block = index_block->next;
-          continue;
-        }
+        if (arc->radius < GCODE_PRECISION)
+          index_block->flags |= GCODE_FLAGS_TAGGED;
+        else
+          index_block->flags &= ~GCODE_FLAGS_TAGGED;
 
         break;
       }
     }
 
+    index_block = index_block->next;
+  }
+
+  return (0);
+}
+
+/**
+ * Crawl along the entire chain of blocks 'listhead' points at, and remove from
+ * the chain (then free) each tagged one (ie. has the flag 'GCODE_FLAGS_TAGGED')
+ */
+
+int
+gcode_util_remove_tagged_blocks (gcode_block_t **listhead)
+{
+  gcode_block_t *index_block, *next_block;
+
+  if (!(*listhead))
+    return (1);
+
+  index_block = *listhead;
+
+  while (index_block)
+  {
     next_block = index_block->next;
 
-    if (index_block->next)
-      index_block->next->prev = index_block->prev;
+    if (index_block->flags & GCODE_FLAGS_TAGGED)
+    {
+      if (index_block->next)
+        index_block->next->prev = index_block->prev;
 
-    if (index_block->prev)
-      index_block->prev->next = index_block->next;
+      if (index_block->prev)
+        index_block->prev->next = index_block->next;
 
-    if (*listhead == index_block)
-      *listhead = next_block;
+      if (*listhead == index_block)
+        *listhead = next_block;
 
-    index_block->free (&index_block);
+      index_block->free (&index_block);
+    }
 
     index_block = next_block;
   }
+
+  return (0);
+}
+
+/**
+ * Crawl along the entire chain of blocks 'listhead' points at, and remove from
+ * the chain (then free) each one that is of zero size (ie. single point sized)
+ */
+
+int
+gcode_util_remove_null_sections (gcode_block_t **listhead)
+{
+  if (gcode_util_tag_null_size_blocks (*listhead) != 0)
+    return (1);
+
+  if (gcode_util_remove_tagged_blocks (listhead) != 0)
+    return (1);
 
   return (0);
 }

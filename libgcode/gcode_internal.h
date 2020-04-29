@@ -83,6 +83,7 @@
 
 #define GCODE_FLAGS_LOCK              0x01
 #define GCODE_FLAGS_SUPPRESS          0x02
+#define GCODE_FLAGS_TAGGED            0x04
 
 #define GCODE_DRILLING_CANNED         0x00
 #define GCODE_DRILLING_SIMPLE         0x01
@@ -262,7 +263,7 @@ typedef struct gcode_offset_s
 typedef struct gcode_block_s
 {
   uint8_t type;
-  uint8_t flags;                                                                // Flags include: lock, suppress
+  uint8_t flags;                                                                // Flags include: lock, suppress, tagged
 
   char comment[64];
   char status[64];

@@ -65,5 +65,6 @@ int gcode_sketch_is_closed (gcode_block_t *block);
 int gcode_sketch_is_joined (gcode_block_t *block);
 gcode_block_t *gcode_sketch_prev_connected (gcode_block_t *block);
 gcode_block_t *gcode_sketch_next_connected (gcode_block_t *block);
+gcode_block_t *gcode_sketch_first_untagged (gcode_block_t *block, gcode_block_t *listhead);
 
 #endif

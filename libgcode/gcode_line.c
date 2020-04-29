@@ -371,6 +371,9 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
 
     case GCODE_GET_NORMAL:
 
+      if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
+        return (1);
+
       gcode_line_with_offset (block, p0, p1, normal);
 
       p0[0] = normal[0];
@@ -381,6 +384,9 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       break;
 
     case GCODE_GET_TANGENT:
+
+      if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
+        return (1);
 
       p0[0] = line->p1[0] - line->p0[0];
       p0[1] = line->p1[1] - line->p0[1];

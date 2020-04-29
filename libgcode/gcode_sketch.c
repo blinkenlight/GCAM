@@ -163,8 +163,8 @@ gcode_sketch_inside (gcode_block_t *start_block, gcode_block_t *end_block)
  * NOTE: the supplied list is expected to consist of a chain blocks that used to
  * be connected originally (before extrusion offsets were applied) - trying to
  * intersect randomly ordered blocks is unlikely to result in anything sane;
- * NOTE: the supplied list is expected to not contain primitives of zero length
- * zero radius or zero sweep - those should be eliminated on some earlier pass;
+ * NOTE: the supplied list is expected to already be tagged (using block flags)
+ * so that any primitives of zero length zero radius or zero sweep are flagged;
  * NOTE: unfortunate as it may be, this RELIES on all involved blocks having an
  * offset of ZERO, considering intersection calculates taking any offsets into
  * account, but obtained intersection points are then assigned as new endpoints
@@ -186,15 +186,16 @@ gcode_sketch_trim_intersections (gcode_block_t *listhead, int closed)
   if (!listhead)                                                                // The list should not be empty, but if it is, leave;
     return;
 
-  index_block = listhead;                                                       // Start with the first block in the list;
+  index_block = gcode_sketch_first_untagged (listhead, NULL);                   // Start with the first non-tagged block in the list;
 
   while (index_block)                                                           // Keep looping through all the blocks in the list;
   {
-    if (index_block->next)                                                      // If this is not the last block,
-      next_block = index_block->next;                                           // the one we want to try intersecting it is the next block;
-    else if (closed)                                                            // If this IS the last block but the list is 'closed',
-      next_block = listhead;                                                    // the one we want to try intersecting it is the FIRST block;
-    else                                                                        // If this is the last block and the list is NOT 'closed',
+    if (closed)                                                                 // If the chain is supposed to be closed,
+      next_block = gcode_sketch_first_untagged (index_block->next, listhead);   // loop around at the end while looking for the next block;
+    else                                                                        // If the chain is supposed to be open,
+      next_block = gcode_sketch_first_untagged (index_block->next, NULL);       // stop looking for the next block having reached the end;
+
+    if (!next_block)                                                            // If no suitable next block has been found,
       break;                                                                    // we're done intersecting - just leave;
 
     gcode_util_intersect (index_block, next_block, ip_array, &ip_count);        // Get an array of intersection points between 'index_block' and 'next_block';
@@ -325,7 +326,7 @@ gcode_sketch_trim_intersections (gcode_block_t *listhead, int closed)
       }
     }
 
-    index_block = index_block->next;                                            // Move on to the next pair - the current 'second block' and the one after it;
+    index_block = gcode_sketch_first_untagged (index_block->next, NULL);        // Move on to the next non-tagged block, WITHOUT looping past the end of the list;
   }
 }
 
@@ -338,8 +339,8 @@ gcode_sketch_trim_intersections (gcode_block_t *listhead, int closed)
  * attempt to 'intersect and trim' has already been made, so only the primitives
  * that don't intersect remain unconnected - trying to build transitions between
  * randomly ordered blocks is unlikely to result in anything sane;
- * NOTE: the supplied list is expected to not contain primitives of zero length
- * zero radius or zero sweep - those should be eliminated on some earlier pass;
+ * NOTE: the supplied list is expected to already be tagged (using block flags)
+ * so that any primitives of zero length zero radius or zero sweep are flagged;
  * NOTE: the transition arcs attempt to maintain 'C1 continuity' which is just a
  * fancy way to say that the arc should transition 'smoothly' on both ends into
  * the primitives it connects (both should be tangential to the arc); this use
@@ -370,6 +371,36 @@ gcode_sketch_insert_transitions (gcode_block_t *listhead, int closed)
 
   while (index_block)                                                           // Keep looping through all the blocks in the list;
   {
+    /**
+    /* If there are any null-size blocks between this one and the next one that
+    /* can be skipped we MUST skip them or else we get aberrant transition arcs
+     */
+
+    if (closed)                                                                 // If the chain is supposed to be closed,
+      next_block = gcode_sketch_first_untagged (index_block->next, listhead);   // loop around at the end while looking for the next block;
+    else                                                                        // If the chain is supposed to be open,
+      next_block = gcode_sketch_first_untagged (index_block->next, NULL);       // stop looking for the next block having reached the end;
+
+    if (next_block)                                                             // If a suitable NON-NULL next block has been found,
+    {
+      index_block->ends (index_block, p, p0, GCODE_GET);                        // Obtain the endpoints of both primitives;
+      next_block->ends (next_block, p1, p, GCODE_GET);
+
+      d = GCODE_MATH_2D_DISTANCE (p0, p1);                                      // Find the distance from the end of this block to the start of the next;
+
+      if (d < GCODE_TOLERANCE)                                                  // If that distance is zero, there cannot be a transition between them.
+      {
+        index_block = gcode_sketch_first_untagged (index_block->next, NULL);    // So skip any null blocks between this one and the next WITHOUT LOOPING,
+
+        continue;                                                               // abandon this transition and move on to the next pair of blocks.
+      }
+    }
+
+    /**
+    /* If we are still here we have to try transitioning from this block to the
+    /* immediately next one regardless of whether it is a null-sized one or not
+     */
+
     if (index_block->next)                                                      // If this is not the last block,
       next_block = index_block->next;                                           // the one we want to try transition it to is the next block;
     else if (closed)                                                            // If this IS the last block but the list is 'closed',
@@ -382,70 +413,127 @@ gcode_sketch_insert_transitions (gcode_block_t *listhead, int closed)
 
     d = GCODE_MATH_2D_DISTANCE (p0, p1);                                        // Find the distance between the endpoints that should be connected;
 
-    if (d > GCODE_TOLERANCE)                                                    // This only makes sense if the endpoints are some distance apart;
+    if (d < GCODE_TOLERANCE)                                                    // If that distance is zero, there cannot be a transition between them.
     {
-      new_block = NULL;                                                         // Clear the reference that should point to the new transition arc;
+      index_block = index_block->next;                                          // So abandon this transition and move on to the next pair of blocks.
 
-      index_block->ends (index_block, n, n0, GCODE_GET_NORMAL);                 // Obtain NORMAL VECTORS to the endpoints of both primitives; since a radius is
-      next_block->ends (next_block, n1, n, GCODE_GET_NORMAL);                   // always normal to an arc, these normals MUST BE our radii for C1 continuity;
-                                                                                // That means we only need to find their intersection to get our arc's center!
-      a = n0[1] * n1[0] - n0[0] * n1[1];                                        // This is the denominator of a factor that will get us the intersection point;
-
-      if (fabs (a) > GCODE_PRECISION)                                           // Obviously, if it's zero, we have no intersection (the normals are parallel).
-      {
-        b = (p0[0] - p1[0]) * n0[1] - (p0[1] - p1[1]) * n0[0];                  // The rest of the formula for the intersection factor - this is the numerator;
-
-        f = b / a;                                                              // This factor is what one needs to multiply the unity-sized normal with
-                                                                                // to get from point 'p1' to the point where the normals intersect.
-        p[0] = p1[0] + f * n1[0];                                               // Note: 'f' results from solving equations asserting that multiplying 'n0' by
-        p[1] = p1[1] + f * n1[1];                                               // some factor 'e' and 'n1' by some factor 'f' gets you to the same point 'p';
-
-        d0 = GCODE_MATH_2D_DISTANCE (p0, p);                                    // Find the distance of both endpoints 'p0', 'p1' from the proposed transition
-        d1 = GCODE_MATH_2D_DISTANCE (p1, p);                                    // arc center point 'p': clearly, if they differ, this arc is a bust...
-
-        if (fabs (d1 - d0) < GCODE_PRECISION)                                   // If the two proposed 'radii' are effectively equal, this is a viable arc.
-        {
-          gcode_arc_t *arc;
-
-          gcode_math_xy_to_angle (p, p0, &a0);
-          gcode_math_xy_to_angle (p, p1, &a1);
-
-          gcode_arc_init (&new_block, index_block->gcode, NULL);
-
-          arc = (gcode_arc_t *)new_block->pdata;
-
-          arc->p[0] = p0[0];
-          arc->p[1] = p0[1];
-
-          arc->radius = d0;
-
-          arc->start_angle = a0;
-          arc->sweep_angle = a1 - a0;
-
-          GCODE_MATH_WRAP_SIGNED_DEGREES (arc->sweep_angle);
-        }
-      }
-
-      if (!new_block)                                                           // If the transition arc is still nonexistent, it seems we can't build one;
-      {
-        gcode_line_t *line;
-
-        gcode_line_init (&new_block, index_block->gcode, NULL);                 // So as a stopgap last effort, we insert a line from 'p0' to 'p1' instead.
-
-        line = (gcode_line_t *)new_block->pdata;
-                                                                                // Note: in current usage this should never happen though - as long as the
-        line->p0[0] = p0[0];                                                    // transition arcs are used to 'plug up' gaps created by extrusion profile
-        line->p0[1] = p0[1];                                                    // displacement (obviously equal for both primitives here), there always is
-        line->p1[0] = p1[0];                                                    // a possible transition arc - rather amusingly, we just keep recalculating
-        line->p1[1] = p1[1];                                                    // as our 'p' the points where the original un-offset primitives meet up...
-      }
-
-      gcode_insert_after_block (index_block, new_block);                        // Either way, *SOME* transition block MUST exist by now: insert it, THE END.
-
-      index_block = index_block->next;                                          // Of course, that means we either correct for it or keep looping forever...
+      continue;
     }
 
-    index_block = index_block->next;                                            // Move on to the next pair - the current 'second block' and the one after it;
+    /**
+    /* If we are still here there is an actual transition needed here: find one
+     */
+
+    new_block = NULL;                                                           // Clear the reference that should point to the new transition arc;
+
+    index_block->ends (index_block, n, n0, GCODE_GET_NORMAL);                   // Obtain NORMAL VECTORS to the endpoints of both primitives; since a radius is
+    next_block->ends (next_block, n1, n, GCODE_GET_NORMAL);                     // always normal to an arc, these normals MUST BE our radii for C1 continuity;
+                                                                                // That means we only need to find their intersection to get our arc's center!
+    a = n0[1] * n1[0] - n0[0] * n1[1];                                          // This is the denominator of a factor that will get us the intersection point;
+
+    if (fabs (a) > GCODE_PRECISION)                                             // Obviously, if it's zero, we have no intersection (the normals are parallel).
+    {
+      b = (p0[0] - p1[0]) * n0[1] - (p0[1] - p1[1]) * n0[0];                    // The rest of the formula for the intersection factor - this is the numerator;
+
+      f = b / a;                                                                // This factor is what one needs to multiply the unity-sized normal with
+                                                                                // to get from point 'p1' to the point where the normals intersect.
+      p[0] = p1[0] + f * n1[0];                                                 // Note: 'f' results from solving equations asserting that multiplying 'n0' by
+      p[1] = p1[1] + f * n1[1];                                                 // some factor 'e' and 'n1' by some factor 'f' gets you to the same point 'p';
+
+      d0 = GCODE_MATH_2D_DISTANCE (p0, p);                                      // Find the distance of both endpoints 'p0', 'p1' from the proposed transition
+      d1 = GCODE_MATH_2D_DISTANCE (p1, p);                                      // arc center point 'p': clearly, if they differ, this arc is a bust...
+
+      if (fabs (d1 - d0) < GCODE_PRECISION)                                     // If the two proposed 'radii' are effectively equal, this is a viable arc.
+      {
+        gcode_arc_t *arc;
+
+        gcode_math_xy_to_angle (p, p0, &a0);                                    // There is actually not enough information in endpoints and center alone to
+        gcode_math_xy_to_angle (p, p1, &a1);                                    // reliably calculate the correct sweep of an arc in general...
+
+        gcode_arc_init (&new_block, index_block->gcode, NULL);
+
+        arc = (gcode_arc_t *)new_block->pdata;
+
+        arc->p[0] = p0[0];
+        arc->p[1] = p0[1];
+
+        arc->radius = d0;
+
+        arc->start_angle = a0;
+        arc->sweep_angle = a1 - a0;                                             // ...so this only works because the sweep angle of a _transition_ arc...
+
+        GCODE_MATH_WRAP_SIGNED_DEGREES (arc->sweep_angle);                      // ...is not supposed to be larger than 180 degrees.
+      }
+    }
+    else                                                                        // Obviously, obvious things never are - collinear normals can still intersect.
+    {
+      gcode_vec2d_t t0, t1, t, v;
+
+      GCODE_MATH_VEC2D_SUB (v, p1, p0);                                         // So if the line connecting the two points of interest...
+      GCODE_MATH_VEC2D_UNITIZE (v);
+      GCODE_MATH_VEC2D_DOT (f, v, n1);                                          // ...is ALSO parallel with the normals, we can still form a transition arc;
+
+      if (fabs (f) - 1 < GCODE_PRECISION)
+      {
+        gcode_arc_t *arc;
+
+        p[0] = (p0[0] + p1[0]) / 2;
+        p[1] = (p0[1] + p1[1]) / 2;
+
+        d = GCODE_MATH_2D_DISTANCE (p0, p1) / 2;
+
+        gcode_math_xy_to_angle (p, p0, &a0);                                    // Fortunately, there's no need to calculate the sweep: it can only be 180 degrees;
+
+        gcode_arc_init (&new_block, index_block->gcode, NULL);
+
+        arc = (gcode_arc_t *)new_block->pdata;
+
+        arc->p[0] = p0[0];
+        arc->p[1] = p0[1];
+
+        arc->radius = d;
+
+        arc->start_angle = a0;
+        arc->sweep_angle = 180;                                                 // Unfortunately, we have no idea whether it's supposed to be +180 or -180 degrees.
+
+        new_block->ends (new_block, t0, t1, GCODE_GET_TANGENT);                 // So we take our best shot at tangency at whichever end we manage to compute it;
+
+        if (index_block->ends (index_block, v, t, GCODE_GET_TANGENT) == 0)
+        {
+          GCODE_MATH_VEC2D_DOT (f, t, t0);
+
+          if (f < 0)
+            arc->sweep_angle = -arc->sweep_angle;
+        }
+        else if (next_block->ends (next_block, t, v, GCODE_GET_TANGENT) == 0)
+        {
+          GCODE_MATH_VEC2D_DOT (f, t1, t);
+
+          if (f < 0)
+            arc->sweep_angle = -arc->sweep_angle;
+        }
+      }
+    }
+
+    if (!new_block)                                                             // If the transition arc is still nonexistent, it seems we can't build one;
+    {
+      gcode_line_t *line;
+
+      gcode_line_init (&new_block, index_block->gcode, NULL);                   // So as a stopgap last effort, we insert a line from 'p0' to 'p1' instead.
+
+      line = (gcode_line_t *)new_block->pdata;
+                                                                                // Note: in current usage this should never happen though - as long as the
+      line->p0[0] = p0[0];                                                      // transition arcs are used to 'plug up' gaps created by extrusion profile
+      line->p0[1] = p0[1];                                                      // displacement (obviously equal for both primitives here), there always is
+      line->p1[0] = p1[0];                                                      // a possible transition arc - rather amusingly, we just keep recalculating
+      line->p1[1] = p1[1];                                                      // as our 'p' the points where the original un-offset primitives meet up...
+    }
+
+    gcode_insert_after_block (index_block, new_block);                          // Either way, *SOME* transition block MUST exist by now: insert it, THE END.
+
+    index_block = index_block->next;                                            // We have a brand new block in front of us now, so we need to advance TWICE;
+
+    index_block = index_block->next;                                            // Move on to the next pair; can't use 'next_block', it may have been looping.
   }
 }
 
@@ -943,10 +1031,12 @@ gcode_sketch_make (gcode_block_t *block)
 
       gcode_util_get_sublist_snapshot (&offset_listhead, start_block, index_block);     // Another working snapshot is needed, so we can preserve 'sorted_list';
       gcode_util_convert_to_no_offset (offset_listhead);                        // Recalculate that snapshot with offsets included & link it to a zero offset;
-      gcode_util_remove_null_sections (&offset_listhead);                       // Just making sure nothing BECAME zero-sized by applying the offset;
+      gcode_util_tag_null_size_blocks (offset_listhead);                        // Tag but do not remove anything that BECAME zero-sized by applying the offset;
 
       gcode_sketch_trim_intersections (offset_listhead, closed);                // Find and trim intersecting primitives back to the intersection point;
       gcode_sketch_insert_transitions (offset_listhead, closed);                // Add transition arcs wherever connected endpoints were pulled apart;
+
+      gcode_util_remove_tagged_blocks (&offset_listhead);                       // Remove the tagged blocks - they are no longer needed, the contour is done;
 
       /**
        * POCKETING:
@@ -999,10 +1089,12 @@ gcode_sketch_make (gcode_block_t *block)
             {                                                                   // there is no need at all for the outer pass, it matches the inner one;
               gcode_util_get_sublist_snapshot (&outer_offset_listhead, start_block, index_block);       // Once the offset is ready, create another working snapshot;
               gcode_util_convert_to_no_offset (outer_offset_listhead);          // Recalculate the snapshot with the new 'z1' offsets included & a zero offset;
-              gcode_util_remove_null_sections (&outer_offset_listhead);         // Just making sure nothing BECAME zero-sized by applying the offset;
+              gcode_util_tag_null_size_blocks (outer_offset_listhead);          // Tag but do not remove anything that BECAME zero-sized by applying the offset;
 
               gcode_sketch_trim_intersections (outer_offset_listhead, closed);  // Find and trim intersecting primitives back to the intersection point;
               gcode_sketch_insert_transitions (outer_offset_listhead, closed);  // Add transition arcs wherever connected endpoints were pulled apart;
+
+              gcode_util_remove_tagged_blocks (&outer_offset_listhead);         // Remove the tagged blocks - they are no longer needed, the contour is done;
 
               if (fabs (maximum_proffset - current_proffset) > tool->diameter)  // The thing is, if the current profile offset is less than a tool diameter
               {                                                                 // away from the maximum profile offset, there is no need to pocket at all;
@@ -1291,10 +1383,13 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
 
         gcode_util_get_sublist_snapshot (&offset_listhead, start_block, index_block);   // Another working snapshot is needed, so we can preserve 'sorted_list';
         gcode_util_convert_to_no_offset (offset_listhead);                      // Recalculate that snapshot with offsets included & link it to a zero offset;
-        gcode_util_remove_null_sections (&offset_listhead);                     // Just making sure nothing BECAME zero-sized by applying the offset;
+        gcode_util_tag_null_size_blocks (offset_listhead);                      // Tag but do not remove anything that BECAME zero-sized by applying the offset;
 
         gcode_sketch_trim_intersections (offset_listhead, closed);              // Find and trim intersecting primitives back to the intersection point;
         gcode_sketch_insert_transitions (offset_listhead, closed);              // Add transition arcs wherever connected endpoints were pulled apart;
+
+        gcode_util_remove_tagged_blocks (&offset_listhead);                     // Remove the tagged blocks - they are no longer needed, the contour is done;
+
         gcode_sketch_add_up_path_length (offset_listhead, &path_length);        // Calculate the full path length for use in helical z-depth calculations;
 
         accum_length = 0.0;                                                     // Start logging distance along the path for helical z-depth calculations;
@@ -1821,4 +1916,54 @@ gcode_sketch_next_connected (gcode_block_t *block)
   }
 
   return (NULL);
+}
+
+/**
+ * Using block flags, keep looking for a NOT tagged block starting with 'block'
+ * itself and return the first one found. If 'listhead' is null stop at the end
+ * of the chain, otherwise loop around continuing from the block pointed at by
+ * 'listhead'. If 'block' itself is null, consider the end of the list reached
+ * and act according to the content of 'listhead'. If either the end of the list
+ * is reached or a complete loop-around happens back to 'block' before a tagfree
+ * block is found, null is returned; else, a pointer to the tagfree block found.
+ * NOTE: the reason why this doesn't simply use 'prev' links or other pointers
+ * 'block' might have is twofold: first, this allows us to operate on subchains
+ * that might not actually start at the proper 'first prev' block in the chain;
+ * and second, this offers an easy way to select circular or single traversal.
+ * NOTE: indeed, if 'block' is not part of the chain 'listhead' is pointing at,
+ * this can end rather badly; so, y'know, how about don't do that.
+ * NOTE: the reason a null starting block is allowed is so that this can also be
+ * used to find the NEXT block after the current one - clearly, in such a case
+ * 'next' can easily be null, and we have to deal with that case.
+ */
+
+gcode_block_t *
+gcode_sketch_first_untagged (gcode_block_t *block, gcode_block_t *listhead)
+{
+  gcode_block_t *index_block;
+
+  index_block = block;
+
+  for (;;)                                                                      // Can't loop on tagged-ness before we check for null-ness
+  {
+    if (index_block)                                                            // If the block exists, we can now test if it's tagged;
+    {
+      if ((index_block->flags & GCODE_FLAGS_TAGGED) == 0)                       // If it's not, we're done - return it as-is;
+        return (index_block);
+      else                                                                      // If it is, move on the the next block;
+        index_block = index_block->next;
+    }
+    else                                                                        // If block points to nothing, loop over or stop;
+    {
+      if (listhead)                                                             // If there is a listhead, loop over to it and keep going;
+        index_block = listhead;
+      else                                                                      // If listhead points to nothing, the list does not loop - give up;
+        return (NULL);
+    }
+
+    if (index_block == block)                                                   // If the list loops but has no non-tagged blocks we would be stuck here,
+      return (NULL);                                                            // so if we loop around back to the original block, make sure we give up.
+  }
+
+  return (NULL);                                                                // Getting here requires either magic or corrupted code...
 }
