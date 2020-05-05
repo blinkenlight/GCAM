@@ -72,6 +72,8 @@
 #define GCODE_GET_WITH_OFFSET         0x02
 #define GCODE_GET_NORMAL              0x03
 #define GCODE_GET_TANGENT             0x04
+#define GCODE_GET_ALPHA               0x05
+#define GCODE_GET_OMEGA               0x06
 
 #define GCODE_FORMAT_TBD              0x00
 #define GCODE_FORMAT_BIN              0x01

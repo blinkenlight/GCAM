@@ -344,7 +344,7 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
   switch (mode)
   {
     case GCODE_GET:
-
+    {
       p0[0] = line->p0[0];
       p0[1] = line->p0[1];
 
@@ -352,9 +352,10 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = line->p1[1];
 
       break;
+    }
 
     case GCODE_SET:
-
+    {
       line->p0[0] = p0[0];
       line->p0[1] = p0[1];
 
@@ -362,15 +363,17 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       line->p1[1] = p1[1];
 
       break;
+    }
 
     case GCODE_GET_WITH_OFFSET:
-
+    {
       gcode_line_with_offset (block, p0, p1, normal);
 
       break;
+    }
 
     case GCODE_GET_NORMAL:
-
+    {
       if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
         return (1);
 
@@ -382,9 +385,10 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = normal[1];
 
       break;
+    }
 
     case GCODE_GET_TANGENT:
-
+    {
       if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
         return (1);
 
@@ -397,6 +401,23 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = p0[1];
 
       break;
+    }
+
+    case GCODE_GET_ALPHA:
+    {
+      p0[0] = p1[0] = line->p0[0];
+      p0[1] = p1[1] = line->p0[1];
+
+      break;
+    }
+
+    case GCODE_GET_OMEGA:
+    {
+      p0[0] = p1[0] = line->p1[0];
+      p0[1] = p1[1] = line->p1[1];
+
+      break;
+    }
 
     default:
 

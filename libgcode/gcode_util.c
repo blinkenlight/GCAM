@@ -239,13 +239,26 @@ gcode_util_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 }
 
 /**
+ * Silly little convenience function to get a single endpoint of a line or arc
+ */
+
+int
+gcode_util_endpoint (gcode_block_t *block, gcode_vec2d_t point, uint8_t mode)
+{
+  if (mode == GCODE_GET_ALPHA || mode == GCODE_GET_OMEGA)
+    return (block->ends (block, point, point, mode));
+  else
+    return (1);
+}
+
+/**
  * Calculate and return the points where a line segments and an arc intersect
  * NOTE: valid points have to actually lie between the segment's/arc's endpoints
  * NOTE: the calculations are done taking each block's offset into account
  */
 
 static int
-line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_vec2d_t ip_array[2], int *ip_num)
+line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_vec2d_t ip_array[2], int *ip_count)
 {
   gcode_line_t *line;
   gcode_arc_t *arc;
@@ -253,7 +266,7 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
   gfloat_t arc_radius, line_dx, line_dy, line_dr, line_dr_inv, line_d, line_sgn, line_disc, arc_start_angle, angle;
   int p0_test, p1_test;
 
-  *ip_num = 0;
+  *ip_count = 0;
 
   line = (gcode_line_t *)line_block->pdata;
   arc = (gcode_arc_t *)arc_block->pdata;
@@ -349,19 +362,19 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
   /* Handle Tangent case where the discriminant equals 0.0 */
   if (p0_test && (line_disc > GCODE_PRECISION))
   {
-    ip_array[*ip_num][0] = arc_p0[0];
-    ip_array[*ip_num][1] = arc_p0[1];
-    (*ip_num)++;
+    ip_array[*ip_count][0] = arc_p0[0];
+    ip_array[*ip_count][1] = arc_p0[1];
+    (*ip_count)++;
   }
 
   if (p1_test)
   {
-    ip_array[*ip_num][0] = arc_p1[0];
-    ip_array[*ip_num][1] = arc_p1[1];
-    (*ip_num)++;
+    ip_array[*ip_count][0] = arc_p1[0];
+    ip_array[*ip_count][1] = arc_p1[1];
+    (*ip_count)++;
   }
 
-  return (*ip_num ? 0 : 1);
+  return (*ip_count ? 0 : 1);
 }
 
 /**
@@ -371,7 +384,7 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
  */
 
 static int
-line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode_vec2d_t ip_array[2], int *ip_num)
+line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode_vec2d_t ip_array[2], int *ip_count)
 {
   gcode_line_t *line1;
   gcode_line_t *line2;
@@ -381,7 +394,7 @@ line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gco
 
   eps = GCODE_PRECISION;
 
-  *ip_num = 0;
+  *ip_count = 0;
 
   line1 = (gcode_line_t *)line1_block->pdata;
   line2 = (gcode_line_t *)line2_block->pdata;
@@ -395,7 +408,7 @@ line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gco
     ip_array[0][0] = line2_p0[0];
     ip_array[0][1] = line2_p0[1];
 
-    *ip_num = 1;
+    *ip_count = 1;
 
     return (0);                                                                 // Unless we test for it first, straight continuity gets missed as "parallels";
   }
@@ -406,7 +419,7 @@ line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gco
     ip_array[0][0] = line2_p1[0];
     ip_array[0][1] = line2_p1[1];
 
-    *ip_num = 1;
+    *ip_count = 1;
 
     return (0);                                                                 // The most likely got tested first, but there are 2 x 2 possibilities...
   }
@@ -450,7 +463,7 @@ line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gco
       ((ip[1] > line2_p0[1] + eps) && (ip[1] > line2_p1[1] + eps)))
     return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d];
 
-  *ip_num = 1;                                                                  // Oh, still here? Ok, one intersection point it is then...
+  *ip_count = 1;                                                                // Oh, still here? Ok, one intersection point it is then...
 
   return (0);
 }
@@ -462,7 +475,7 @@ line_line_intersect (gcode_block_t *line1_block, gcode_block_t *line2_block, gco
  */
 
 static int
-arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_vec2d_t ip_array[2], int *ip_num)
+arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_vec2d_t ip_array[2], int *ip_count)
 {
   gcode_arc_t *arc1;
   gcode_arc_t *arc2;
@@ -473,7 +486,7 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
   gfloat_t dx, dy, d, a, h, x2, y2, rx, ry, angle1, angle2;
   int miss;
 
-  *ip_num = 0;
+  *ip_count = 0;
 
   arc1 = (gcode_arc_t *)arc1_block->pdata;
   arc2 = (gcode_arc_t *)arc2_block->pdata;
@@ -563,9 +576,9 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
   if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
       (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_num][0] = arc_ip[0];
-    ip_array[*ip_num][1] = arc_ip[1];
-    (*ip_num)++;
+    ip_array[*ip_count][0] = arc_ip[0];
+    ip_array[*ip_count][1] = arc_ip[1];
+    (*ip_count)++;
     miss = 0;
   }
 
@@ -578,9 +591,9 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
   if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
       (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_num][0] = arc_ip[0];
-    ip_array[*ip_num][1] = arc_ip[1];
-    (*ip_num)++;
+    ip_array[*ip_count][0] = arc_ip[0];
+    ip_array[*ip_count][1] = arc_ip[1];
+    (*ip_count)++;
     miss = 0;
   }
 
@@ -594,21 +607,150 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
  */
 
 int
-gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip_array[2], int *ip_num)
+gcode_util_intersect (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip_array[2], int *ip_count)
 {
   if ((block_a->type == GCODE_TYPE_LINE) && (block_b->type == GCODE_TYPE_LINE))
-    return line_line_intersect (block_a, block_b, ip_array, ip_num);
+    return line_line_intersect (block_a, block_b, ip_array, ip_count);
 
   if ((block_a->type == GCODE_TYPE_ARC) && (block_b->type == GCODE_TYPE_ARC))
-    return arc_arc_intersect (block_a, block_b, ip_array, ip_num);
+    return arc_arc_intersect (block_a, block_b, ip_array, ip_count);
 
   if ((block_a->type == GCODE_TYPE_LINE) && (block_b->type == GCODE_TYPE_ARC))
-    return line_arc_intersect (block_a, block_b, ip_array, ip_num);
+    return line_arc_intersect (block_a, block_b, ip_array, ip_count);
 
   if ((block_a->type == GCODE_TYPE_ARC) && (block_b->type == GCODE_TYPE_LINE))
-    return line_arc_intersect (block_b, block_a, ip_array, ip_num);
+    return line_arc_intersect (block_b, block_a, ip_array, ip_count);
 
   return -1;
+}
+
+/**
+ * Adjust the second endpoint of the first block and the first endpoint of the
+ * second block to meet up at the supplied already existing intersection point;
+ * NOTE: not a general purpose 'move ends anywhere' routine; it is assumed that
+ * the supplied point is an existing intersection and only shortens both blocks
+ */
+
+int
+gcode_util_trim_both (gcode_block_t *block_a, gcode_block_t *block_b, gcode_vec2d_t ip)
+{
+  gcode_line_t *line;
+  gcode_arc_t *arc;
+  gfloat_t old_angle, new_angle, delta;
+  gcode_vec2d_t center;
+
+  switch (block_a->type)                                                        // *** Adjusting the ending point of the first primitive ***
+  {
+    case GCODE_TYPE_LINE:                                                       // If it's a line, get a reference to its 'line' data struct;
+
+      line = (gcode_line_t *)block_a->pdata;
+
+      line->p1[0] = ip[0];                                                      // Update the ending point of the line to the chosen intersection point;
+      line->p1[1] = ip[1];
+
+      break;                                                                    // Done!
+
+    case GCODE_TYPE_ARC:                                                        // If it's an arc, get the position of its center;
+
+      gcode_arc_center (block_a, center, GCODE_GET);
+
+      arc = (gcode_arc_t *)block_a->pdata;                                      // Also, get a reference to the 'arc' data struct;
+
+      old_angle = arc->start_angle + arc->sweep_angle;                          // The original ending angle is the wrapped sum of 'start' and 'sweep';
+
+      GCODE_MATH_WRAP_TO_360_DEGREES (old_angle);
+
+      gcode_math_xy_to_angle (center, ip, &new_angle);                          // The new ending angle results from the relation of 'ip' and the arc center;
+
+      GCODE_MATH_SNAP_TO_360_DEGREES (old_angle);                               // Math imprecision can fuzz a 0.0 angle into 359.9 that will fail any attempt
+      GCODE_MATH_SNAP_TO_360_DEGREES (new_angle);                               // to match it to its expected range - yes, nasty, but we round 359.9 to 0.0;
+
+      if (arc->sweep_angle > 0.0)                                               // Ugly, but hopefully bug-free: the sweep must keep its sign, but become 'shorter';
+      {
+        delta = old_angle - new_angle;                                          // If the sweep was positive, the new ending angle HAS to be smaller than the old one...
+
+        if (delta < -GCODE_ANGULAR_PRECISION)                                   // ...unless they happen to be on different sides of the "0" axis -> correct for it.
+          delta += 360.0;                                                       // Delta should now be a positive quantity;
+
+        arc->sweep_angle -= delta;                                              // The new sweep MUST be 'shorter' than the old one, so we subtract delta from the sweep;
+      }
+      else                                                                      // NOTE: 'shorter' is obviously understood here as 'shorter OR EQUAL - but NOT LONGER'.
+      {
+        delta = new_angle - old_angle;                                          // If the sweep was negative, the new ending angle HAS to be larger than the old one...
+
+        if (delta < -GCODE_ANGULAR_PRECISION)                                   // ...unless they happen to be on different sides of the "0" axis -> correct for it.
+          delta += 360.0;                                                       // Delta should now be a positive quantity;
+
+        arc->sweep_angle += delta;                                              // The new sweep MUST be 'shorter' than the old one, so we add delta to the negative sweep;
+      }
+
+      GCODE_MATH_SNAP_TO_720_DEGREES (arc->sweep_angle);                        // Clamp the sweep to +/-360.0 since ending up with 360.00001 would NOT be fun;
+
+      break;                                                                    // Erm... done?
+
+    default:                                                                    // This only handles linear features like arcs and lines;
+
+      return (1);
+  }
+
+  switch (block_b->type)                                                        // *** Adjusting the starting point of the second primitive ***
+  {
+    case GCODE_TYPE_LINE:                                                       // If it's a line, get a reference to its 'line' data struct;
+
+      line = (gcode_line_t *)block_b->pdata;
+
+      line->p0[0] = ip[0];                                                      // Update the starting point of the line to the chosen intersection point;
+      line->p0[1] = ip[1];
+
+      break;                                                                    // Done!
+
+    case GCODE_TYPE_ARC:                                                        // If it's an arc, get the position of its center;
+
+      gcode_arc_center (block_b, center, GCODE_GET);
+
+      arc = (gcode_arc_t *)block_b->pdata;                                      // Also, get a reference to the 'arc' data struct;
+
+      arc->p[0] = ip[0];                                                        // Update the starting point of the arc to the chosen intersection point;
+      arc->p[1] = ip[1];
+
+      old_angle = arc->start_angle;                                             // The original start angle is the... ummm... start angle;
+
+      gcode_math_xy_to_angle (center, arc->p, &new_angle);                      // The new start angle results from the relation of the new starting point and the arc center;
+
+      GCODE_MATH_SNAP_TO_360_DEGREES (old_angle);                               // Math imprecision can fuzz a 0.0 angle into 359.9 that will fail any attempt
+      GCODE_MATH_SNAP_TO_360_DEGREES (new_angle);                               // to match it to its expected range - yes, nasty, but we round 359.9 to 0.0;
+
+      if (arc->sweep_angle > 0.0)                                               // Ugly, but hopefully bug-free: the sweep must keep its sign, but become 'shorter';
+      {
+        delta = new_angle - old_angle;                                          // If the sweep was positive, the new start angle HAS to be larger than the old one...
+
+        if (delta < -GCODE_ANGULAR_PRECISION)                                   // ...unless they happen to be on different sides of the "0" axis -> correct for it.
+          delta += 360.0;                                                       // Delta should now be a positive quantity;
+
+        arc->sweep_angle -= delta;                                              // The new sweep MUST be 'shorter' than the old one, so we subtract delta from the sweep;
+      }
+      else                                                                      // NOTE: 'shorter' is obviously understood here as 'shorter OR EQUAL - but NOT LONGER'.
+      {
+        delta = old_angle - new_angle;                                          // If the sweep was negative, the new start angle HAS to be smaller than the old one...
+
+        if (delta < -GCODE_ANGULAR_PRECISION)                                   // ...unless they happen to be on different sides of the "0" axis -> correct for it.
+          delta += 360.0;                                                       // Delta should now be a positive quantity;
+
+        arc->sweep_angle += delta;                                              // The new sweep MUST be 'shorter' than the old one, so we add delta to the negative sweep;
+      }
+
+      GCODE_MATH_SNAP_TO_720_DEGREES (arc->sweep_angle);                        // Clamp the sweep to +/-360.0 since ending up with 360.00001 would NOT be fun;
+
+      arc->start_angle = new_angle;                                             // Oh, the new start angle? That's... well... the new start angle.
+
+      break;                                                                    // Erm... done?
+
+    default:                                                                    // This only handles linear features like arcs and lines;
+
+      return (1);
+  }
+
+  return (0);
 }
 
 int
@@ -782,6 +924,38 @@ gcode_util_flip_direction (gcode_block_t *block)
 }
 
 /**
+ * Calculate the change in heading between the end of the first block and the
+ * start of the second, returning a (continuous) index of coincidence: from 1
+ * if the directions are the same going down to 0 if there is a perpendicular
+ * turn then down to -1 if the directions are exact opposites of each other.
+ * NOTE: while the purpose of this function is to detect full-reverse "spikes"
+ * in contiguous chains of blocks, there is no actual requirement for the two
+ * investigated endpoints to be coincident for the returned value to be valid;
+ * NOTE: as a linear object tool, this obviously ONLY handles lines and arcs;
+ */
+
+int gcode_util_get_continuity_index (gcode_block_t *block_a, gcode_block_t *block_b, gfloat_t *index)
+{
+  gcode_vec2d_t tangent_a, tangent_b, tangent;
+
+  if (!block_a->ends)
+    return (1);
+
+  if (!block_b->ends)
+    return (1);
+
+  if (block_a->ends (block_a, tangent, tangent_a, GCODE_GET_TANGENT) != 0)
+    return (1);
+
+  if (block_b->ends (block_b, tangent_b, tangent, GCODE_GET_TANGENT) != 0)
+      return (1);
+
+  GCODE_MATH_VEC2D_DOT (*index, tangent_a, tangent_b);
+
+  return (0);
+}
+
+/**
  * Create a copy of the chain of blocks between 'start_block' and 'end_block' -
  * including both - and point 'listhead' to the first block of the copied chain;
  * NOTE: the resulting snapshot is meaningfully different from a list of clones
@@ -859,9 +1033,13 @@ gcode_util_tag_null_size_blocks (gcode_block_t *listhead)
         line = (gcode_line_t *)index_block->pdata;
 
         if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
-          index_block->flags |= GCODE_FLAGS_TAGGED;
+        {
+          GCODE_UTIL_TAG_BLOCK (index_block);
+        }
         else
-          index_block->flags &= ~GCODE_FLAGS_TAGGED;
+        {
+          GCODE_UTIL_CLEAR_TAG (index_block);
+        }
 
         break;
       }
@@ -873,9 +1051,13 @@ gcode_util_tag_null_size_blocks (gcode_block_t *listhead)
         arc = (gcode_arc_t *)index_block->pdata;
 
         if (arc->radius < GCODE_PRECISION)
-          index_block->flags |= GCODE_FLAGS_TAGGED;
+        {
+          GCODE_UTIL_TAG_BLOCK (index_block);
+        }
         else
-          index_block->flags &= ~GCODE_FLAGS_TAGGED;
+        {
+          GCODE_UTIL_CLEAR_TAG (index_block);
+        }
 
         break;
       }
@@ -906,7 +1088,7 @@ gcode_util_remove_tagged_blocks (gcode_block_t **listhead)
   {
     next_block = index_block->next;
 
-    if (index_block->flags & GCODE_FLAGS_TAGGED)
+    if (GCODE_UTIL_IS_TAGGED (index_block))
     {
       if (index_block->next)
         index_block->next->prev = index_block->prev;

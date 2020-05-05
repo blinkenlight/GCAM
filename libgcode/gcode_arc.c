@@ -543,6 +543,29 @@ gcode_arc_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_
       break;
     }
 
+    case GCODE_GET_ALPHA:
+    {
+      gcode_vec2d_t center;
+
+      p0[0] = p1[0] = arc->p[0];
+      p0[1] = p1[1] = arc->p[1];
+
+      break;
+    }
+
+    case GCODE_GET_OMEGA:
+    {
+      gcode_vec2d_t center;
+
+      center[0] = arc->p[0] - arc->radius * cos (arc->start_angle * GCODE_DEG2RAD);
+      center[1] = arc->p[1] - arc->radius * sin (arc->start_angle * GCODE_DEG2RAD);
+
+      p0[0] = p1[0] = center[0] + arc->radius * cos ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+      p0[1] = p1[1] = center[1] + arc->radius * sin ((arc->start_angle + arc->sweep_angle) * GCODE_DEG2RAD);
+
+      break;
+    }
+
     default:
 
       return (1);
