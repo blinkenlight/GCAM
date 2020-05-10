@@ -34,9 +34,11 @@
 #define GCODE_INCH2MM           25.4
 #define GCODE_TOLERANCE          0.00001                                        /* Connectivity */
 #define GCODE_PRECISION          0.00001                                        /* Cartesian */
-#define GCODE_ANGULAR_PRECISION  0.0001                                         /* Angular Degrees */
+#define GCODE_ANGULAR_PRECISION  0.001                                          /* Angular Degrees */
 #define GCODE_RAD2DEG           57.29577951308232
 #define GCODE_DEG2RAD            0.017453292519943295
+
+#define GCODE_PRECISION_FLOOR   DBL_EPSILON * 1000                              /* Precision Drift */
 
 #define gfloat_t double
 

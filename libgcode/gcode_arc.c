@@ -359,80 +359,96 @@ int
 gcode_arc_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x_index)
 {
   gcode_arc_t *arc;
-  gfloat_t angle1, angle2, start_angle, end_angle, arc_radius_offset, xform_start_angle;
-  gcode_vec2d_t origin, center, p0;
+  gfloat_t angle1, angle2, start_angle, end_angle, arc_radius, arc_start_angle;
+  gcode_vec2d_t arc_p0, arc_center, arc_p1;
   int fail;
 
   arc = (gcode_arc_t *)block->pdata;
 
   /* Transform */
-  gcode_arc_with_offset (block, origin, center, p0, &arc_radius_offset, &xform_start_angle);
+  gcode_arc_with_offset (block, arc_p0, arc_center, arc_p1, &arc_radius, &arc_start_angle);
 
-  if (arc_radius_offset < GCODE_PRECISION)
+  if (arc_radius < GCODE_PRECISION)
     return (1);
 
+  /**
+   * Work-around for assuring things that should intersect, do. Without this,
+   * calculated objects could JUST miss a raster line with nasty consequences.
+   */
+
+  arc_radius += GCODE_PRECISION_FLOOR;
+
   /* Check whether y is outside of the circle boundaries */
-  if (fabs (center[1] - y) > arc_radius_offset)
+  if (arc_radius < GCODE_MATH_1D_DISTANCE (arc_center[1], y))
     return (1);
 
   /* y is now in unit circle coordinates */
-  y = (y - center[1]) / arc_radius_offset;
+  y = (y - arc_center[1]) / arc_radius;
 
   /* Take the arcsin to get the angles */
   angle1 = GCODE_RAD2DEG * asin (y);
-  angle2 = angle1 + 2.0 * (90.0 - angle1);
+  angle2 = 180.0 - angle1;
 
-  if (angle1 < 0.0)
-    angle1 += 360.0;
+  GCODE_MATH_WRAP_TO_360_DEGREES (angle1);
 
   /**
    * Notes:
-   * angle2 can never be negative.
+   * angle2 can never be negative as angle1 is always within +/- 90 degrees;
    * angle1 represents quadrants 1 and 4. (+X)
    * angle2 represents quadrants 2 and 3. (-X)
    */
 
-  /* Set the start and end angle in a counter clockwise format */
-  if (arc->sweep_angle < 0.0)
+  fail = 1;
+
+  /**
+   * If the two intersection angles are effectively indistinguishable, they are
+   * probably a single point of tangency and returning both would be a mistake.
+   * Also, if the arc does not have an endpoint coincident with that tangency
+   * point, returning anything at all would be a mistake as well: the pocketing
+   * algorithm considers each intersection a passage between the outside and the
+   * inside of the contour, which a point of tangency clearly wouldn't be if the
+   * arc in question curves away from it in both directions. Therefore, if this
+   * is indeed a tangency point, we return either a single point or none at all.
+   */
+
+  if (GCODE_MATH_DIFFERENCE (angle1, angle2) < GCODE_ANGULAR_PRECISION)
   {
-    start_angle = xform_start_angle + arc->sweep_angle;
-    end_angle = xform_start_angle;
+    gfloat_t angle;
+
+    angle = (angle1 + angle2) / 2;
+
+    if ((GCODE_MATH_1D_DISTANCE (arc_p0[0], arc_center[0]) > GCODE_PRECISION) &&
+        (GCODE_MATH_1D_DISTANCE (arc_p1[0], arc_center[0]) > GCODE_PRECISION))
+      return(fail);
+
+    if (gcode_math_angle_within_arc (arc_start_angle, arc->sweep_angle, angle) == 0)
+    {
+      x_array[*x_index] = arc_center[0] + arc_radius * cos (GCODE_DEG2RAD * angle);
+
+      (*x_index)++;
+
+      fail = 0;
+    }
   }
   else
   {
-    start_angle = xform_start_angle;
-    end_angle = xform_start_angle + arc->sweep_angle;
-  }
+    if (gcode_math_angle_within_arc (arc_start_angle, arc->sweep_angle, angle1) == 0)
+    {
+      x_array[*x_index] = arc_center[0] + arc_radius * cos (GCODE_DEG2RAD * angle1);
 
-  /* Only the case if arc->sweep_angle < 0 */
-  if (start_angle < 0.0)
-  {
-    start_angle += 360.0;
-    end_angle += 360.0;
-  }
+      (*x_index)++;
 
-  /* Precision adjustment */
-  if (fabs (angle1 - start_angle) < GCODE_PRECISION)
-    angle1 = start_angle;
+      fail = 0;
+    }
 
-  if (angle1 < start_angle - GCODE_PRECISION)
-    angle1 += 360.0;
+    if (gcode_math_angle_within_arc (arc_start_angle, arc->sweep_angle, angle2) == 0)
+    {
+      x_array[*x_index] = arc_center[0] + arc_radius * cos (GCODE_DEG2RAD * angle2);
 
-  if (angle2 < start_angle - GCODE_PRECISION)
-    angle2 += 360.0;
+      (*x_index)++;
 
-  fail = 1;
-
-  if (angle1 >= start_angle && angle1 <= end_angle)
-  {
-    x_array[(*x_index)++] = center[0] + arc_radius_offset * cos (GCODE_DEG2RAD * angle1);
-    fail = 0;
-  }
-
-  if (fabs (angle1 - angle2) > GCODE_PRECISION && angle2 >= (start_angle - GCODE_PRECISION) && angle2 <= (end_angle + GCODE_PRECISION))
-  {
-    x_array[(*x_index)++] = center[0] + arc_radius_offset * cos (GCODE_DEG2RAD * angle2);
-    fail = 0;
+      fail = 0;
+    }
   }
 
   return (fail);
@@ -877,7 +893,7 @@ gcode_arc_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
  * by 'block's offset pointer, calculate the parameters of an arc that is first
  * rotated and translated by 'offset->rotation' and 'offset->origin' then also
  * shifted radially "in" or "out" by 'offset->tool' plus 'offset->eval' in the
- * direction determined by 'offset->side', such as to form an arc that would be 
+ * direction determined by 'offset->side', such as to form an arc that would be
  * "parallel" with the result of the original roto-translation.
  */
 
@@ -939,7 +955,7 @@ gcode_arc_with_offset (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t cen
 
 /**
  * Invert the endpoints of 'block' - because arcs only explicitly define their
- * starting point (not the ending one), this requires finding the former ending 
+ * starting point (not the ending one), this requires finding the former ending
  * point and the new starting angle for the reversed arc (sweep simply inverts).
  */
 
@@ -1030,7 +1046,7 @@ gcode_arc_radius_to_sweep (gcode_arcdata_t *arc)
 
   theta = GCODE_RAD2DEG * theta;
 
-  GCODE_MATH_WRAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.  
+  GCODE_MATH_WRAP_TO_360_DEGREES (theta);                                       // Yes, fmod (x, 360.0) DOES sometimes return "360.0". Yes, that would be BAD.
   GCODE_MATH_SNAP_TO_360_DEGREES (theta);
 
   ux = vx;

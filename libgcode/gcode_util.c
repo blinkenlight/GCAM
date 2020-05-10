@@ -199,6 +199,7 @@ gcode_util_remove_duplicate_scalars (gfloat_t *array, uint32_t *num)
       }
 
       num2--;
+      i--;
     }
   }
 
@@ -275,6 +276,13 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
 
   if (arc_radius <= GCODE_PRECISION)
     return (1);
+
+  /**
+   * Work-around for assuring things that should intersect, do. Without this,
+   * calculated objects could JUST miss each other with nasty consequences.
+   */
+
+  arc_radius += GCODE_PRECISION_FLOOR;
 
   gcode_line_with_offset (line_block, line_p0, line_p1, line_normal);
 
@@ -364,6 +372,7 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
   {
     ip_array[*ip_count][0] = arc_p0[0];
     ip_array[*ip_count][1] = arc_p0[1];
+
     (*ip_count)++;
   }
 
@@ -371,7 +380,21 @@ line_arc_intersect (gcode_block_t *line_block, gcode_block_t *arc_block, gcode_v
   {
     ip_array[*ip_count][0] = arc_p1[0];
     ip_array[*ip_count][1] = arc_p1[1];
+
     (*ip_count)++;
+  }
+
+  /**
+   * If the two intersection points are effectively indistinguishable, they are
+   * probably a single point of tangency and returning both would be a mistake.
+   */
+
+  if ((*ip_count > 0) && (GCODE_MATH_2D_DISTANCE (arc_p0, arc_p1) < GCODE_PRECISION))
+  {
+    ip_array[0][0] = (arc_p0[0] + arc_p1[0]) / 2;
+    ip_array[0][1] = (arc_p0[1] + arc_p1[1]) / 2;
+
+    *ip_count = 1;
   }
 
   return (*ip_count ? 0 : 1);
@@ -479,7 +502,7 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
 {
   gcode_arc_t *arc1;
   gcode_arc_t *arc2;
-  gcode_vec2d_t arc_ip;
+  gcode_vec2d_t arc_p0, arc_p1;
   gcode_vec2d_t arc1_origin, arc1_center, arc1_p0;
   gcode_vec2d_t arc2_origin, arc2_center, arc2_p0;
   gfloat_t arc1_radius, arc1_start_angle, arc2_radius, arc2_start_angle;
@@ -493,6 +516,14 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
 
   gcode_arc_with_offset (arc1_block, arc1_origin, arc1_center, arc1_p0, &arc1_radius, &arc1_start_angle);
   gcode_arc_with_offset (arc2_block, arc2_origin, arc2_center, arc2_p0, &arc2_radius, &arc2_start_angle);
+
+  /**
+   * Work-around for assuring things that should intersect, do. Without this,
+   * calculated objects could JUST miss each other with nasty consequences.
+   */
+
+  arc1_radius += GCODE_PRECISION_FLOOR;
+  arc2_radius += GCODE_PRECISION_FLOOR;
 
   /**
    * Circle-Circle intersection code derrived from 3/26/2005 Tim Voght.
@@ -533,7 +564,7 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
   /**
    * 'point 2' is the point where the line through the circle
    * intersection points crosses the line between the circle
-   * centers.  
+   * centers.
    */
 
   /* Determine the distance from point 0 to point 2. */
@@ -567,34 +598,51 @@ arc_arc_intersect (gcode_block_t *arc1_block, gcode_block_t *arc2_block, gcode_v
    */
   miss = 1;
 
-  arc_ip[0] = x2 + rx;
-  arc_ip[1] = y2 + ry;
+  arc_p0[0] = x2 + rx;
+  arc_p0[1] = y2 + ry;
 
-  gcode_math_xy_to_angle (arc1_center, arc_ip, &angle1);
-  gcode_math_xy_to_angle (arc2_center, arc_ip, &angle2);
+  gcode_math_xy_to_angle (arc1_center, arc_p0, &angle1);
+  gcode_math_xy_to_angle (arc2_center, arc_p0, &angle2);
 
   if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
       (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_count][0] = arc_ip[0];
-    ip_array[*ip_count][1] = arc_ip[1];
+    ip_array[*ip_count][0] = arc_p0[0];
+    ip_array[*ip_count][1] = arc_p0[1];
+
     (*ip_count)++;
+
     miss = 0;
   }
 
-  arc_ip[0] = x2 - rx;
-  arc_ip[1] = y2 - ry;
+  arc_p1[0] = x2 - rx;
+  arc_p1[1] = y2 - ry;
 
-  gcode_math_xy_to_angle (arc1_center, arc_ip, &angle1);
-  gcode_math_xy_to_angle (arc2_center, arc_ip, &angle2);
+  gcode_math_xy_to_angle (arc1_center, arc_p1, &angle1);
+  gcode_math_xy_to_angle (arc2_center, arc_p1, &angle2);
 
   if ((gcode_math_angle_within_arc (arc1_start_angle, arc1->sweep_angle, angle1) == 0) &&
       (gcode_math_angle_within_arc (arc2_start_angle, arc2->sweep_angle, angle2) == 0))
   {
-    ip_array[*ip_count][0] = arc_ip[0];
-    ip_array[*ip_count][1] = arc_ip[1];
+    ip_array[*ip_count][0] = arc_p1[0];
+    ip_array[*ip_count][1] = arc_p1[1];
+
     (*ip_count)++;
+
     miss = 0;
+  }
+
+  /**
+   * If the two intersection points are effectively indistinguishable, they are
+   * probably a single point of tangency and returning both would be a mistake.
+   */
+
+  if ((*ip_count > 0) && (GCODE_MATH_2D_DISTANCE (arc_p0, arc_p1) < GCODE_PRECISION))
+  {
+    ip_array[0][0] = (arc_p0[0] + arc_p1[0]) / 2;
+    ip_array[0][1] = (arc_p0[1] + arc_p1[1]) / 2;
+
+    *ip_count = 1;
   }
 
   return (miss);
@@ -831,7 +879,7 @@ gcode_util_fillet (gcode_block_t *line1_block, gcode_block_t *line2_block, gcode
 
   if (((pt2[1] < line2->p0[1] - eps) && (pt2[1] < line2->p1[1] - eps)) ||
       ((pt2[1] > line2->p0[1] + eps) && (pt2[1] > line2->p1[1] + eps)))
-    return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d]; 
+    return (1);                                                                 // If (y<c and y<d) or (y>c and y>d), y cannot belong to [c d];
 
   /* If we're still here, we should apply the new endpoints */
   GCODE_MATH_VEC2D_COPY (line1->p1, pt1);
@@ -1134,10 +1182,10 @@ gcode_util_remove_null_sections (gcode_block_t **listhead)
  * the original direction the majority of the blocks in the list are facing in;
  * NOTE: this will return 1 even if multiple unconnected fragments are found, as
  * long as each one is closed;
- * NOTE: although practical observed performance (speed) of this function seems 
+ * NOTE: although practical observed performance (speed) of this function seems
  * quite adequate in ordinary conditions, it could slow down significantly for
- * inconveniently ordered large lists; the best bet to avoid that is keeping 
- * lists correctly ordered in the first place thereby reducing the amount of 
+ * inconveniently ordered large lists; the best bet to avoid that is keeping
+ * lists correctly ordered in the first place thereby reducing the amount of
  * processing involved from quadratic to linear in relation to list size;
  */
 
@@ -1312,10 +1360,10 @@ gcode_util_merge_list_fragments (gcode_block_t **listhead)
 }
 
 /**
- * Take each block in the list starting with 'listhead' and apply to it whatever 
+ * Take each block in the list starting with 'listhead' and apply to it whatever
  * offset it is linked to; in other words, calculate how the linked offset would
  * change each primitive and update each with the new data, then re-link it to
- * the same (newly created) zero-offset record that should eventually be freed 
+ * the same (newly created) zero-offset record that should eventually be freed
  * when the list itself is disposed of;
  */
 
