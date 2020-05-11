@@ -67,7 +67,7 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *first_block, gcode_blo
   pocket->first_block = first_block;
   pocket->final_block = final_block;
 
-  y_resolution = pocket->tool->diameter * 0.5;
+  y_resolution = pocket->tool->diameter * (1 - gcode->roughing_overlap);
 
   /**
    * Call eval on each block and get the x values. Next, sort the x values.
@@ -231,7 +231,7 @@ pocket_make_traditional (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z)
 
   travel_z = block->gcode->ztraverse;
 
-  padding = pocket->tool->diameter * PADDING_FRACTION;
+  padding = pocket->tool->diameter * block->gcode->padding_fraction;
 
   if (pocket->seg_count == 0)                                                   // Return if no pocketing is to occur
     return;
@@ -322,7 +322,7 @@ pocket_make_alternate_1 (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z)
 
   travel_z = block->gcode->ztraverse;
 
-  padding = pocket->tool->diameter * PADDING_FRACTION;
+  padding = pocket->tool->diameter * block->gcode->padding_fraction;
 
   if (pocket->seg_count == 0)                                                   // Return if no pocketing is to occur
     return;

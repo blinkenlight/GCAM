@@ -890,6 +890,9 @@ gcode_init (gcode_t *gcode)
 
   gcode->curve_segments = 0;
 
+  gcode->roughing_overlap = 0;
+  gcode->padding_fraction = 0;
+
   gcode->tool_xpos = FLT_MAX;
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;

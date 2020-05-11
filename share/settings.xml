@@ -1,4 +1,10 @@
 <list>
-	<setting voxel_resolution='768'/>
+	<!-- Density of voxels when rendering the final part for displaying -->
+	<setting voxel_resolution='1000'/>
+	<!-- Number of line segment used to approximate a curve at SVG import -->
 	<setting curve_segments='50'/>
+	<!-- Fraction of overlap between roughing lines when pocketing (max=0.9) -->
+	<setting roughing_overlap='0.5'/>
+	<!-- Fraction of tool diameter left for the finishing pass when pocketing -->
+	<setting padding_fraction='0.1'/>
 </list>

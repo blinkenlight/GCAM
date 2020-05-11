@@ -333,6 +333,9 @@ typedef struct gcode_s
 
   uint16_t curve_segments;
 
+  gfloat_t roughing_overlap;
+  gfloat_t padding_fraction;
+
   gfloat_t tool_xpos;
   gfloat_t tool_ypos;
   gfloat_t tool_zpos;

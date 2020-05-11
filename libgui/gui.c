@@ -828,6 +828,8 @@ gui_attach (gcode_t *gcode, gui_t *gui)
 
   gcode->voxel_resolution = gui->settings.voxel_resolution;
   gcode->curve_segments = gui->settings.curve_segments;
+  gcode->roughing_overlap = gui->settings.roughing_overlap;
+  gcode->padding_fraction = gui->settings.padding_fraction;
 }
 
 /**
