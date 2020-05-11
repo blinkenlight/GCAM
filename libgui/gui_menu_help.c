@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@ gui_menu_help_about_menuitem_callback (GtkWidget *widget, gpointer data)
   sprintf (copyright,
            "Copyright (C) 2006 - 2010 Justin Shumaker\n"
            "justin@js.cx\n\n"
-           "Copyright (C) 2014 Asztalos Attila Oszkár\n"
+           "Copyright (C) 2014 - 2020 Asztalos Attila Oszkár\n"
            "attila.asztalos@gmail.com");
 
   gtk_show_about_dialog (GTK_WINDOW (gui->window),

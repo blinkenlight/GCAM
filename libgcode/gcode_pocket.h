@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszk·r
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszk√°r
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
