@@ -662,46 +662,74 @@ gcode_arc_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode)
 }
 
 void
-gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_arc_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_arc_t *arc;
-  gcode_vec2d_t origin, center, end_pos;
-  gfloat_t arc_radius_offset, start_angle;
+  gcode_vec2d_t arc_p0, arc_center, arc_p1;
+  gfloat_t arc_radius, arc_start_angle, arc_sweep_angle;
 
   arc = (gcode_arc_t *)block->pdata;
 
-  gcode_arc_with_offset (block, origin, center, end_pos, &arc_radius_offset, &start_angle);
+  arc_radius = arc->radius;
+  arc_start_angle = arc->start_angle;
+  arc_sweep_angle = arc->sweep_angle;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      gcode_arc_ends (block, arc_p0, arc_p1, mode);
+      gcode_arc_center (block, arc_center, mode);
+
+      break;
+    }
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_arc_with_offset (block, arc_p0, arc_center, arc_p1, &arc_radius, &arc_start_angle);
+
+      break;
+    }
+
+    default:                                                                    // Invalid mode;
+    {
+      min[0] = min[1] = 1;                                                      // Callers should test for an inside-out aabb being returned;
+      max[0] = max[1] = 0;
+
+      return;
+    }
+  }
 
   /* Use start and end points to check for min and max */
-  min[0] = origin[0];
-  min[1] = origin[1];
-  max[0] = origin[0];
-  max[1] = origin[1];
+  min[0] = arc_p0[0];
+  min[1] = arc_p0[1];
+  max[0] = arc_p0[0];
+  max[1] = arc_p0[1];
 
-  if (end_pos[0] < min[0])
-    min[0] = end_pos[0];
+  if (arc_p1[0] < min[0])
+    min[0] = arc_p1[0];
 
-  if (end_pos[0] > max[0])
-    max[0] = end_pos[0];
+  if (arc_p1[0] > max[0])
+    max[0] = arc_p1[0];
 
-  if (end_pos[1] < min[1])
-    min[1] = end_pos[1];
+  if (arc_p1[1] < min[1])
+    min[1] = arc_p1[1];
 
-  if (end_pos[1] > max[1])
-    max[1] = end_pos[1];
+  if (arc_p1[1] > max[1])
+    max[1] = arc_p1[1];
 
   /* Test if arc intersects X or Y axis with respect to arc center */
-  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 0.0) == 0)
-    max[0] = center[0] + arc_radius_offset;
+  if (gcode_math_angle_within_arc (arc_start_angle, arc_sweep_angle, 0.0) == 0)
+    max[0] = arc_center[0] + arc_radius;
 
-  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 90.0) == 0)
-    max[1] = center[1] + arc_radius_offset;
+  if (gcode_math_angle_within_arc (arc_start_angle, arc_sweep_angle, 90.0) == 0)
+    max[1] = arc_center[1] + arc_radius;
 
-  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 180.0) == 0)
-    min[0] = center[0] - arc_radius_offset;
+  if (gcode_math_angle_within_arc (arc_start_angle, arc_sweep_angle, 180.0) == 0)
+    min[0] = arc_center[0] - arc_radius;
 
-  if (gcode_math_angle_within_arc (start_angle, arc->sweep_angle, 270.0) == 0)
-    min[1] = center[1] - arc_radius_offset;
+  if (gcode_math_angle_within_arc (arc_start_angle, arc_sweep_angle, 270.0) == 0)
+    min[1] = arc_center[1] - arc_radius;
 }
 
 void

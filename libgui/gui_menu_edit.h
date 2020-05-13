@@ -25,6 +25,9 @@
 
 #include <gtk/gtk.h>
 
+static const char *GCAM_TTIP_SPIN_ROTATE_ABOUT = "Warning: this value is relative to the origin of the currently selected object";
+static const char *GCAM_TTIP_FLIP_MIRROR_POINT = "Warning: this value is relative to the origin of the currently selected object";
+
 void gui_menu_edit_remove_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data);

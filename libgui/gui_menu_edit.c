@@ -307,7 +307,7 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
 
   if (selected_block->aabb)
   {
-    selected_block->aabb (selected_block, aabb_min, aabb_max);
+    selected_block->aabb (selected_block, aabb_min, aabb_max, GCODE_GET);
 
     if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
     {
@@ -329,6 +329,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_aboutx_spin), rotate_about[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_aboutx_spin, 1, 2, 0, 1);
 
+  gtk_widget_set_tooltip_text (rotate_aboutx_spin, GCAM_TTIP_SPIN_ROTATE_ABOUT);
+
   g_signal_connect_swapped (rotate_aboutx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   label = gtk_label_new ("Rotate About (Y)");
@@ -338,6 +340,8 @@ spin_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (rotate_abouty_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (rotate_abouty_spin), rotate_about[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), rotate_abouty_spin, 1, 2, 1, 2);
+
+  gtk_widget_set_tooltip_text (rotate_abouty_spin, GCAM_TTIP_SPIN_ROTATE_ABOUT);
 
   g_signal_connect_swapped (rotate_abouty_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
@@ -506,7 +510,7 @@ flip_create_page1 (GtkWidget *assistant, gpointer data)
 
   if (selected_block->aabb)
   {
-    selected_block->aabb (selected_block, aabb_min, aabb_max);
+    selected_block->aabb (selected_block, aabb_min, aabb_max, GCODE_GET);
 
     if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
     {
@@ -537,6 +541,8 @@ flip_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (mirror_pointx_spin), mirror_point[0]);
   gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointx_spin, 1, 2, 1, 2);
 
+  gtk_widget_set_tooltip_text (mirror_pointx_spin, GCAM_TTIP_FLIP_MIRROR_POINT);
+
   g_signal_connect_swapped (mirror_pointx_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 
   mirror_pointy_label = gtk_label_new ("Passing Through (Y)");
@@ -546,6 +552,8 @@ flip_create_page1 (GtkWidget *assistant, gpointer data)
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (mirror_pointy_spin), 5);
   gtk_spin_button_set_value (GTK_SPIN_BUTTON (mirror_pointy_spin), mirror_point[1]);
   gtk_table_attach_defaults (GTK_TABLE (table), mirror_pointy_spin, 1, 2, 1, 2);
+
+  gtk_widget_set_tooltip_text (mirror_pointy_spin, GCAM_TTIP_FLIP_MIRROR_POINT);
 
   g_signal_connect_swapped (mirror_pointy_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
 

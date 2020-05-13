@@ -462,14 +462,37 @@ gcode_line_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode)
 }
 
 void
-gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_line_t *line;
   gcode_vec2d_t p0, p1, normal;
 
   line = (gcode_line_t *)block->pdata;
 
-  gcode_line_with_offset (block, p0, p1, normal);
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      gcode_line_ends (block, p0, p1, mode);
+
+      break;
+    }
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_line_with_offset (block, p0, p1, normal);
+
+      break;
+    }
+
+    default:                                                                    // Invalid mode;
+    {
+      min[0] = min[1] = 1;                                                      // Callers should test for an inside-out aabb being returned;
+      max[0] = max[1] = 0;
+
+      return;
+    }
+  }
 
   min[0] = p0[0];
   min[1] = p0[1];
@@ -664,9 +687,9 @@ gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 /**
  * Based on the line data retrieved from 'block' and the offset data referenced
  * by 'block's offset pointer, calculate the endpoints of- and the normal vector
- * to a new line that is first rotated and translated by 'offset->rotation' and 
- * 'offset->origin' then also shifted "sideways" (in a direction perpendicular 
- * to the line) by 'offset->tool' plus 'offset->eval' on the side determined by 
+ * to a new line that is first rotated and translated by 'offset->rotation' and
+ * 'offset->origin' then also shifted "sideways" (in a direction perpendicular
+ * to the line) by 'offset->tool' plus 'offset->eval' on the side determined by
  * 'offset->side', such as to form a line that would be parallel with the result
  * of the original roto-translation.
  */

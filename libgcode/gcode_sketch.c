@@ -1670,7 +1670,7 @@ gcode_sketch_draw (gcode_block_t *block, gcode_block_t *selected)
  */
 
 void
-gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_block_t *index_block;
   gcode_vec2d_t tmin, tmax;
@@ -1680,6 +1680,9 @@ gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
   min[0] = min[1] = 1;                                                          // Never cross the streams, you say...? Oh well, too late...
   max[0] = max[1] = 0;                                                          // Callers should test for an inside-out aabb being returned;
 
+  if ((mode != GCODE_GET) && (mode != GCODE_GET_WITH_OFFSET))
+    return;
+
   while (index_block)
   {
     if (!index_block->aabb)                                                     // If the block has no bounds function, don't try to call it;
@@ -1688,7 +1691,7 @@ gcode_sketch_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
       continue;
     }
 
-    index_block->aabb (index_block, tmin, tmax);
+    index_block->aabb (index_block, tmin, tmax, mode);
 
     if ((tmin[0] > tmax[0]) || (tmin[1] > tmax[1]))                             // If the block returned an inside-out box, discard the box;
     {

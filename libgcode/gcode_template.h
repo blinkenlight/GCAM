@@ -46,7 +46,7 @@ void gcode_template_save (gcode_block_t *block, FILE *fh);
 void gcode_template_load (gcode_block_t *block, FILE *fh);
 void gcode_template_make (gcode_block_t *block);
 void gcode_template_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode);
 void gcode_template_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_template_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);

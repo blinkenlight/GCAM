@@ -542,7 +542,7 @@ gcode_bolt_holes_parse (gcode_block_t *block, const char **xmlattr)
  * NOTE: in case you're wondering, the "CTRL-click on a hole to select its row
  * in the tree view" still works because rebuilding the arcs the holes consist
  * of gets them renamed to the name of the bolt_holes, and 'snapshots' preserve
- * the name of their original - so all arcs drawn get actually tagged with the 
+ * the name of their original - so all arcs drawn get actually tagged with the
  * name of the bolt_holes block, and therefore can select it when clicked on.
  */
 
@@ -629,12 +629,12 @@ gcode_bolt_holes_draw (gcode_block_t *block, gcode_block_t *selected)
  * Construct the axis-aligned bounding box of all the holes in the bolt holes;
  * NOTE: this can and does return an "imposible" or "inside-out" bounding box
  * which has its minimum larger than its maximum as a sign of failure to pick
- * up any valid holes, if either the list is empty or none of the members are 
+ * up any valid holes, if either the list is empty or none of the members are
  * arcs (there should ONLY be arcs) - THIS SHOULD BE TESTED FOR ON RETURN!
  */
 
 void
-gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_block_t *index_block;
   gcode_bolt_holes_t *bolt_holes;
@@ -648,13 +648,16 @@ gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t ma
   min[0] = min[1] = 1;
   max[0] = max[1] = 0;
 
+  if ((mode != GCODE_GET) && (mode != GCODE_GET_WITH_OFFSET))
+    return;
+
   index_block = block->listhead;
 
   while (index_block)
   {
     if (index_block->type == GCODE_TYPE_ARC)
     {
-      gcode_arc_center (index_block, center, GCODE_GET);
+      gcode_arc_center (index_block, center, mode);
 
       if ((min[0] > max[0]) || (min[1] > max[1]))                               // If bounds were inside-out (unset), accept the hole directly;
       {
@@ -723,7 +726,7 @@ gcode_bolt_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle
   gfloat_t delta;
 
   bolt_holes = (gcode_bolt_holes_t *)block->pdata;
-  
+
   if (GCODE_MATH_IS_EQUAL (angle, 0))
   {
     delta = (bolt_holes->number[1] - 1) * bolt_holes->offset_distance;          // We need this because the origin of a bolt hole matrix is NOT in its center

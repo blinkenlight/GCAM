@@ -40,6 +40,7 @@ void gcode_point_free (gcode_block_t **block);
 void gcode_point_save (gcode_block_t *block, FILE *fh);
 void gcode_point_load (gcode_block_t *block, FILE *fh);
 void gcode_point_draw (gcode_block_t *block, gcode_block_t *selected);
+int gcode_point_center (gcode_block_t *block, gcode_vec2d_t p, uint8_t mode);
 void gcode_point_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_point_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_point_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);

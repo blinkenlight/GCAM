@@ -167,6 +167,38 @@ gcode_point_draw (gcode_block_t *block, gcode_block_t *selected)
 #endif
 }
 
+int
+gcode_point_center (gcode_block_t *block, gcode_vec2d_t p, uint8_t mode)
+{
+  gcode_point_t *point;
+
+  point = (gcode_point_t *)block->pdata;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      p[0] = point->p[0];
+      p[1] = point->p[1];
+
+      break;
+    }
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_point_with_offset (block, p);
+
+      break;
+    }
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
+}
+
 void
 gcode_point_move (gcode_block_t *block, gcode_vec2d_t delta)
 {

@@ -236,7 +236,7 @@ typedef void gcode_make_t (struct gcode_block_s *block);
 typedef void gcode_draw_t (struct gcode_block_s *block, struct gcode_block_s *selected);
 typedef int gcode_eval_t (struct gcode_block_s *block, gfloat_t y, gfloat_t *x_array, uint32_t *xind);
 typedef int gcode_ends_t (struct gcode_block_s *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
-typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max);
+typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode);
 typedef gfloat_t gcode_length_t (struct gcode_block_s *block);
 typedef void gcode_move_t (struct gcode_block_s *block, gcode_vec2d_t delta);
 typedef void gcode_spin_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);

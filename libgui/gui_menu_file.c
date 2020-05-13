@@ -1520,7 +1520,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   }
 
   /* Get the bounding box for the template */
-  template_block->aabb (template_block, aabb_min, aabb_max);
+  template_block->aabb (template_block, aabb_min, aabb_max, GCODE_GET);
 
   /* Extend material size and/or move origin if anything spills over */
   if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))

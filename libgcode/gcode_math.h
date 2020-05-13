@@ -88,6 +88,12 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
 /**
  * Macros returning their result as an argument
  */
+#define GCODE_MATH_SWAP(_a, _b) { \
+        gfloat_t _x; \
+        _x = _a; \
+        _a = _b; \
+        _b = _x; }
+
 #define GCODE_MATH_VEC2D_SET(_v, _x, _y) { \
         _v[0] = _x; \
         _v[1] = _y; }

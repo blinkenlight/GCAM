@@ -49,7 +49,7 @@ void gcode_drill_holes_save (gcode_block_t *block, FILE *fh);
 void gcode_drill_holes_load (gcode_block_t *block, FILE *fh);
 void gcode_drill_holes_make (gcode_block_t *block);
 void gcode_drill_holes_draw (gcode_block_t *block, gcode_block_t *selected);
-void gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode);
 void gcode_drill_holes_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_drill_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_drill_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
