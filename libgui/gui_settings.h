@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,10 +30,16 @@ static const char *GCODE_XML_SETTINGS_FILENAME = "settings.xml";
 static const char *GCODE_XML_TAG_SETTING = "setting";
 
 static const char *GCODE_XML_ATTR_SETTING_VOXEL_RESOLUTION = "voxel-resolution";
+static const char *GCODE_XML_ATTR_SETTING_CURVE_SEGMENTS = "curve-segments";
+static const char *GCODE_XML_ATTR_SETTING_ROUGHING_OVERLAP = "roughing-overlap";
+static const char *GCODE_XML_ATTR_SETTING_PADDING_FRACTION = "padding-fraction";
 
 typedef struct gui_settings_s
 {
   int voxel_resolution;
+  int curve_segments;
+  gfloat_t roughing_overlap;
+  gfloat_t padding_fraction;
 } gui_settings_t;
 
 void gui_settings_init (gui_settings_t *settings);

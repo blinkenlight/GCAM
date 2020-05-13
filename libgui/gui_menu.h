@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,6 +52,7 @@ static GtkActionEntry gui_menu_entries[] = {
   { "Duplicate",                   GTK_STOCK_COPY,                    "_Duplicate",                   "<control>D",        "Duplicate",                        G_CALLBACK (gui_menu_edit_duplicate_menuitem_callback) },
   { "Translate",                   GCAM_STOCK_EDIT_TRANSLATE,         "_Translate",                   "<alt><control>T",   "Translate",                        G_CALLBACK (gui_menu_edit_move_menuitem_callback) },
   { "Rotate",                      GCAM_STOCK_EDIT_ROTATE,            "_Rotate",                      "<alt><control>R",   "Rotate",                           G_CALLBACK (gui_menu_edit_spin_menuitem_callback) },
+  { "Mirror",                      GCAM_STOCK_EDIT_MIRROR,            "_Mirror",                      "<alt><control>M",   "Mirror",                           G_CALLBACK (gui_menu_edit_flip_menuitem_callback) },
   { "Scale",                       GCAM_STOCK_EDIT_SCALE,             "_Scale",                       "<alt><control>S",   "Scale",                            G_CALLBACK (gui_menu_edit_scale_menuitem_callback) },
   { "Attract Previous",            GCAM_STOCK_EDIT_ATTRACT_PREV,      "Attract _Previous",            "<alt><control>P",   "Attract Previous",                 G_CALLBACK (gui_menu_edit_attract_previous_menuitem_callback) },
   { "Attract Next",                GCAM_STOCK_EDIT_ATTRACT_NEXT,      "Attract _Next",                "<alt><control>N",   "Attract Next",                     G_CALLBACK (gui_menu_edit_attract_next_menuitem_callback) },
@@ -76,11 +77,12 @@ static GtkActionEntry gui_menu_entries[] = {
   { "ViewMenu",                    NULL,                              "_View" },
   { "Perspective",                 GCAM_STOCK_VIEW_PERSPECTIVE,       "_Perspective",                 NULL,                "View Perspective",                 G_CALLBACK (gui_menu_view_perspective_menuitem_callback) },
   { "Orthographic",                GCAM_STOCK_VIEW_ORTHOGRAPHIC,      "_Orthographic",                NULL,                "View Orthographic",                G_CALLBACK (gui_menu_view_orthographic_menuitem_callback) },
-  { "Top",                         GCAM_STOCK_VIEW_TOP,               "_Top",                         NULL,                "View Top",                         G_CALLBACK (gui_menu_view_top_menuitem_callback) },
-  { "Left",                        GCAM_STOCK_VIEW_LEFT,              "_Left",                        NULL,                "View Left",                        G_CALLBACK (gui_menu_view_left_menuitem_callback) },
-  { "Right",                       GCAM_STOCK_VIEW_RIGHT,             "_Right",                       NULL,                "View Right",                       G_CALLBACK (gui_menu_view_right_menuitem_callback) },
-  { "Front",                       GCAM_STOCK_VIEW_FRONT,             "_Front",                       NULL,                "View Front",                       G_CALLBACK (gui_menu_view_front_menuitem_callback) },
-  { "Back",                        GCAM_STOCK_VIEW_BACK,              "_Back",                        NULL,                "View Back",                        G_CALLBACK (gui_menu_view_back_menuitem_callback) },
+  { "Iso",                         GCAM_STOCK_VIEW_ISO,               "_Iso",                         "<alt>0",            "View Iso",                         G_CALLBACK (gui_menu_view_iso_menuitem_callback) },
+  { "Top",                         GCAM_STOCK_VIEW_TOP,               "_Top",                         "<alt>1",            "View Top",                         G_CALLBACK (gui_menu_view_top_menuitem_callback) },
+  { "Left",                        GCAM_STOCK_VIEW_LEFT,              "_Left",                        "<alt>2",            "View Left",                        G_CALLBACK (gui_menu_view_left_menuitem_callback) },
+  { "Right",                       GCAM_STOCK_VIEW_RIGHT,             "_Right",                       "<alt>3",            "View Right",                       G_CALLBACK (gui_menu_view_right_menuitem_callback) },
+  { "Front",                       GCAM_STOCK_VIEW_FRONT,             "_Front",                       "<alt>4",            "View Front",                       G_CALLBACK (gui_menu_view_front_menuitem_callback) },
+  { "Back",                        GCAM_STOCK_VIEW_BACK,              "_Back",                        "<alt>5",            "View Back",                        G_CALLBACK (gui_menu_view_back_menuitem_callback) },
   { "RenderMenu",                  NULL,                              "_Render" },
   { "FinalPart",                   GTK_STOCK_EXECUTE,                 "_Final Part",                  "<control>F",        "Render Final Part",                G_CALLBACK (gui_menu_view_render_final_part_menuitem_callback) },
   { "HelpMenu",                    NULL,                              "_Help" },
@@ -113,6 +115,7 @@ static const char *gui_menu_description =
 "      <separator/>"
 "      <menuitem action='Translate'/>"
 "      <menuitem action='Rotate'/>"
+"      <menuitem action='Mirror'/>"
 "      <menuitem action='Scale'/>"
 "      <separator/>"
 "      <menuitem action='Attract Previous'/>"
@@ -152,6 +155,7 @@ static const char *gui_menu_description =
 "      <menuitem action='Perspective'/>"
 "      <menuitem action='Orthographic'/>"
 "      <separator/>"
+"      <menuitem action='Iso'/>"
 "      <menuitem action='Top'/>"
 "      <menuitem action='Left'/>"
 "      <menuitem action='Right'/>"

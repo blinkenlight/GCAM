@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *first_block, gcode_blo
   gcode_t *gcode;
   gcode_block_t *index_block;
   gcode_pocket_row_t *row;
-  gfloat_t x_array[64], y;
+  gfloat_t x_array[1024], y;
   uint32_t x_index, i;
   gfloat_t y_min, y_max;
   gfloat_t y_resolution;
@@ -67,7 +67,7 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *first_block, gcode_blo
   pocket->first_block = first_block;
   pocket->final_block = final_block;
 
-  y_resolution = pocket->tool->diameter * 0.5;
+  y_resolution = pocket->tool->diameter * (1 - gcode->roughing_overlap);
 
   /**
    * Call eval on each block and get the x values. Next, sort the x values.
@@ -93,7 +93,7 @@ gcode_pocket_prep (gcode_pocket_t *pocket, gcode_block_t *first_block, gcode_blo
 
     index_block = first_block;
 
-    while (index_block != final_block)
+    while ((index_block != final_block) && (x_index < MAX_ELEMENTS (x_array) - 2))
     {
       index_block->eval (index_block, y, x_array, &x_index);
       index_block = index_block->next;
@@ -140,8 +140,8 @@ now_at_depth (gcode_pocket_t *pocket, gfloat_t z)
 /**
  * This returns a TRUE/FALSE determination of whether it is possible to travel
  * from the current tool position (stored in the gcode of the pocket's target)
- * to (x,y) in a straight line without ever hitting the contour of 'pocket'; 
- * unfortunately, finding that out that implies intersecting every segment of 
+ * to (x,y) in a straight line without ever hitting the contour of 'pocket';
+ * unfortunately, finding that out that implies intersecting every segment of
  * the contour with the line starting where the tool is and ending in (x,y);
  * NOTE: pockets are created ('prepped') based on a list of blocks that are
  * already offset according to the depth 'z' the pocket is meant to be milled
@@ -231,7 +231,7 @@ pocket_make_traditional (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z)
 
   travel_z = block->gcode->ztraverse;
 
-  padding = pocket->tool->diameter * PADDING_FRACTION;
+  padding = pocket->tool->diameter * block->gcode->padding_fraction;
 
   if (pocket->seg_count == 0)                                                   // Return if no pocketing is to occur
     return;
@@ -261,7 +261,7 @@ pocket_make_traditional (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z)
           continue;
 
         /**
-         * This retract exists because it is not guaranteed that the next pass 
+         * This retract exists because it is not guaranteed that the next pass
          * of the zig-zag will not remove material that should remain, e.g.
          * +---------------+
          * +---*********---+
@@ -322,7 +322,7 @@ pocket_make_alternate_1 (gcode_pocket_t *pocket, gfloat_t z, gfloat_t touch_z)
 
   travel_z = block->gcode->ztraverse;
 
-  padding = pocket->tool->diameter * PADDING_FRACTION;
+  padding = pocket->tool->diameter * block->gcode->padding_fraction;
 
   if (pocket->seg_count == 0)                                                   // Return if no pocketing is to occur
     return;

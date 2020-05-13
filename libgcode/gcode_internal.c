@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@ gcode_internal_init (gcode_block_t *block, gcode_t *gcode, gcode_block_t *parent
   block->length = NULL;
   block->move = NULL;
   block->spin = NULL;
+  block->flip = NULL;
   block->scale = NULL;
   block->parse = NULL;
   block->clone = NULL;

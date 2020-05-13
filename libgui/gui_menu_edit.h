@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,10 +25,14 @@
 
 #include <gtk/gtk.h>
 
+static const char *GCAM_TTIP_SPIN_ROTATE_ABOUT = "Warning: this value is relative to the origin of the currently selected object";
+static const char *GCAM_TTIP_FLIP_MIRROR_POINT = "Warning: this value is relative to the origin of the currently selected object";
+
 void gui_menu_edit_remove_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_duplicate_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_move_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_spin_menuitem_callback (GtkWidget *widget, gpointer data);
+void gui_menu_edit_flip_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_scale_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_attract_previous_menuitem_callback (GtkWidget *widget, gpointer data);
 void gui_menu_edit_attract_next_menuitem_callback (GtkWidget *widget, gpointer data);

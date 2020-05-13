@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@ gcode_drill_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *pa
   (*block)->aabb = gcode_drill_holes_aabb;
   (*block)->move = gcode_drill_holes_move;
   (*block)->spin = gcode_drill_holes_spin;
+  (*block)->flip = gcode_drill_holes_flip;
   (*block)->scale = gcode_drill_holes_scale;
   (*block)->parse = gcode_drill_holes_parse;
   (*block)->clone = gcode_drill_holes_clone;
@@ -606,11 +607,11 @@ gcode_drill_holes_draw (gcode_block_t *block, gcode_block_t *selected)
  */
 
 void
-gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_block_t *index_block;
   gcode_tool_t *tool;
-  gcode_point_t *point;
+  gcode_vec2d_t center;
   gfloat_t radius;
 
   tool = gcode_tool_find (block);                                               // Find the tool that applies to this block;
@@ -620,34 +621,37 @@ gcode_drill_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t m
   min[0] = min[1] = 1;                                                          // Confuse the hell out of anyone who's not paying attention properly;
   max[0] = max[1] = 0;
 
+  if ((mode != GCODE_GET) && (mode != GCODE_GET_WITH_OFFSET))
+    return;
+
   index_block = block->listhead;
 
   while (index_block)
   {
     if (index_block->type == GCODE_TYPE_POINT)                                  // This not being true should never happen either (to a d... oops, sorry);
     {
-      point = (gcode_point_t *)index_block->pdata;
+      gcode_point_center (index_block, center, mode);
 
       if ((min[0] > max[0]) || (min[1] > max[1]))                               // If bounds were inside-out (unset), accept the hole directly;
       {
-        min[0] = point->p[0] - radius;
-        max[0] = point->p[0] + radius;
-        min[1] = point->p[1] - radius;
-        max[1] = point->p[1] + radius;
+        min[0] = center[0] - radius;
+        max[0] = center[0] + radius;
+        min[1] = center[1] - radius;
+        max[1] = center[1] + radius;
       }
       else                                                                      // If bounds are already valid (set), look for holes not inside;
       {
-        if (point->p[0] - radius < min[0])
-          min[0] = point->p[0] - radius;
+        if (center[0] - radius < min[0])
+          min[0] = center[0] - radius;
 
-        if (point->p[0] + radius > max[0])
-          max[0] = point->p[0] + radius;
+        if (center[0] + radius > max[0])
+          max[0] = center[0] + radius;
 
-        if (point->p[1] - radius < min[1])
-          min[1] = point->p[1] - radius;
+        if (center[1] - radius < min[1])
+          min[1] = center[1] - radius;
 
-        if (point->p[1] + radius > max[1])
-          max[1] = point->p[1] + radius;
+        if (center[1] + radius > max[1])
+          max[1] = center[1] + radius;
       }
     }
 
@@ -682,6 +686,22 @@ gcode_drill_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angl
   {
     if (index_block->spin)
       index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_drill_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_block_t *index_block;
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->flip)
+      index_block->flip (index_block, datum, angle);
 
     index_block = index_block->next;
   }

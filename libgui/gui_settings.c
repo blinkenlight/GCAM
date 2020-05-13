@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,10 @@
 void
 gui_settings_init (gui_settings_t *settings)
 {
-  settings->voxel_resolution = 250;
+  settings->voxel_resolution = 1000;
+  settings->curve_segments = 50;
+  settings->roughing_overlap = 0.5;
+  settings->padding_fraction = 0.1;
 }
 
 void
@@ -73,6 +76,33 @@ start (void *data, const char *xmlelem, const char **xmlattr)
       if (strcmp (name, GCODE_XML_ATTR_SETTING_VOXEL_RESOLUTION) == 0)
       {
         settings->voxel_resolution = atoi (value);
+      }
+
+      if (strcmp (name, GCODE_XML_ATTR_SETTING_CURVE_SEGMENTS) == 0)
+      {
+        settings->curve_segments = atoi (value);
+
+        if (settings->curve_segments < 1)
+          settings->curve_segments = 1;
+      }
+
+      if (strcmp (name, GCODE_XML_ATTR_SETTING_ROUGHING_OVERLAP) == 0)
+      {
+        settings->roughing_overlap = atof (value);
+
+        if (settings->roughing_overlap < 0.0)
+          settings->roughing_overlap = 0.0;
+
+        if (settings->roughing_overlap > 0.9)
+          settings->roughing_overlap = 0.9;
+      }
+
+      if (strcmp (name, GCODE_XML_ATTR_SETTING_PADDING_FRACTION) == 0)
+      {
+        settings->padding_fraction = atof (value);
+
+        if (settings->padding_fraction < 0.0)
+          settings->padding_fraction = 0.0;
       }
     }
   }

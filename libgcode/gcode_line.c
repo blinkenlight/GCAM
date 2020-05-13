@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,6 +44,7 @@ gcode_line_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->length = gcode_line_length;
   (*block)->move = gcode_line_move;
   (*block)->spin = gcode_line_spin;
+  (*block)->flip = gcode_line_flip;
   (*block)->scale = gcode_line_scale;
   (*block)->parse = gcode_line_parse;
   (*block)->clone = gcode_line_clone;
@@ -343,7 +344,7 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
   switch (mode)
   {
     case GCODE_GET:
-
+    {
       p0[0] = line->p0[0];
       p0[1] = line->p0[1];
 
@@ -351,9 +352,10 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = line->p1[1];
 
       break;
+    }
 
     case GCODE_SET:
-
+    {
       line->p0[0] = p0[0];
       line->p0[1] = p0[1];
 
@@ -361,14 +363,19 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       line->p1[1] = p1[1];
 
       break;
+    }
 
     case GCODE_GET_WITH_OFFSET:
-
+    {
       gcode_line_with_offset (block, p0, p1, normal);
 
       break;
+    }
 
     case GCODE_GET_NORMAL:
+    {
+      if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
+        return (1);
 
       gcode_line_with_offset (block, p0, p1, normal);
 
@@ -378,8 +385,12 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = normal[1];
 
       break;
+    }
 
     case GCODE_GET_TANGENT:
+    {
+      if (GCODE_MATH_2D_MANHATTAN (line->p0, line->p1) < GCODE_PRECISION)
+        return (1);
 
       p0[0] = line->p1[0] - line->p0[0];
       p0[1] = line->p1[1] - line->p0[1];
@@ -390,6 +401,23 @@ gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8
       p1[1] = p0[1];
 
       break;
+    }
+
+    case GCODE_GET_ALPHA:
+    {
+      p0[0] = p1[0] = line->p0[0];
+      p0[1] = p1[1] = line->p0[1];
+
+      break;
+    }
+
+    case GCODE_GET_OMEGA:
+    {
+      p0[0] = p1[0] = line->p1[0];
+      p0[1] = p1[1] = line->p1[1];
+
+      break;
+    }
 
     default:
 
@@ -434,14 +462,37 @@ gcode_line_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode)
 }
 
 void
-gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_line_t *line;
   gcode_vec2d_t p0, p1, normal;
 
   line = (gcode_line_t *)block->pdata;
 
-  gcode_line_with_offset (block, p0, p1, normal);
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      gcode_line_ends (block, p0, p1, mode);
+
+      break;
+    }
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_line_with_offset (block, p0, p1, normal);
+
+      break;
+    }
+
+    default:                                                                    // Invalid mode;
+    {
+      min[0] = min[1] = 1;                                                      // Callers should test for an inside-out aabb being returned;
+      max[0] = max[1] = 0;
+
+      return;
+    }
+  }
 
   min[0] = p0[0];
   min[1] = p0[1];
@@ -527,6 +578,36 @@ gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
 }
 
 void
+gcode_line_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)     // Flips the line around an axis through a point, not the endpoints of the line
+{
+  gcode_line_t *line;
+
+  line = (gcode_line_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    line->p0[1] -= datum[1];
+    line->p0[1] = -line->p0[1];
+    line->p0[1] += datum[1];
+
+    line->p1[1] -= datum[1];
+    line->p1[1] = -line->p1[1];
+    line->p1[1] += datum[1];
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    line->p0[0] -= datum[0];
+    line->p0[0] = -line->p0[0];
+    line->p0[0] += datum[0];
+
+    line->p1[0] -= datum[0];
+    line->p1[0] = -line->p1[0];
+    line->p1[0] += datum[0];
+  }
+}
+
+void
 gcode_line_scale (gcode_block_t *block, gfloat_t scale)
 {
   gcode_line_t *line;
@@ -606,9 +687,9 @@ gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model)
 /**
  * Based on the line data retrieved from 'block' and the offset data referenced
  * by 'block's offset pointer, calculate the endpoints of- and the normal vector
- * to a new line that is first rotated and translated by 'offset->rotation' and 
- * 'offset->origin' then also shifted "sideways" (in a direction perpendicular 
- * to the line) by 'offset->tool' plus 'offset->eval' on the side determined by 
+ * to a new line that is first rotated and translated by 'offset->rotation' and
+ * 'offset->origin' then also shifted "sideways" (in a direction perpendicular
+ * to the line) by 'offset->tool' plus 'offset->eval' on the side determined by
  * 'offset->side', such as to form a line that would be parallel with the result
  * of the original roto-translation.
  */

@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@ gcode_bolt_holes_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *par
   (*block)->aabb = gcode_bolt_holes_aabb;
   (*block)->move = gcode_bolt_holes_move;
   (*block)->spin = gcode_bolt_holes_spin;
+  (*block)->flip = gcode_bolt_holes_flip;
   (*block)->scale = gcode_bolt_holes_scale;
   (*block)->parse = gcode_bolt_holes_parse;
   (*block)->clone = gcode_bolt_holes_clone;
@@ -177,8 +178,6 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   safe_z = block->gcode->ztraverse;                                             // This is just a short-hand for the traverse z...
 
-  touch_z = block->gcode->material_origin[2];                                   // Track the depth the material begins at (gets lower after every pass);
-
   if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)      // Start of drill cycle (G81 - if the tool can create the holes by drilling);
   {
     if (block->gcode->drilling_motion == GCODE_DRILLING_CANNED)
@@ -193,6 +192,8 @@ gcode_bolt_holes_make (gcode_block_t *block)
 
   while (index_block)                                                           // Keep looping as long as the list lasts, one hole per loop;
   {
+    touch_z = block->gcode->material_origin[2];                                 // Track the depth the material begins at (gets lower after every pass);
+
     if (fabs (bolt_holes->hole_diameter - tool->diameter) < GCODE_PRECISION)    // See if the hole can be created by drilling with this tool;
     {
       if (index_block->type == GCODE_TYPE_ARC)                                  // This should always be true - there can only be arcs here...
@@ -541,7 +542,7 @@ gcode_bolt_holes_parse (gcode_block_t *block, const char **xmlattr)
  * NOTE: in case you're wondering, the "CTRL-click on a hole to select its row
  * in the tree view" still works because rebuilding the arcs the holes consist
  * of gets them renamed to the name of the bolt_holes, and 'snapshots' preserve
- * the name of their original - so all arcs drawn get actually tagged with the 
+ * the name of their original - so all arcs drawn get actually tagged with the
  * name of the bolt_holes block, and therefore can select it when clicked on.
  */
 
@@ -628,12 +629,12 @@ gcode_bolt_holes_draw (gcode_block_t *block, gcode_block_t *selected)
  * Construct the axis-aligned bounding box of all the holes in the bolt holes;
  * NOTE: this can and does return an "imposible" or "inside-out" bounding box
  * which has its minimum larger than its maximum as a sign of failure to pick
- * up any valid holes, if either the list is empty or none of the members are 
+ * up any valid holes, if either the list is empty or none of the members are
  * arcs (there should ONLY be arcs) - THIS SHOULD BE TESTED FOR ON RETURN!
  */
 
 void
-gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_block_t *index_block;
   gcode_bolt_holes_t *bolt_holes;
@@ -647,13 +648,16 @@ gcode_bolt_holes_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t ma
   min[0] = min[1] = 1;
   max[0] = max[1] = 0;
 
+  if ((mode != GCODE_GET) && (mode != GCODE_GET_WITH_OFFSET))
+    return;
+
   index_block = block->listhead;
 
   while (index_block)
   {
     if (index_block->type == GCODE_TYPE_ARC)
     {
-      gcode_arc_center (index_block, center, GCODE_GET);
+      gcode_arc_center (index_block, center, mode);
 
       if ((min[0] > max[0]) || (min[1] > max[1]))                               // If bounds were inside-out (unset), accept the hole directly;
       {
@@ -711,6 +715,47 @@ gcode_bolt_holes_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle
 
   bolt_holes->offset_angle += angle;
   GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+
+  gcode_bolt_holes_rebuild (block);
+}
+
+void
+gcode_bolt_holes_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_bolt_holes_t *bolt_holes;
+  gfloat_t delta;
+
+  bolt_holes = (gcode_bolt_holes_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    delta = (bolt_holes->number[1] - 1) * bolt_holes->offset_distance;          // We need this because the origin of a bolt hole matrix is NOT in its center
+
+    bolt_holes->position[1] -= datum[1];
+    bolt_holes->position[1] = -bolt_holes->position[1];
+    bolt_holes->position[1] += datum[1];
+
+    if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)                       // Without this little trick the mirror will be correct but NOT what we wanted
+      bolt_holes->position[1] -= delta;
+
+    bolt_holes->offset_angle = 360 - bolt_holes->offset_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    delta = (bolt_holes->number[0] - 1) * bolt_holes->offset_distance;          // We need this because the origin of a bolt hole matrix is NOT in its center
+
+    bolt_holes->position[0] -= datum[0];
+    bolt_holes->position[0] = -bolt_holes->position[0];
+    bolt_holes->position[0] += datum[0];
+
+    if (bolt_holes->type == GCODE_BOLT_HOLES_TYPE_MATRIX)                       // Without this little trick the mirror will be correct but NOT what we wanted
+      bolt_holes->position[0] -= delta;
+
+    bolt_holes->offset_angle = 180 - bolt_holes->offset_angle;
+    GCODE_MATH_WRAP_TO_360_DEGREES (bolt_holes->offset_angle);
+  }
 
   gcode_bolt_holes_rebuild (block);
 }

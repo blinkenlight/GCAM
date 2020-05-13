@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,9 +34,11 @@
 #define GCODE_INCH2MM           25.4
 #define GCODE_TOLERANCE          0.00001                                        /* Connectivity */
 #define GCODE_PRECISION          0.00001                                        /* Cartesian */
-#define GCODE_ANGULAR_PRECISION  0.0001                                         /* Angular Degrees */
+#define GCODE_ANGULAR_PRECISION  0.001                                          /* Angular Degrees */
 #define GCODE_RAD2DEG           57.29577951308232
 #define GCODE_DEG2RAD            0.017453292519943295
+
+#define GCODE_PRECISION_FLOOR   DBL_EPSILON * 1000                              /* Precision Drift */
 
 #define gfloat_t double
 
@@ -55,6 +57,9 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
 
 #define GCODE_MATH_IS_EQUAL(_a, _b) \
         (fabs (_a - _b) < GCODE_PRECISION)
+
+#define GCODE_MATH_DIFFERENCE(_a, _b) \
+        (fabs (_a - _b))
 
 #define GCODE_MATH_1D_DISTANCE(_a, _b) \
         (fabs (_a - _b))
@@ -83,6 +88,12 @@ void gcode_math_xy_to_angle (gcode_vec2d_t center, gcode_vec2d_t point, gfloat_t
 /**
  * Macros returning their result as an argument
  */
+#define GCODE_MATH_SWAP(_a, _b) { \
+        gfloat_t _x; \
+        _x = _a; \
+        _a = _b; \
+        _b = _x; }
+
 #define GCODE_MATH_VEC2D_SET(_v, _x, _y) { \
         _v[0] = _x; \
         _v[1] = _y; }

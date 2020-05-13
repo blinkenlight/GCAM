@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -26,9 +26,6 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <expat.h>
-
-// Number of segments to use to approximate curves other than a circular arc;
-#define CURVESEGMENTS 50
 
 /**
  * Convert a center-defined elliptic arc into an endpoint-defined one.
@@ -303,12 +300,15 @@ static int
 gcode_svg_create_elliptic_arc (void *context, double pt0[], double pt1[], double rx, double ry, double phi, int fla, int fls)
 {
   double t;
+  int segments;
   int n, items = 0;
 
   gcode_arc_by_points_t arc1;
   gcode_arc_by_center_t arc2;
 
   gcode_svg_t *svg = (gcode_svg_t *) context;                                   // First things first: retrieve a reference to the SVG context;
+
+  segments = svg->gcode->curve_segments;                                        // Retrieve the number of segments used to approximate a curve;
 
   if ((pt0[0] == pt1[0]) && (pt0[1] == pt1[1]))                                 // Standard SVG bailout (SVG Implementation Notes - F.6.2);
   {
@@ -347,11 +347,11 @@ gcode_svg_create_elliptic_arc (void *context, double pt0[], double pt1[], double
     }
     else                                                                        // If the arc is indeed elliptic, we must approximate it with lines;
     {
-      arc2.sweep /= CURVESEGMENTS;                                              // Reduce the sweep of the conversion result to a fraction of itself;
+      arc2.sweep /= segments;                                                   // Reduce the sweep of the conversion result to a fraction of itself;
 
-      for (n = 1; n <= CURVESEGMENTS; n++)                                      // Create a bunch of consecutive sub-arcs with that fractional sweep;
+      for (n = 1; n <= segments; n++)                                           // Create a bunch of consecutive sub-arcs with that fractional sweep;
       {
-        t = (double)n / CURVESEGMENTS;                                          // Funnily enough, looping directly on 't' would have issues comparing to "1";
+        t = (double)n / segments;                                               // Funnily enough, looping directly on 't' would have issues comparing to "1";
 
         arc1 = gcode_arc_center_to_points (arc2);                               // Find out where the endpoints of the current sub-arc would be;
 
@@ -379,14 +379,19 @@ gcode_svg_create_quadratic_bezier (void *context, double pt0[], double pt1[], do
   double t;
   double ptA[2], ptB[2];
 
+  int segments;
   int n, items = 0;
+
+  gcode_svg_t *svg = (gcode_svg_t *) context;                                   // First things first: retrieve a reference to the SVG context;
+
+  segments = svg->gcode->curve_segments;                                        // Retrieve the number of segments used to approximate a curve;
 
   ptA[0] = pt0[0];
   ptA[1] = pt0[1];
 
-  for (n = 1; n <= CURVESEGMENTS; n++)
+  for (n = 1; n <= segments; n++)
   {
-    t = (double)n / CURVESEGMENTS;
+    t = (double)n / segments;
 
     ptB[0] = gcode_svg_quadratic_bezier (t, pt0[0], pt1[0], pt2[0]);
     ptB[1] = gcode_svg_quadratic_bezier (t, pt0[1], pt1[1], pt2[1]);
@@ -414,14 +419,19 @@ gcode_svg_create_cubic_bezier (void *context, double pt0[], double pt1[], double
   double t;
   double ptA[2], ptB[2];
 
+  int segments;
   int n, items = 0;
+
+  gcode_svg_t *svg = (gcode_svg_t *) context;                                   // First things first: retrieve a reference to the SVG context;
+
+  segments = svg->gcode->curve_segments;                                        // Retrieve the number of segments used to approximate a curve;
 
   ptA[0] = pt0[0];
   ptA[1] = pt0[1];
 
-  for (n = 1; n <= CURVESEGMENTS; n++)
+  for (n = 1; n <= segments; n++)
   {
-    t = (double)n / CURVESEGMENTS;
+    t = (double)n / segments;
 
     ptB[0] = gcode_svg_cubic_bezier (t, pt0[0], pt1[0], pt2[0], pt3[0]);
     ptB[1] = gcode_svg_cubic_bezier (t, pt0[1], pt1[1], pt2[1], pt3[1]);

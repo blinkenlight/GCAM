@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ gcode_template_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *paren
   (*block)->aabb = gcode_template_aabb;
   (*block)->move = gcode_template_move;
   (*block)->spin = gcode_template_spin;
+  (*block)->flip = gcode_template_flip;
   (*block)->scale = gcode_template_scale;
   (*block)->parse = gcode_template_parse;
   (*block)->clone = gcode_template_clone;
@@ -380,7 +381,7 @@ gcode_template_draw (gcode_block_t *block, gcode_block_t *selected)
 }
 
 void
-gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
+gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode)
 {
   gcode_block_t *index_block;
   gcode_vec2d_t tmin, tmax;
@@ -390,6 +391,9 @@ gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
   min[0] = min[1] = 1;                                                          // Never cross the streams, you say...? Oh well, too late...
   max[0] = max[1] = 0;                                                          // Callers should test for an inside-out aabb being returned;
 
+  if ((mode != GCODE_GET) && (mode != GCODE_GET_WITH_OFFSET))
+    return;
+
   while (index_block)
   {
     if (!index_block->aabb)                                                     // If the block has no bounds function, don't try to call it;
@@ -398,7 +402,7 @@ gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
       continue;
     }
 
-    index_block->aabb (index_block, tmin, tmax);
+    index_block->aabb (index_block, tmin, tmax, mode);
 
     if ((tmin[0] > tmax[0]) || (tmin[1] > tmax[1]))                             // If the block returned an inside-out box, discard the box;
     {
@@ -430,6 +434,35 @@ gcode_template_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max)
 
     index_block = index_block->next;
   }
+
+  /**
+   * The "relative" no-offset mode is useful for working with basic primitives
+   * like arcs, lines etc. but it becomes meaningless as soon as templates get
+   * involved. Merging the un-offset AABBs of objects displaced by templates at
+   * various nesting levels yields no meaningful result. Therefore, templates
+   * make no attempt to adjust AABBs retrieved in WITH_OFFSET mode, but adjust
+   * those AABBs with their own displacement in no-offset mode; this keeps them
+   * comparable even across nesting levels, always relative to the local origin
+   */
+
+  if ((mode == GCODE_GET) && (min[0] < max[0]) && (min[1] < max[1]))
+  {
+    gcode_template_t *template;
+
+    template = (gcode_template_t *)block->pdata;
+
+    GCODE_MATH_ROTATE (min, min, template->rotation);
+    GCODE_MATH_TRANSLATE (min, min, template->position);
+
+    GCODE_MATH_ROTATE (max, max, template->rotation);
+    GCODE_MATH_TRANSLATE (max, max, template->position);
+
+    if (min[0] > max[0])
+      GCODE_MATH_SWAP(min[0], max[0]);
+
+    if (min[1] > max[1])
+      GCODE_MATH_SWAP(min[1], max[1]);
+  }
 }
 
 void
@@ -452,6 +485,20 @@ void
 gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
 {
   gcode_block_t *index_block;
+  gcode_template_t *template;
+  gcode_vec2d_t reverse_shift;
+  gfloat_t reverse_spin;
+
+  template = (gcode_template_t *)block->pdata;
+
+  reverse_shift[0] = -template->position[0];
+  reverse_shift[1] = -template->position[1];
+  reverse_spin = -template->rotation;
+
+  GCODE_MATH_WRAP_TO_360_DEGREES (reverse_spin);
+
+  GCODE_MATH_TRANSLATE (datum, datum, reverse_shift);
+  GCODE_MATH_ROTATE (datum, datum, reverse_spin);
 
   index_block = block->listhead;
 
@@ -459,6 +506,49 @@ gcode_template_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
   {
     if (index_block->spin)
       index_block->spin (index_block, datum, angle);
+
+    index_block = index_block->next;
+  }
+}
+
+void
+gcode_template_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_template_t *template;
+  gcode_block_t *index_block;
+  gcode_vec2d_t origin;
+
+  template = (gcode_template_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    template->position[1] -= datum[1];
+    template->position[1] = -template->position[1];
+    template->position[1] += datum[1];
+
+    template->rotation = 360 - template->rotation;                              // The reverse of the usual angle due to further mirroring inside the template
+    GCODE_MATH_WRAP_TO_360_DEGREES(template->rotation);
+
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    template->position[0] -= datum[0];
+    template->position[0] = -template->position[0];
+    template->position[0] += datum[0];
+
+    template->rotation = 360 - template->rotation;                              // The reverse of the usual angle due to further mirroring inside the template
+    GCODE_MATH_WRAP_TO_360_DEGREES(template->rotation);
+  }
+
+  GCODE_MATH_VEC2D_SET (origin, 0, 0);
+
+  index_block = block->listhead;
+
+  while (index_block)
+  {
+    if (index_block->flip)
+      index_block->flip (index_block, origin, angle);
 
     index_block = index_block->next;
   }

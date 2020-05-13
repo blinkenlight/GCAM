@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -274,7 +274,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   material_sizex_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_X), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizex_spin), 3);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), DEFVAL_INCHES (3.0));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizex_spin), DEFVAL_INCHES (4.0));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizex_spin, 1, 2, 3, 4);
 
   g_signal_connect_swapped (material_sizex_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -288,7 +288,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   material_sizez_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.01), DEFVAL_INCHES (MAX_DIM_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (material_sizez_spin), 3);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), DEFVAL_INCHES (0.25));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (material_sizez_spin), DEFVAL_INCHES (0.2));
   gtk_table_attach_defaults (GTK_TABLE (table), material_sizez_spin, 3, 4, 3, 4);
 
   g_signal_connect_swapped (material_sizez_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -322,7 +322,7 @@ new_project_create_page1 (GtkWidget *assistant, gpointer data)
 
   ztraverse_spin = gtk_spin_button_new_with_range (DEFVAL_INCHES (0.0), DEFVAL_INCHES (MAX_CLR_Z), DEFVAL_INCHES (0.01));
   gtk_spin_button_set_digits (GTK_SPIN_BUTTON (ztraverse_spin), 2);
-  gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.05));
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (ztraverse_spin), DEFVAL_INCHES (0.4));
   gtk_table_attach (GTK_TABLE (table), ztraverse_spin, 1, 4, 5, 6, GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
   g_signal_connect_swapped (ztraverse_spin, "activate", G_CALLBACK (gtk_window_activate_default), assistant);
@@ -1451,7 +1451,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
 
   gcode_template_init (&template_block, &gui->gcode, NULL);                     // Create a new template block to import things into;
 
-  sprintf (template_block->comment, "Gerber layer from '%s'", basename ((char *)filename));
+  snprintf (template_block->comment, sizeof (template_block->comment), "Gerber layer from '%s'", basename ((char *)filename));    // Create a block comment that mentions the filename;
 
   gcode_tool_init (&tool_block, &gui->gcode, template_block);                   // Create a new tool to perform the etching with,
 
@@ -1520,7 +1520,7 @@ gerber_on_assistant_apply (GtkWidget *assistant, gpointer data)
   }
 
   /* Get the bounding box for the template */
-  template_block->aabb (template_block, aabb_min, aabb_max);
+  template_block->aabb (template_block, aabb_min, aabb_max, GCODE_GET);
 
   /* Extend material size and/or move origin if anything spills over */
   if ((aabb_min[0] < aabb_max[0]) && (aabb_min[1] < aabb_max[1]))
@@ -1826,24 +1826,39 @@ gerber_create_page2 (GtkWidget *assistant, gpointer data)
   gtk_box_pack_start (GTK_BOX (vbox2), hbox3, FALSE, FALSE, 0);                 // 'vbox2' cell 3 <- horizontal box 'hbox3'
 
   {
+    gui_endmill_t *endmill;
+    gfloat_t tool_diameter;
+    gfloat_t min_diameter;
     char string[32];
-    int i;
+    int i, j, k;
 
     label = gtk_label_new ("End Mill");
     gtk_box_pack_start (GTK_BOX (hbox1), label, TRUE, TRUE, 0);                 // 'hbox1' cell 1 <- label 'label'
 
     tool_combo = gtk_combo_box_new_text ();
 
-    for (i = 0; i < gui->endmills.number; i++)
+    for (i = j = k = 0; i < gui->endmills.number; i++)
     {
-      if (gui->endmills.endmill[i].origin == GUI_ENDMILL_INTERNAL)
+      endmill = &(gui->endmills.endmill[i]);
+
+      if (endmill->origin == GUI_ENDMILL_INTERNAL)
       {
-        sprintf (string, "T%.2d - %s", gui->endmills.endmill[i].number, gui->endmills.endmill[i].description);
+        tool_diameter = gui_endmills_size (endmill, gui->gcode.units);
+
+        if ( k == 0 || tool_diameter < min_diameter)
+        {
+          min_diameter = tool_diameter;
+          k = j;
+        }
+
+        sprintf (string, "T%.2d - %s", endmill->number, endmill->description);
         gtk_combo_box_append_text (GTK_COMBO_BOX (tool_combo), string);
+
+        j++;
       }
     }
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), 0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX (tool_combo), k);
     gtk_box_pack_start (GTK_BOX (hbox1), tool_combo, TRUE, TRUE, 0);            // 'hbox1' cell 2 <- combo 'tool_combo'
   }
 
@@ -2105,7 +2120,7 @@ gui_menu_file_import_excellon_menuitem_callback (GtkWidget *widget, gpointer dat
       return;
     }
 
-    sprintf (template_block->comment, "Excellon layer from '%s'", basename ((char *)filename)); // Create a block comment that mentions the filename;
+    snprintf (template_block->comment, sizeof (template_block->comment), "Excellon layer from '%s'", basename ((char *)filename));    // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 
@@ -2212,7 +2227,7 @@ gui_menu_file_import_svg_menuitem_callback (GtkWidget *widget, gpointer data)
       return;
     }
 
-    sprintf (template_block->comment, "SVG layer from '%s'", basename ((char *)filename));      // Create a block comment that mentions the filename;
+    snprintf (template_block->comment, sizeof (template_block->comment), "SVG layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 
@@ -2317,7 +2332,7 @@ gui_menu_file_import_stl_menuitem_callback (GtkWidget *widget, gpointer data)
       return;
     }
 
-    sprintf (stl_block->comment, "STL layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
+    snprintf (stl_block->comment, sizeof (stl_block->comment), "STL layer from '%s'", basename ((char *)filename));   // Create a block comment that mentions the filename;
 
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (gui->gcode_block_treeview));        // Retrieve a reference to the model of the main GUI tree view;
 

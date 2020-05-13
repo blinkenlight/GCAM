@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -112,6 +112,9 @@ insert_aperture (int *aperture_count, gcode_gerber_aperture_t **aperture_set, ui
 
 /**
  * Insert an exposure spot into the "exposure table", but only if it's a NEW one
+ * NOTE: we actually allow for two exposures with the same size and position to
+ * be added if they are of different type: polygon-fill-based pads typically do
+ * come with a circular pad right under them, we need to allow both to be there
  */
 
 static int
@@ -120,16 +123,18 @@ insert_exposure (int *exposure_count, gcode_gerber_exposure_t **exposure_set, gc
   int i;
 
   for (i = 0; i < *exposure_count; i++)
-    if (GCODE_MATH_IS_EQUAL ((*exposure_set)[i].v[0], aperture->v[0]))
-      if (GCODE_MATH_IS_EQUAL ((*exposure_set)[i].v[1], aperture->v[1]))
-        if (GCODE_MATH_2D_DISTANCE ((*exposure_set)[i].pos, p) < GCODE_PRECISION)
-          return (1);
+    if ((*exposure_set)[i].type == aperture->type)
+      if (GCODE_MATH_IS_EQUAL ((*exposure_set)[i].v[0], aperture->v[0]))
+        if (GCODE_MATH_IS_EQUAL ((*exposure_set)[i].v[1], aperture->v[1]))
+          if (GCODE_MATH_2D_DISTANCE ((*exposure_set)[i].pos, p) < GCODE_PRECISION)
+            return (1);
 
   *exposure_set = realloc (*exposure_set, (*exposure_count + 1) * sizeof (gcode_gerber_exposure_t));
 
   (*exposure_set)[*exposure_count].type = aperture->type;
   (*exposure_set)[*exposure_count].v[0] = aperture->v[0];
   (*exposure_set)[*exposure_count].v[1] = aperture->v[1];
+  (*exposure_set)[*exposure_count].r = aperture->r;
   (*exposure_set)[*exposure_count].pos[0] = p[0];
   (*exposure_set)[*exposure_count].pos[1] = p[1];
 
@@ -279,6 +284,410 @@ insert_trace_elbow (int *trace_elbow_count, gcode_vec3d_t **trace_elbow_set, gco
 }
 
 /**
+ * Create an exposure spot as a contour of code blocks under 'sketch_block'
+ * NOTE: we actually allow for two exposures with the same size and position to
+ * be added if they are of different type: polygon-fill-based pads typically do
+ * come with a circular pad right under them, we need to allow both to be there
+ */
+
+static int
+create_exposure (gcode_block_t *sketch_block, gcode_gerber_aperture_t *aperture, gcode_vec2d_t p)
+{
+  switch (aperture->type)
+  {
+    case GCODE_GERBER_APERTURE_TYPE_CIRCLE:
+    {
+      gcode_block_t *arc_block;
+      gcode_arc_t *arc;
+      gfloat_t diameter;
+
+      diameter = aperture->v[0];
+
+      /* arc 1 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc = (gcode_arc_t *)arc_block->pdata;
+
+      arc->radius = 0.5 * diameter;
+      arc->p[0] = p[0];
+      arc->p[1] = p[1] + arc->radius;
+      arc->start_angle = 90.0;
+      arc->sweep_angle = -360.0;
+
+      break;
+    }
+
+    case GCODE_GERBER_APERTURE_TYPE_RECTANGLE:
+    {
+      gcode_block_t *line_block;
+      gcode_line_t *line;
+      gfloat_t width, height;
+
+      width = aperture->v[0];
+      height = aperture->v[1];
+
+      /* Line 1 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line = (gcode_line_t *)line_block->pdata;
+
+      line->p0[0] = p[0] - 0.5 * width;
+      line->p0[1] = p[1] + 0.5 * height;
+      line->p1[0] = p[0] + 0.5 * width;
+      line->p1[1] = p[1] + 0.5 * height;
+
+      /* Line 2 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line = (gcode_line_t *)line_block->pdata;
+
+      line->p0[0] = p[0] + 0.5 * width;
+      line->p0[1] = p[1] + 0.5 * height;
+      line->p1[0] = p[0] + 0.5 * width;
+      line->p1[1] = p[1] - 0.5 * height;
+
+      /* Line 3 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line = (gcode_line_t *)line_block->pdata;
+
+      line->p0[0] = p[0] + 0.5 * width;
+      line->p0[1] = p[1] - 0.5 * height;
+      line->p1[0] = p[0] - 0.5 * width;
+      line->p1[1] = p[1] - 0.5 * height;
+
+      /* Line 4 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line = (gcode_line_t *)line_block->pdata;
+
+      line->p0[0] = p[0] - 0.5 * width;
+      line->p0[1] = p[1] - 0.5 * height;
+      line->p1[0] = p[0] - 0.5 * width;
+      line->p1[1] = p[1] + 0.5 * height;
+
+      break;
+    }
+
+    case GCODE_GERBER_APERTURE_TYPE_OBROUND:
+    {
+      gcode_block_t *line_block;
+      gcode_block_t *arc_block;
+      gcode_line_t *line1, *line2;
+      gcode_arc_t *arc1, *arc2;
+      gfloat_t width, height;
+
+      /* arc 1 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc1 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 1 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line1 = (gcode_line_t *)line_block->pdata;
+
+      /* arc 2 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc2 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 2 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line2 = (gcode_line_t *)line_block->pdata;
+
+      width = aperture->v[0];
+      height = aperture->v[1];
+
+      if (width > height)
+      {
+        arc1->p[0] = p[0] + 0.5 * (width - height);
+        arc1->p[1] = p[1] + 0.5 * height;
+        arc1->start_angle = 90.0;
+        arc1->sweep_angle = -180.0;
+        arc1->radius = 0.5 * height;
+
+        arc2->p[0] = p[0] - 0.5 * (width - height);
+        arc2->p[1] = p[1] - 0.5 * height;
+        arc2->start_angle = 270.0;
+        arc2->sweep_angle = -180.0;
+        arc2->radius = 0.5 * height;
+
+        line1->p0[0] = p[0] + 0.5 * (width - height);
+        line1->p0[1] = p[1] - 0.5 * height;
+        line1->p1[0] = p[0] - 0.5 * (width - height);
+        line1->p1[1] = p[1] - 0.5 * height;
+
+        line2->p0[0] = p[0] - 0.5 * (width - height);
+        line2->p0[1] = p[1] + 0.5 * height;
+        line2->p1[0] = p[0] + 0.5 * (width - height);
+        line2->p1[1] = p[1] + 0.5 * height;
+      }
+      else
+      {
+        arc1->p[0] = p[0] + 0.5 * width;
+        arc1->p[1] = p[1] - 0.5 * (height - width);
+        arc1->start_angle = 0.0;
+        arc1->sweep_angle = -180.0;
+        arc1->radius = 0.5 * width;
+
+        arc2->p[0] = p[0] - 0.5 * width;
+        arc2->p[1] = p[1] + 0.5 * (height - width);
+        arc2->start_angle = 180.0;
+        arc2->sweep_angle = -180.0;
+        arc2->radius = 0.5 * width;
+
+        line1->p0[0] = p[0] - 0.5 * width;
+        line1->p0[1] = p[1] - 0.5 * (height - width);
+        line1->p1[0] = p[0] - 0.5 * width;
+        line1->p1[1] = p[1] + 0.5 * (height - width);
+
+        line2->p0[0] = p[0] + 0.5 * width;
+        line2->p0[1] = p[1] + 0.5 * (height - width);
+        line2->p1[0] = p[0] + 0.5 * width;
+        line2->p1[1] = p[1] - 0.5 * (height - width);
+      }
+
+      break;
+    }
+
+    case GCODE_GERBER_APERTURE_TYPE_ROUNDRECT:
+    {
+      gcode_block_t *line_block;
+      gcode_block_t *arc_block;
+      gcode_line_t *line1, *line2, *line3, *line4;
+      gcode_arc_t *arc1, *arc2, *arc3, *arc4;
+      gfloat_t width, height, radius;
+
+      /* arc 1 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc1 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 1 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line1 = (gcode_line_t *)line_block->pdata;
+
+      /* arc 2 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc2 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 2 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line2 = (gcode_line_t *)line_block->pdata;
+
+      /* arc 3 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc3 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 3 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line3 = (gcode_line_t *)line_block->pdata;
+
+      /* arc 4 */
+      gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, arc_block);
+
+      arc4 = (gcode_arc_t *)arc_block->pdata;
+
+      /* Line 4 */
+      gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+      gcode_append_as_listtail (sketch_block, line_block);
+
+      line4 = (gcode_line_t *)line_block->pdata;
+
+      width = aperture->v[0];
+      height = aperture->v[1];
+      radius = aperture->r;
+
+      arc1->p[0] = p[0] - 0.5 * width + radius;
+      arc1->p[1] = p[1] - 0.5 * height;
+      arc1->start_angle = 270.0;
+      arc1->sweep_angle = -90.0;
+      arc1->radius = radius;
+
+      arc2->p[0] = p[0] - 0.5 * width;
+      arc2->p[1] = p[1] + 0.5 * height - radius;
+      arc2->start_angle = 180.0;
+      arc2->sweep_angle = -90.0;
+      arc2->radius = radius;
+
+      arc3->p[0] = p[0] + 0.5 * width - radius;
+      arc3->p[1] = p[1] + 0.5 * height;
+      arc3->start_angle = 90.0;
+      arc3->sweep_angle = -90.0;
+      arc3->radius = radius;
+
+      arc4->p[0] = p[0] + 0.5 * width;
+      arc4->p[1] = p[1] - 0.5 * height + radius;
+      arc4->start_angle = 0.0;
+      arc4->sweep_angle = -90.0;
+      arc4->radius = radius;
+
+      line1->p0[0] = p[0] - 0.5 * width;
+      line1->p0[1] = p[1] - 0.5 * height + radius;
+      line1->p1[0] = p[0] - 0.5 * width;
+      line1->p1[1] = p[1] + 0.5 * height - radius;
+
+      line2->p0[0] = p[0] - 0.5 * width + radius;
+      line2->p0[1] = p[1] + 0.5 * height;
+      line2->p1[0] = p[0] + 0.5 * width - radius;
+      line2->p1[1] = p[1] + 0.5 * height;
+
+      line3->p0[0] = p[0] + 0.5 * width;
+      line3->p0[1] = p[1] + 0.5 * height - radius;
+      line3->p1[0] = p[0] + 0.5 * width;
+      line3->p1[1] = p[1] - 0.5 * height + radius;
+
+      line4->p0[0] = p[0] + 0.5 * width - radius;
+      line4->p0[1] = p[1] - 0.5 * height;
+      line4->p1[0] = p[0] - 0.5 * width + radius;
+      line4->p1[1] = p[1] - 0.5 * height;
+
+      break;
+    }
+
+    default:
+    {
+      return (1);
+    }
+  }
+
+  return (0);
+}
+
+/**
+ * Create a trace line as a contour of code blocks under 'sketch_block'
+ */
+
+static int
+create_trace_line (gcode_block_t *sketch_block, gcode_gerber_aperture_t *aperture, gcode_vec2d_t p0, gcode_vec2d_t p1)
+{
+  gcode_block_t *line_block;
+  gcode_line_t *line;
+  gcode_vec2d_t normal;
+  gfloat_t mag, width;
+
+  /* Line 1 */
+  gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+  gcode_append_as_listtail (sketch_block, line_block);
+
+  line = (gcode_line_t *)line_block->pdata;
+
+  normal[0] = p0[1] - p1[1];
+  normal[1] = p1[0] - p0[0];
+  mag = 1.0 / GCODE_MATH_2D_MAGNITUDE (normal);
+  normal[0] *= mag;
+  normal[1] *= mag;
+
+  width = aperture->v[0];
+
+  line->p0[0] = p0[0] + 0.5 * width * normal[0];
+  line->p0[1] = p0[1] + 0.5 * width * normal[1];
+  line->p1[0] = p1[0] + 0.5 * width * normal[0];
+  line->p1[1] = p1[1] + 0.5 * width * normal[1];
+
+  /* Line 2 */
+  gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+
+  gcode_append_as_listtail (sketch_block, line_block);
+
+  line = (gcode_line_t *)line_block->pdata;
+
+  line->p0[0] = p0[0] - 0.5 * width * normal[0];
+  line->p0[1] = p0[1] - 0.5 * width * normal[1];
+  line->p1[0] = p1[0] - 0.5 * width * normal[0];
+  line->p1[1] = p1[1] - 0.5 * width * normal[1];
+
+  return(0);
+}
+
+/**
+ * Create a trace arc as a contour of code blocks under 'sketch_block'
+ */
+
+static int
+create_trace_arc (gcode_block_t *sketch_block, gcode_gerber_aperture_t *aperture, gcode_vec2d_t p, gfloat_t radius, gfloat_t start_angle, gfloat_t sweep_angle)
+{
+  gcode_arc_t *arc;
+  gcode_block_t *arc_block;
+  gcode_vec2d_t normal;
+  gfloat_t width;
+
+  width = aperture->v[0];
+
+  normal[0] = cos (start_angle * GCODE_DEG2RAD);
+  normal[1] = sin (start_angle * GCODE_DEG2RAD);
+
+  /* Arc 1 */
+  gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+  gcode_append_as_listtail (sketch_block, arc_block);
+
+  arc = (gcode_arc_t *)arc_block->pdata;
+
+  arc->p[0] = p[0] + 0.5 * width * normal[0];
+  arc->p[1] = p[1] + 0.5 * width * normal[1];
+  arc->radius = radius + 0.5 * width;
+  arc->start_angle = start_angle;
+  arc->sweep_angle = sweep_angle;
+
+  /* Arc 2 */
+  gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
+
+  gcode_append_as_listtail (sketch_block, arc_block);
+
+  arc = (gcode_arc_t *)arc_block->pdata;
+
+  arc->p[0] = p[0] - 0.5 * width * normal[0];
+  arc->p[1] = p[1] - 0.5 * width * normal[1];
+  arc->radius = radius - 0.5 * width;
+  arc->start_angle = start_angle;
+  arc->sweep_angle = sweep_angle;
+
+  return(0);
+}
+
+/**
  * Returns "TRUE" (non-zero) if 'point' is within (NOT on) the circle having
  * the center at 'center' and the diameter (NOT the radius) of 'diameter';
  */
@@ -372,6 +781,212 @@ point_inside_obround (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t width,
 }
 
 /**
+ * Returns "TRUE" (non-zero) if 'point' is within (NOT on) the "rounded rectangle"
+ * (a rectangle with 90 degree arcs for corners) having the center at 'center' 
+ * the width / height of 'width' & 'height' and rounding radius of 'radius';
+ */
+
+static int
+point_inside_roundrect (gcode_vec2d_t point, gcode_vec2d_t center, gfloat_t width, gfloat_t height, gfloat radius)
+{
+  gcode_vec2d_t center1, center2, center3, center4;
+
+  center1[0] = center[0] - 0.5 * width + radius;
+  center1[1] = center[1] - 0.5 * height + radius;
+
+  center2[0] = center[0] - 0.5 * width + radius;
+  center2[1] = center[1] + 0.5 * height - radius;
+
+  center3[0] = center[0] + 0.5 * width - radius;
+  center3[1] = center[1] + 0.5 * height - radius;
+
+  center4[0] = center[0] + 0.5 * width - radius;
+  center4[1] = center[1] - 0.5 * height + radius;
+
+  if (point_inside_circle (point, center1, radius * 2))
+    return (1);
+
+  if (point_inside_circle (point, center2, radius * 2))
+    return (1);
+
+  if (point_inside_circle (point, center3, radius * 2))
+    return (1);
+
+  if (point_inside_circle (point, center4, radius * 2))
+    return (1);
+
+  if (point_inside_rectangle (point, center, width - radius * 2, height))
+    return (1);
+
+  if (point_inside_rectangle (point, center, width, height - radius * 2))
+    return (1);
+
+  return (0);
+}
+
+/**
+ * Reset all current polygon (G36/G37 delimited region) data; the next call to
+ * "append_to_polygon()" will start a new polygon starting from this 'point'
+ * NOTE: region handling is extremely primitive, there is no actual building of
+ * a polygon happening - all we do is collect statistical data that we hope we
+ * can turn into an axis-aligned rounded rectangle pad at the end;
+ */
+
+static int
+seed_next_polygon (gcode_gerber_polygon_t *polygon, gcode_vec2d_t point)
+{
+  polygon->segment_count = 0;
+
+  GCODE_MATH_VEC2D_SET (polygon->side_count, 0, 0);
+  GCODE_MATH_VEC2D_SET (polygon->side_max, 0, 0);
+
+  GCODE_MATH_VEC2D_COPY (polygon->initial, point);
+  GCODE_MATH_VEC2D_COPY (polygon->current, point);
+
+  GCODE_MATH_VEC2D_COPY (polygon->aabb_min, point);
+  GCODE_MATH_VEC2D_COPY (polygon->aabb_max, point);
+
+  return (0);
+}
+
+/**
+ * Add another point to the current polygon (G36/G37 delimited region)
+ * NOTE: region handling is extremely primitive, there is no actual building of
+ * a polygon happening - all we do is collect statistical data that we hope we
+ * can turn into an axis-aligned rounded rectangle pad at the end;
+ */
+
+ static int
+append_to_polygon (gcode_gerber_polygon_t *polygon, gcode_vec2d_t point)
+{
+  gfloat_t eps;
+  gfloat_t length;
+
+  eps = GERBER_EPSILON;
+
+  if (GCODE_MATH_1D_DISTANCE (point[0], polygon->current[0]) < eps)             // This is a "zero width" (vertical) segment
+  {
+    length = GCODE_MATH_1D_DISTANCE (point[1], polygon->current[1]);            // In this case, size DOES matter
+
+    if (length < eps)                                                           // It's just the same point twice -> drop it
+      return (1);
+
+    if (GCODE_MATH_DIFFERENCE (length, polygon->side_max[1]) < eps)             // If the length matches the longest horizontal found so far,
+    {
+      polygon->side_count[1]++;                                                 // this is the other horizontal side of the rounded rectangle
+    }
+    else if (length > polygon->side_max[1])                                     // If the length exceeds the longest horizontal found so far,
+    {
+      polygon->side_max[1] = length;                                            // then the previous one wasn't a side, but this one might be
+      polygon->side_count[1] = 1;                                               // so reset the counter and start looking for this side size
+    }
+  }
+  else if (GCODE_MATH_1D_DISTANCE (point[1], polygon->current[1]) < eps)        // This is a "zero height" (horizontal) segment
+  {
+    length = GCODE_MATH_1D_DISTANCE (point[0], polygon->current[0]);            // In this case, size DOES matter
+
+    if (length < eps)                                                           // It's just the same point twice -> drop it
+      return (1);
+
+    if (GCODE_MATH_DIFFERENCE (length, polygon->side_max[0]) < eps)             // If the length matches the longest horizontal found so far,
+    {
+      polygon->side_count[0]++;                                                 // this is the other horizontal side of the rounded rectangle
+    }
+    else if (length > polygon->side_max[0])                                     // If the length exceeds the longest horizontal found so far,
+    {
+      polygon->side_max[0] = length;                                            // then the previous one wasn't a side, but this one might be
+      polygon->side_count[0] = 1;                                               // so reset the counter and start looking for this side size
+    }
+  }
+
+  if (point[0] < polygon->aabb_min[0])                                          // If the new point is outside the poly's current bounding box,
+    polygon->aabb_min[0] = point[0];                                            // expand the bounding box to include it
+
+  if (point[0] > polygon->aabb_max[0])
+    polygon->aabb_max[0] = point[0];
+
+  if (point[1] < polygon->aabb_min[1])
+    polygon->aabb_min[1] = point[1];
+
+  if (point[1] > polygon->aabb_max[1])
+    polygon->aabb_max[1] = point[1];
+
+  GCODE_MATH_VEC2D_COPY (polygon->current, point);                              // Update the current endpoint
+
+  polygon->segment_count++;                                                     // Update the segment count
+
+  return (0);
+}
+
+/**
+ * Evaluate data collected so far about the contour of the polygon/region and if
+ * it is consistent with a rounded rectangle, return an aperture and a position
+ * that can be used to flash those into an exposure of rounded rectangle type;
+ * Returns "0" if the conversion was successful, an error code otherwise;
+ * NOTE: region handling is extremely primitive, there is no actual building of
+ * a polygon happening - all we do is collect statistical data that we hope we
+ * can turn into an axis-aligned rounded rectangle pad at the end;
+ * NOTE: the sequence of import & cleanup "passes" in this file gets performed
+ * once for each distinct isolation milling contour, each at a specific offset;
+ * that offset is incorporated into each run by modifying the size of every
+ * aperture correspondingly immediately as they are loaded, before ever using
+ * them to paint traces and exposure spots. This, however, obviously does not
+ * happen for an exposure that isn't really painted using a real aperture, such
+ * as the rounded rectangles we inject via the function below. That means that
+ * to stay on par with every other object in this pass, we have to incorporate
+ * the supplied offset into the actual data we detected, increasing everything
+ * appropriately...
+ */
+
+static int
+polygon_to_aperture (gcode_gerber_polygon_t *polygon, gfloat_t offset, gcode_gerber_aperture_t *aperture, gcode_vec2d_t point)
+{
+  gfloat_t eps;
+  gfloat_t x, y;
+  gfloat_t w, h;
+  gfloat_t rx, ry;
+  gfloat_t r;
+
+  eps = GERBER_EPSILON;
+
+  if (polygon->side_count[0] != 2 || polygon->side_count[1] != 2)               // Unless there are exactly two vertical and two horizontal sides
+    return (1);                                                                 // this was not a rounded rectangle
+
+  if (polygon->side_max[0] < eps || polygon->side_max[1] < eps)                 // Unless both vertical and horizontal sides are larger than zero
+    return (1);                                                                 // this was not a rounded rectangle
+
+  if (GCODE_MATH_2D_DISTANCE (polygon->initial, polygon->current) > eps)        // Unless the initial and final polygon points are not the same
+    return (1);                                                                 // this was not a valid Gerber polygon, full stop
+
+  x = (polygon->aabb_min[0] + polygon->aabb_max[0]) / 2;                        // Okay, this part is trivial...
+  y = (polygon->aabb_min[1] + polygon->aabb_max[1]) / 2;
+
+  w = polygon->aabb_max[0] - polygon->aabb_min[0];
+  h = polygon->aabb_max[1] - polygon->aabb_min[1];
+
+  if (polygon->side_max[0] > w || polygon->side_max[1] > h)                     // Unless the sides are smaller than the size of the whole rectangle
+    return (1);                                                                 // this was not a rounded rectangle
+
+  rx = (w - polygon->side_max[0]) / 2;
+  ry = (h - polygon->side_max[1]) / 2;
+
+  r = (rx + ry) / 2;
+
+  if (GCODE_MATH_DIFFERENCE (rx, ry) > (r / 100))                               // Unless the rounding radius is not similar in both dimensions
+    return (1);                                                                 // this was not a rounded rectangle
+
+  point[0] = x;                                                                 // Fine, so it WAS a rounded rectangle...
+  point[1] = y;
+
+  aperture->type = GCODE_GERBER_APERTURE_TYPE_ROUNDRECT;
+  aperture->v[0] = w + offset * 2;
+  aperture->v[1] = h + offset * 2;
+  aperture->r = r + offset;
+
+  return (0);
+}
+
+/**
  * PASS 1 - Parse the Gerber file to create aperture, exposure and elbow tables
  * and open-ended ("endcap-less") trace outlines inserted under 'sketch_block';
  */
@@ -381,15 +996,18 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
                     gcode_vec3d_t **trace_elbow_array, int *exposure_count, gcode_gerber_exposure_t **exposure_array, gfloat_t offset)
 {
   gcode_t *gcode;
-  gcode_sketch_t *sketch;
   char buf[10], *buffer = NULL;
   long int length, nomore, index;
   int i, j, buf_ind, inum, aperture_num, aperture_cmd, arc_dir;
   uint8_t aperture_ind, aperture_closed, trace_elbow_match;
   gcode_gerber_aperture_t *aperture_set;
+  gcode_gerber_aperture_t aperture;
+  gcode_gerber_polygon_t contour;
   gcode_vec2d_t cur_pos = { 0.0, 0.0 };
   gcode_vec2d_t cur_ij = { 0.0, 0.0 };
   gcode_vec2d_t normal = { 0.0, 0.0 };
+  gcode_vec2d_t center;
+  int in_a_region = FALSE;
   gfloat_t digit_scale, unit_scale;
   gfloat_t progress;
 
@@ -403,8 +1021,6 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
   arc_dir = GCODE_GERBER_ARC_CW;
 
   gcode = (gcode_t *)sketch_block->gcode;
-
-  sketch = (gcode_sketch_t *)sketch_block->pdata;
 
   fseek (fh, 0, SEEK_END);
   length = ftell (fh);
@@ -673,7 +1289,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
 
       index++;
     }
-    else if (buffer[index] == 'X' || buffer[index] == 'Y' || buffer[index] == 'I' || buffer[index] == 'J')
+    else if (buffer[index] == 'X' || buffer[index] == 'Y' || buffer[index] == 'I' || buffer[index] == 'J' || buffer[index] == 'D')
     {
       gfloat_t pos[2];
       int xy_mask;
@@ -687,7 +1303,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
         xy_mask = 0;
         ij_mask = 0;
 
-        if (buffer[index] == 'X')
+        if (buffer[index] == 'X')                                               /* X */
         {
           index++;
           buf_ind = 0;
@@ -705,7 +1321,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
           xy_mask |= 1;
         }
 
-        if (buffer[index] == 'Y')
+        if (buffer[index] == 'Y')                                               /* Y */
         {
           index++;
           buf_ind = 0;
@@ -759,7 +1375,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
           ij_mask |= 2;
         }
 
-        if (buffer[index] == 'D')                                               /* Set aperture Number or cmd */
+        if (buffer[index] == 'D')                                               /* D - Set aperture Number or cmd */
         {
           int d;
 
@@ -783,105 +1399,48 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
           }
         }
 
-        if (ij_mask)
+        if (in_a_region)                                                        /* We ARE inside a G36/G37 region */
         {
-          gcode_arc_t *arc;
-          gcode_block_t *arc_block;
-          gfloat_t start_angle, sweep_angle;
-          gfloat_t width, radius;
-
-          if (insert_trace_arc (trace_count, trace_array, &aperture_set[aperture_ind], cur_pos, pos, cur_ij, arc_dir) == 0)
+          if (aperture_cmd == 1)
           {
-            width = aperture_set[aperture_ind].v[0];
+            append_to_polygon (&contour, pos);                                  /* Add current position to the current contour */
+          }
+          else if (aperture_cmd == 2)
+          {
+            if ( contour.segment_count > 0 )
+              if (polygon_to_aperture (&contour, offset, &aperture, center) == 0)
+              {
+                /* Insert this exposure into the exposure array for future "is-inside" checking */
+                /* Create the actual code blocks that make up the contour of this exposure spot */
+                if (insert_exposure (exposure_count, exposure_array, &aperture, center) == 0)
+                  create_exposure (sketch_block, &aperture, center);
+              }
+              else
+              {
+                REMARK ("Failed to convert G36/G37 fill region to a rounded pad...\n");
+                return (1);
+              }
 
-            radius = (*trace_array)[*trace_count - 1].radius;
-
-            start_angle = (*trace_array)[*trace_count - 1].start_angle;
-            sweep_angle = (*trace_array)[*trace_count - 1].sweep_angle;
-
-            normal[0] = cos (start_angle * GCODE_DEG2RAD);
-            normal[1] = sin (start_angle * GCODE_DEG2RAD);
-
-            /* Arc 1 */
-            gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-            gcode_append_as_listtail (sketch_block, arc_block);
-
-            arc = (gcode_arc_t *)arc_block->pdata;
-
-            arc->p[0] = cur_pos[0] + 0.5 * width * normal[0];
-            arc->p[1] = cur_pos[1] + 0.5 * width * normal[1];
-            arc->radius = radius + 0.5 * width;
-            arc->start_angle = start_angle;
-            arc->sweep_angle = sweep_angle;
-
-            /* Arc 2 */
-            gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-            gcode_append_as_listtail (sketch_block, arc_block);
-
-            arc = (gcode_arc_t *)arc_block->pdata;
-
-            arc->p[0] = cur_pos[0] - 0.5 * width * normal[0];
-            arc->p[1] = cur_pos[1] - 0.5 * width * normal[1];
-            arc->radius = radius - 0.5 * width;
-            arc->start_angle = start_angle;
-            arc->sweep_angle = sweep_angle;
-
-            /* If the aperture was previously closed insert an elbow - check both position and diameter for duplicity */
-            if (aperture_closed)
-            {
-              insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], cur_pos);
-
-              aperture_closed = 0;
-            }
-
-            /* Insert an elbow at the end of this trace segment - check both position and diameter for duplicity */
-            insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], pos);
+            seed_next_polygon (&contour, pos);                                  /* Reset the current contour and seed a potential new one with the current position */
           }
         }
-        else if (xy_mask)                                                       /* And X or Y has occured - Uses previous aperture_cmd if a new one isn't present. */
+        else                                                                    /* We are NOT inside a G36/G37 region */
         {
-          if (aperture_cmd == 1)                                                /* Open Exposure - Trace (line) */
+          if (ij_mask)                                                          /* An I or J has occurred */
           {
-            gcode_block_t *line_block;
-            gcode_line_t *line;
-            gfloat_t mag, width;
-
             /* Store the Trace - Check for Duplicates before storing */
-            if (insert_trace_line (trace_count, trace_array, &aperture_set[aperture_ind], cur_pos, pos) == 0)
+            if (insert_trace_arc (trace_count, trace_array, &aperture_set[aperture_ind], cur_pos, pos, cur_ij, arc_dir) == 0)
             {
-              /* Line 1 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
+              gfloat_t radius;
+              gfloat_t start_angle, sweep_angle;
 
-              gcode_append_as_listtail (sketch_block, line_block);
+              radius = (*trace_array)[*trace_count - 1].radius;
 
-              line = (gcode_line_t *)line_block->pdata;
+              start_angle = (*trace_array)[*trace_count - 1].start_angle;
+              sweep_angle = (*trace_array)[*trace_count - 1].sweep_angle;
 
-              normal[0] = cur_pos[1] - pos[1];
-              normal[1] = pos[0] - cur_pos[0];
-              mag = 1.0 / GCODE_MATH_2D_MAGNITUDE (normal);
-              normal[0] *= mag;
-              normal[1] *= mag;
-
-              width = aperture_set[aperture_ind].v[0];
-
-              line->p0[0] = cur_pos[0] + 0.5 * width * normal[0];
-              line->p0[1] = cur_pos[1] + 0.5 * width * normal[1];
-              line->p1[0] = pos[0] + 0.5 * width * normal[0];
-              line->p1[1] = pos[1] + 0.5 * width * normal[1];
-
-              /* Line 2 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line = (gcode_line_t *)line_block->pdata;
-
-              line->p0[0] = cur_pos[0] - 0.5 * width * normal[0];
-              line->p0[1] = cur_pos[1] - 0.5 * width * normal[1];
-              line->p1[0] = pos[0] - 0.5 * width * normal[0];
-              line->p1[1] = pos[1] - 0.5 * width * normal[1];
+              /* Create the actual code blocks that make up the contour of this trace arc */
+              create_trace_arc (sketch_block, &aperture_set[aperture_ind], cur_pos, radius, start_angle, sweep_angle);
 
               /* If the aperture was previously closed insert an elbow - check both position and diameter for duplicity */
               if (aperture_closed)
@@ -895,183 +1454,38 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
               insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], pos);
             }
           }
-          else if (aperture_cmd == 2)                                           /* Aperture Closed */
+          else if (xy_mask)                                                     /* An X or Y has occurred - Uses previous aperture_cmd if a new one isn't present. */
           {
-            aperture_closed = 1;
-          }
-          else if (aperture_cmd == 3)                                           /* Flash exposure */
-          {
-            if (aperture_set[aperture_ind].type == GCODE_GERBER_APERTURE_TYPE_CIRCLE)
+            if (aperture_cmd == 1)                                              /* Open Exposure - Trace (line) */
             {
-              gcode_block_t *arc_block;
-              gcode_arc_t *arc;
-              gfloat_t diameter;
-
-              diameter = aperture_set[aperture_ind].v[0];
-
-              /* arc 1 */
-              gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, arc_block);
-
-              arc = (gcode_arc_t *)arc_block->pdata;
-
-              arc->radius = 0.5 * diameter;
-              arc->p[0] = pos[0];
-              arc->p[1] = pos[1] + arc->radius;
-              arc->start_angle = 90.0;
-              arc->sweep_angle = -360.0;
-
-              insert_exposure (exposure_count, exposure_array, &aperture_set[aperture_ind], pos);
-            }
-            else if (aperture_set[aperture_ind].type == GCODE_GERBER_APERTURE_TYPE_RECTANGLE)
-            {
-              gcode_block_t *line_block;
-              gcode_line_t *line;
-              gfloat_t width, height;
-
-              width = aperture_set[aperture_ind].v[0];
-              height = aperture_set[aperture_ind].v[1];
-
-              /* Line 1 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line = (gcode_line_t *)line_block->pdata;
-
-              line->p0[0] = pos[0] - 0.5 * width;
-              line->p0[1] = pos[1] + 0.5 * height;
-              line->p1[0] = pos[0] + 0.5 * width;
-              line->p1[1] = pos[1] + 0.5 * height;
-
-              /* Line 2 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line = (gcode_line_t *)line_block->pdata;
-
-              line->p0[0] = pos[0] + 0.5 * width;
-              line->p0[1] = pos[1] + 0.5 * height;
-              line->p1[0] = pos[0] + 0.5 * width;
-              line->p1[1] = pos[1] - 0.5 * height;
-
-              /* Line 3 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line = (gcode_line_t *)line_block->pdata;
-
-              line->p0[0] = pos[0] + 0.5 * width;
-              line->p0[1] = pos[1] - 0.5 * height;
-              line->p1[0] = pos[0] - 0.5 * width;
-              line->p1[1] = pos[1] - 0.5 * height;
-
-              /* Line 4 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line = (gcode_line_t *)line_block->pdata;
-
-              line->p0[0] = pos[0] - 0.5 * width;
-              line->p0[1] = pos[1] - 0.5 * height;
-              line->p1[0] = pos[0] - 0.5 * width;
-              line->p1[1] = pos[1] + 0.5 * height;
-
-              insert_exposure (exposure_count, exposure_array, &aperture_set[aperture_ind], pos);
-            }
-            else if (aperture_set[aperture_ind].type == GCODE_GERBER_APERTURE_TYPE_OBROUND)
-            {
-              gcode_block_t *line_block;
-              gcode_block_t *arc_block;
-              gcode_line_t *line1, *line2;
-              gcode_arc_t *arc1, *arc2;
-              gfloat_t width, height;
-
-              /* arc 1 */
-              gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, arc_block);
-
-              arc1 = (gcode_arc_t *)arc_block->pdata;
-
-              /* Line 1 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line1 = (gcode_line_t *)line_block->pdata;
-
-              /* arc 2 */
-              gcode_arc_init (&arc_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, arc_block);
-
-              arc2 = (gcode_arc_t *)arc_block->pdata;
-
-              /* Line 2 */
-              gcode_line_init (&line_block, sketch_block->gcode, sketch_block);
-
-              gcode_append_as_listtail (sketch_block, line_block);
-
-              line2 = (gcode_line_t *)line_block->pdata;
-
-              width = aperture_set[aperture_ind].v[0];
-              height = aperture_set[aperture_ind].v[1];
-
-              if (width > height)
+              /* Store the Trace - Check for Duplicates before storing */
+              if (insert_trace_line (trace_count, trace_array, &aperture_set[aperture_ind], cur_pos, pos) == 0)
               {
-                arc1->p[0] = pos[0] + 0.5 * (width - height);
-                arc1->p[1] = pos[1] + 0.5 * height;
-                arc1->start_angle = 90.0;
-                arc1->sweep_angle = -180.0;
-                arc1->radius = 0.5 * height;
+                /* Create the actual code blocks that make up the contour of this trace line */
+                create_trace_line (sketch_block, &aperture_set[aperture_ind], cur_pos, pos);
 
-                arc2->p[0] = pos[0] - 0.5 * (width - height);
-                arc2->p[1] = pos[1] - 0.5 * height;
-                arc2->start_angle = 270.0;
-                arc2->sweep_angle = -180.0;
-                arc2->radius = 0.5 * height;
+                /* If the aperture was previously closed insert an elbow - check both position and diameter for duplicity */
+                if (aperture_closed)
+                {
+                  insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], cur_pos);
 
-                line1->p0[0] = pos[0] + 0.5 * (width - height);
-                line1->p0[1] = pos[1] - 0.5 * height;
-                line1->p1[0] = pos[0] - 0.5 * (width - height);
-                line1->p1[1] = pos[1] - 0.5 * height;
+                  aperture_closed = 0;
+                }
 
-                line2->p0[0] = pos[0] - 0.5 * (width - height);
-                line2->p0[1] = pos[1] + 0.5 * height;
-                line2->p1[0] = pos[0] + 0.5 * (width - height);
-                line2->p1[1] = pos[1] + 0.5 * height;
+                /* Insert an elbow at the end of this trace segment - check both position and diameter for duplicity */
+                insert_trace_elbow (trace_elbow_count, trace_elbow_array, &aperture_set[aperture_ind], pos);
               }
-              else
-              {
-                arc1->p[0] = pos[0] + 0.5 * width;
-                arc1->p[1] = pos[1] - 0.5 * (height - width);
-                arc1->start_angle = 0.0;
-                arc1->sweep_angle = -180.0;
-                arc1->radius = 0.5 * width;
-
-                arc2->p[0] = pos[0] - 0.5 * width;
-                arc2->p[1] = pos[1] + 0.5 * (height - width);
-                arc2->start_angle = 180.0;
-                arc2->sweep_angle = -180.0;
-                arc2->radius = 0.5 * width;
-
-                line1->p0[0] = pos[0] - 0.5 * width;
-                line1->p0[1] = pos[1] - 0.5 * (height - width);
-                line1->p1[0] = pos[0] - 0.5 * width;
-                line1->p1[1] = pos[1] + 0.5 * (height - width);
-
-                line2->p0[0] = pos[0] + 0.5 * width;
-                line2->p0[1] = pos[1] + 0.5 * (height - width);
-                line2->p1[0] = pos[0] + 0.5 * width;
-                line2->p1[1] = pos[1] - 0.5 * (height - width);
-              }
-
-              insert_exposure (exposure_count, exposure_array, &aperture_set[aperture_ind], pos);
+            }
+            else if (aperture_cmd == 2)                                         /* Aperture Closed */
+            {
+              aperture_closed = 1;
+            }
+            else if (aperture_cmd == 3)                                         /* Flash exposure */
+            {
+              /* Insert this exposure into the exposure array for future "is-inside" checking */
+              /* Create the actual code blocks that make up the contour of this exposure spot */
+              if (insert_exposure (exposure_count, exposure_array, &aperture_set[aperture_ind], pos) == 0)
+                create_exposure (sketch_block, &aperture_set[aperture_ind], pos);
             }
           }
         }
@@ -1107,6 +1521,44 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
         index += 2;
         /* Using current position, generate a CCW arc. */
         arc_dir = GCODE_GERBER_ARC_CCW;
+      }
+      else if (buffer[index] == '0' && buffer[index + 1] == '4')
+      {
+        /* Ignore data block */
+        index += 2;
+
+        while (buffer[index] != '\n')
+          index++;
+      }
+      else if (buffer[index] == '3' && buffer[index + 1] == '6')
+      {
+        /* Start of filled region */
+        index += 2;
+        /* Not a true handling of filled regions, but we do look for rounded pads */
+        in_a_region = TRUE;
+        /* Reset the current contour and seed a potential new one with the current position */
+        seed_next_polygon (&contour, cur_pos);
+      }
+      else if (buffer[index] == '3' && buffer[index + 1] == '7')
+      {
+        /* End of filled region */
+        index += 2;
+        /* Not a true handling of filled regions, but we do look for rounded pads */
+        in_a_region = FALSE;
+
+        if ( contour.segment_count > 0 )
+          if (polygon_to_aperture (&contour, offset, &aperture, center) == 0)
+          {
+            /* Insert this exposure into the exposure array for future "is-inside" checking */
+            /* Create the actual code blocks that make up the contour of this exposure spot */
+            if (insert_exposure (exposure_count, exposure_array, &aperture, center) == 0)
+              create_exposure (sketch_block, &aperture, center);
+          }
+          else
+          {
+            REMARK ("Failed to convert G36/G37 fill region to a rounded pad...\n");
+            return (1);
+          }
       }
       else if (buffer[index] == '0' && buffer[index + 1] == '4')
       {
@@ -1160,7 +1612,7 @@ gcode_gerber_pass1 (gcode_block_t *sketch_block, FILE *fh, int *trace_count, gco
  * PASS 2 - Insert "trace elbows" (full circles) at all trace segment endpoints
  */
 
-static void
+static int
 gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_vec3d_t *trace_elbow)
 {
   gcode_t *gcode;
@@ -1191,6 +1643,8 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_ve
     arc->start_angle = 90.0;
     arc->sweep_angle = -360.0;
   }
+
+  return (0);
 }
 
 /**
@@ -1200,7 +1654,7 @@ gcode_gerber_pass2 (gcode_block_t *sketch_block, int trace_elbow_count, gcode_ve
  * endpoint - the new segments end-to-end must match the old one they replace;
  */
 
-static void
+static int
 gcode_gerber_pass3 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1209,8 +1663,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   gcode_vec2d_t min1, max1, min2, max2;
   gcode_vec2d_t p0, p1;
   gcode_vec2d_t ip_array[2];
-  gcode_vec2d_t full_ip_array[256];
-  gcode_vec3d_t full_ip_sorted_array[256];
+  gcode_vec2d_t full_ip_array[1022];
+  gcode_vec3d_t full_ip_sorted_array[1024];                                     // This MUST always be at least two elements larger than 'full_ip_array';
   int ip_count, full_ip_count, full_ip_sorted_count;
   int block_count, block_index;
   gfloat_t progress;
@@ -1266,15 +1720,25 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
           {
             for (int i = 0; i < ip_count; i++)                                  // Examine every intersection point returned (if any):
             {
-              if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)   // Something touching one of the endpoints of 'index1_block', while technically
-                continue;                                                       // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
+              if (full_ip_count < MAX_ELEMENTS (full_ip_array))                 // Make sure we have more room to store intersection points;
+              {
+                if (GCODE_MATH_2D_DISTANCE (p0, ip_array[i]) < GCODE_PRECISION)   // Something touching one of the endpoints of 'index1_block', while technically
+                  continue;                                                       // being an 'intersection', CANNOT DIVIDE THE BLOCK IN TWO, so drop that point;
 
-              if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)   // Same with the other endpoint - if the only intersections found coincide with
-                continue;                                                       // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
+                if (GCODE_MATH_2D_DISTANCE (p1, ip_array[i]) < GCODE_PRECISION)   // Same with the other endpoint - if the only intersections found coincide with
+                  continue;                                                       // the endpoints, THEN THERE ARE NO INTERSECTIONS as in no division is needed!
 
-              GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);        // If we're here, this is a genuine intersection that will divide the block...
+                GCODE_MATH_VEC2D_COPY (full_ip_array[full_ip_count], ip_array[i]);        // If we're here, this is a genuine intersection that will divide the block...
 
-              full_ip_count++;                                                  // So save it into the full array and increase the total intersection count;
+                full_ip_count++;                                                // So save it into the full array and increase the total intersection count;
+              }
+              else
+              {
+                gcode_list_free (&original_listhead);                           // Free the original list of 'sketch_block' before bailing;
+
+                REMARK ("Intersection array size exceeded!\n");
+                return (1);
+              }
             }
           }
         }
@@ -1450,6 +1914,8 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
   }
 
   gcode_list_free (&original_listhead);                                         // Free the original list of 'sketch_block', it's no longer needed;
+
+  return (0);
 }
 
 /**
@@ -1457,7 +1923,7 @@ gcode_gerber_pass3 (gcode_block_t *sketch_block)
  * created in pass 3, remove all that fall within a trace or a within a pad;
  */
 
-static void
+static int
 gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_trace_t *trace_array, int exposure_count, gcode_gerber_exposure_t *exposure_array)
 {
   gcode_t *gcode;
@@ -1767,6 +2233,30 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
           break;
         }
+
+        case GCODE_GERBER_APERTURE_TYPE_ROUNDRECT:
+        {
+          gcode_vec2d_t center;
+          gfloat_t width, height, radius;
+
+          center[0] = exposure_array[i].pos[0];
+          center[1] = exposure_array[i].pos[1];
+
+          width = exposure_array[i].v[0];
+          height = exposure_array[i].v[1];
+          radius = exposure_array[i].r;
+
+          if (point_inside_roundrect (p0, center, width, height, radius))
+            remove_block = 1;
+
+          if (point_inside_roundrect (p1, center, width, height, radius))
+            remove_block = 1;
+
+          if (point_inside_roundrect (midp, center, width, height, radius))
+            remove_block = 1;
+
+          break;
+        }
       }
     }
 
@@ -1786,6 +2276,8 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
 
   line_block->free (&line_block);
   arc_block->free (&arc_block);
+
+  return (0);
 }
 
 /**
@@ -1794,7 +2286,7 @@ gcode_gerber_pass4 (gcode_block_t *sketch_block, int trace_count, gcode_gerber_t
  * not both.
  */
 
-static void
+static int
 gcode_gerber_pass5 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1867,13 +2359,15 @@ gcode_gerber_pass5 (gcode_block_t *sketch_block)
 
     index1_block = index1_block->next;
   }
+
+  return (0);
 }
 
 /**
  * PASS 6 - Correct the orientation and sequence (continuity) of all segments.
  */
 
-static void
+static int
 gcode_gerber_pass6 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1888,13 +2382,15 @@ gcode_gerber_pass6 (gcode_block_t *sketch_block)
   if (gcode->progress_callback)
     for (progress = 0.0; progress < 1.0; progress += 0.01)
       gcode->progress_callback (gcode->gui, GERBER_PROGRESS (GERBER_PASS_6, progress));
+
+  return (0);
 }
 
 /**
  * PASS 7 - Merge adjacent lines with matching slopes.
  */
 
-static void
+static int
 gcode_gerber_pass7 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -1906,7 +2402,7 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
   gcode = (gcode_t *)sketch_block->gcode;
 
   if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
-    return;
+    return (0);
 
   block_count = 0;
 
@@ -1997,13 +2493,15 @@ gcode_gerber_pass7 (gcode_block_t *sketch_block)
 
     index2_block = index1_block->next;                                          // Either way, block 2 is always the one following block 1;
   }
+
+  return (0);
 }
 
 /**
  * PASS 8 - Merge adjacent arcs with matching centers.
  */
 
-static void
+static int
 gcode_gerber_pass8 (gcode_block_t *sketch_block)
 {
   gcode_t *gcode;
@@ -2017,7 +2515,7 @@ gcode_gerber_pass8 (gcode_block_t *sketch_block)
   gcode = (gcode_t *)sketch_block->gcode;
 
   if (!sketch_block->listhead)                                                  // Not much to merge in an empty list, innit...
-    return;
+    return (0);
 
   block_count = 0;
 
@@ -2120,6 +2618,8 @@ gcode_gerber_pass8 (gcode_block_t *sketch_block)
       index1_block = index1_block->next;                                        // Increment the progress block count and point 'index1' to the next block.
     }
   }
+
+  return (0);
 }
 
 /**
@@ -2177,16 +2677,26 @@ gcode_gerber_import (gcode_block_t *sketch_block, char *filename, gfloat_t depth
 
   fclose (fh);
 
-  if (!error)                                                                   // Only execute further passes if there was no error during the first;
-  {
-    gcode_gerber_pass2 (sketch_block, trace_elbow_count, trace_elbow_array);
-    gcode_gerber_pass3 (sketch_block);
-    gcode_gerber_pass4 (sketch_block, trace_count, trace_array, exposure_count, exposure_array);
-    gcode_gerber_pass5 (sketch_block);
-    gcode_gerber_pass6 (sketch_block);
-    gcode_gerber_pass7 (sketch_block);
-    gcode_gerber_pass8 (sketch_block);
-  }
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass2 (sketch_block, trace_elbow_count, trace_elbow_array);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass3 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass4 (sketch_block, trace_count, trace_array, exposure_count, exposure_array);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass5 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass6 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass7 (sketch_block);
+
+  if (!error)                                                                   // Only execute the next pass if there was no error during the previous one;
+    error = gcode_gerber_pass8 (sketch_block);
 
   free (trace_array);
   free (trace_elbow_array);

@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -434,7 +434,7 @@ comment_cell_edited (GtkCellRendererText *cell, gchar *path_string, gchar *new_t
   GtkTreePath *path;
   GtkTreeIter iter;
   gcode_block_t *selected_block;
-  int i, j;
+  int i, j, k;
   char *modified_text;
 
   tree_view = GTK_TREE_VIEW (gui.gcode_block_treeview);
@@ -448,10 +448,11 @@ comment_cell_edited (GtkCellRendererText *cell, gchar *path_string, gchar *new_t
   gtk_tree_model_get_iter (tree_model, &iter, path);
 
   /* Replace certain characters in string */
-  modified_text = malloc (strlen (new_text) + 1);
+  k = sizeof(((gcode_block_t *)0)->comment);                                    // Get the size of a gcode block's comment field: it is not to be exceeded
+  modified_text = malloc (k);
   j = 0;
 
-  for (i = 0; i < strlen (new_text); i++)
+  for (i = 0; i < k - 1; i++)
   {
     modified_text[j] = new_text[i];
 
@@ -826,6 +827,9 @@ gui_attach (gcode_t *gcode, gui_t *gui)
   gcode->message_callback = generic_dialog;
 
   gcode->voxel_resolution = gui->settings.voxel_resolution;
+  gcode->curve_segments = gui->settings.curve_segments;
+  gcode->roughing_overlap = gui->settings.roughing_overlap;
+  gcode->padding_fraction = gui->settings.padding_fraction;
 }
 
 /**

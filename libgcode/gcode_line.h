@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,12 @@ void gcode_line_draw (gcode_block_t *block, gcode_block_t *selected);
 int gcode_line_eval (gcode_block_t *block, gfloat_t y, gfloat_t *x_array, uint32_t *x_index);
 int gcode_line_ends (gcode_block_t *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
 int gcode_line_midpoint (gcode_block_t *block, gcode_vec2d_t midpoint, uint8_t mode);
-void gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
+void gcode_line_aabb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode);
 void gcode_line_qdbb (gcode_block_t *block, gcode_vec2d_t min, gcode_vec2d_t max);
 gfloat_t gcode_line_length (gcode_block_t *block);
 void gcode_line_move (gcode_block_t *block, gcode_vec2d_t delta);
 void gcode_line_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
+void gcode_line_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle);
 void gcode_line_scale (gcode_block_t *block, gfloat_t scale);
 void gcode_line_parse (gcode_block_t *block, const char **xmlattr);
 void gcode_line_clone (gcode_block_t **block, gcode_t *gcode, gcode_block_t *model);

@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@ gcode_point_init (gcode_block_t **block, gcode_t *gcode, gcode_block_t *parent)
   (*block)->draw = gcode_point_draw;
   (*block)->move = gcode_point_move;
   (*block)->spin = gcode_point_spin;
+  (*block)->flip = gcode_point_flip;
   (*block)->scale = gcode_point_scale;
   (*block)->parse = gcode_point_parse;
   (*block)->clone = gcode_point_clone;
@@ -166,6 +167,38 @@ gcode_point_draw (gcode_block_t *block, gcode_block_t *selected)
 #endif
 }
 
+int
+gcode_point_center (gcode_block_t *block, gcode_vec2d_t p, uint8_t mode)
+{
+  gcode_point_t *point;
+
+  point = (gcode_point_t *)block->pdata;
+
+  switch (mode)
+  {
+    case GCODE_GET:
+    {
+      p[0] = point->p[0];
+      p[1] = point->p[1];
+
+      break;
+    }
+
+    case GCODE_GET_WITH_OFFSET:
+    {
+      gcode_point_with_offset (block, p);
+
+      break;
+    }
+
+    default:
+
+      return (1);
+  }
+
+  return (0);
+}
+
 void
 gcode_point_move (gcode_block_t *block, gcode_vec2d_t delta)
 {
@@ -190,6 +223,28 @@ gcode_point_spin (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
   GCODE_MATH_VEC2D_SUB (orgnl_pt, point->p, datum);
   GCODE_MATH_ROTATE (xform_pt, orgnl_pt, angle);
   GCODE_MATH_VEC2D_ADD (point->p, xform_pt, datum);
+}
+
+void
+gcode_point_flip (gcode_block_t *block, gcode_vec2d_t datum, gfloat_t angle)
+{
+  gcode_point_t *point;
+
+  point = (gcode_point_t *)block->pdata;
+
+  if (GCODE_MATH_IS_EQUAL (angle, 0))
+  {
+    point->p[1] -= datum[1];
+    point->p[1] = -point->p[1];
+    point->p[1] += datum[1];
+  }
+
+  if (GCODE_MATH_IS_EQUAL (angle, 90))
+  {
+    point->p[0] -= datum[0];
+    point->p[0] = -point->p[0];
+    point->p[0] += datum[0];
+  }
 }
 
 void

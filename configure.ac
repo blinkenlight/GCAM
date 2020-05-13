@@ -4,7 +4,7 @@
 #  library.
 #
 #  Copyright (C) 2006 - 2010 by Justin Shumaker
-#  Copyright (C) 2014 by Asztalos Attila Oszkár
+#  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
-AC_INIT([GCAM], [2015.05.13])
+AC_INIT([GCAM], [2020.05.13])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([gcam.c])
 AC_CONFIG_MACRO_DIR([m4])

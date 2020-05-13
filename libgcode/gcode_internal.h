@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -72,6 +72,8 @@
 #define GCODE_GET_WITH_OFFSET         0x02
 #define GCODE_GET_NORMAL              0x03
 #define GCODE_GET_TANGENT             0x04
+#define GCODE_GET_ALPHA               0x05
+#define GCODE_GET_OMEGA               0x06
 
 #define GCODE_FORMAT_TBD              0x00
 #define GCODE_FORMAT_BIN              0x01
@@ -83,6 +85,7 @@
 
 #define GCODE_FLAGS_LOCK              0x01
 #define GCODE_FLAGS_SUPPRESS          0x02
+#define GCODE_FLAGS_TAGGED            0x04
 
 #define GCODE_DRILLING_CANNED         0x00
 #define GCODE_DRILLING_SIMPLE         0x01
@@ -233,10 +236,11 @@ typedef void gcode_make_t (struct gcode_block_s *block);
 typedef void gcode_draw_t (struct gcode_block_s *block, struct gcode_block_s *selected);
 typedef int gcode_eval_t (struct gcode_block_s *block, gfloat_t y, gfloat_t *x_array, uint32_t *xind);
 typedef int gcode_ends_t (struct gcode_block_s *block, gcode_vec2d_t p0, gcode_vec2d_t p1, uint8_t mode);
-typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max);
+typedef void gcode_aabb_t (struct gcode_block_s *block, gcode_vec2d_t min, gcode_vec2d_t max, uint8_t mode);
 typedef gfloat_t gcode_length_t (struct gcode_block_s *block);
 typedef void gcode_move_t (struct gcode_block_s *block, gcode_vec2d_t delta);
 typedef void gcode_spin_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);
+typedef void gcode_flip_t (struct gcode_block_s *block, gcode_vec2d_t datum, gfloat_t angle);
 typedef void gcode_scale_t (struct gcode_block_s *block, gfloat_t scale);
 typedef void gcode_parse_t (struct gcode_block_s *block, const char **xmlattr);
 typedef void gcode_clone_t (struct gcode_block_s **block, struct gcode_s *gcode, struct gcode_block_s *model);
@@ -261,7 +265,7 @@ typedef struct gcode_offset_s
 typedef struct gcode_block_s
 {
   uint8_t type;
-  uint8_t flags;                                                                // Flags include: lock, suppress
+  uint8_t flags;                                                                // Flags include: lock, suppress, tagged
 
   char comment[64];
   char status[64];
@@ -296,6 +300,7 @@ typedef struct gcode_block_s
   gcode_length_t *length;
   gcode_move_t *move;
   gcode_spin_t *spin;
+  gcode_flip_t *flip;
   gcode_scale_t *scale;
   gcode_parse_t *parse;
   gcode_clone_t *clone;
@@ -325,6 +330,11 @@ typedef struct gcode_s
   uint16_t voxel_resolution;
   uint16_t voxel_number[3];
   uint8_t *voxel_map;
+
+  uint16_t curve_segments;
+
+  gfloat_t roughing_overlap;
+  gfloat_t padding_fraction;
 
   gfloat_t tool_xpos;
   gfloat_t tool_ypos;
@@ -373,6 +383,15 @@ void strswp (char *target, char oldchar, char newchar);
 #define REMARK(...) { \
         fprintf (stderr, "Error in '%s()' near line %d:\n", __func__, __LINE__); \
         fprintf (stderr, ## __VA_ARGS__); }
+
+/**
+ * Return the maximum number of elements in an array
+ * NOTE: this only works for LOCALLY DEFINED arrays!
+ * One received as a parameter would return RUBBISH!
+ */
+
+#define MAX_ELEMENTS(_array) \
+        (sizeof (_array) / sizeof (_array[0]))
 
 /**
  * Scale imperial defaults to relatively similar but cleanly rounded metric values if needed.

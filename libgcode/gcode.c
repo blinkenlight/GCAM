@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -359,6 +359,8 @@ gcode_list_make (gcode_t *gcode)
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;
 
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while generating the g-code
+
   block_index = 0;
 
   index_block = gcode->listhead;
@@ -378,6 +380,8 @@ gcode_list_make (gcode_t *gcode)
 
   if (gcode->progress_callback)                                                 // Clean up the progress bar before we leave;
     gcode->progress_callback (gcode->gui, 0.0);
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 }
 
 void
@@ -884,6 +888,11 @@ gcode_init (gcode_t *gcode)
 
   gcode->voxel_map = NULL;
 
+  gcode->curve_segments = 0;
+
+  gcode->roughing_overlap = 0;
+  gcode->padding_fraction = 0;
+
   gcode->tool_xpos = FLT_MAX;
   gcode->tool_ypos = FLT_MAX;
   gcode->tool_zpos = FLT_MAX;
@@ -894,7 +903,7 @@ gcode_init (gcode_t *gcode)
   strcpy (gcode->machine_name, "");
 
   gcode->drilling_motion = GCODE_DRILLING_CANNED;
-  gcode->pocketing_style = GCODE_POCKETING_TRADITIONAL;
+  gcode->pocketing_style = GCODE_POCKETING_ALTERNATE_1;
 
   gcode->machine_options = 0;
   gcode->decimals = 5;
@@ -958,6 +967,8 @@ gcode_save (gcode_t *gcode, char *filename)
     REMARK ("Failed to open file '%s'\n", basename (filename));
     return (1);
   }
+
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while saving the project
 
   if (gcode->format == GCODE_FORMAT_TBD)                                        // If the file format is not determined yet, choose one based on the file extension
   {
@@ -1132,6 +1143,8 @@ gcode_save (gcode_t *gcode, char *filename)
     fseek (fh, sizeof (uint32_t), SEEK_SET);
     fwrite (&fsize, sizeof (uint32_t), 1, fh);
   }
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 
   fclose (fh);
 
@@ -1611,6 +1624,8 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
     line_count++;
   }
 
+  setlocale(LC_NUMERIC, "C");                                                   // Setting the numeric locale back to "decimal point" while parsing the g-code
+
   /* Isolate each line */
   line_index = 0;
   sp = code;
@@ -1777,6 +1792,8 @@ gcode_render_final (gcode_t *gcode, gfloat_t *time_elapsed)
 
     line_index++;
   }
+
+  setlocale(LC_NUMERIC, "");                                                    // Returning the numeric locale back to its system-suggested original value
 
   free (code);
 

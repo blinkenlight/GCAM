@@ -4,7 +4,7 @@
  *  library.
  *
  *  Copyright (C) 2006 - 2010 by Justin Shumaker
- *  Copyright (C) 2014 by Asztalos Attila Oszkár
+ *  Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -60,13 +60,13 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 #define GUI_ADD_AFTER_OR_UNDER            7
 #define GUI_INSERT_WITH_TANGENCY          8
 
-#define WINDOW_W                          720
-#define WINDOW_H                          540
+#define WINDOW_W                          1000
+#define WINDOW_H                          700
 
-#define PANEL_LEFT_W                      280
+#define PANEL_LEFT_W                      350
 #define PANEL_LEFT_H                      (WINDOW_H - 80)                       /* Subtract away the menu and status bar */
 #define PANEL_LEFT_W_SW                   (PANEL_LEFT_W - 20)                   /* Left panel minus margins for scroll window */
-#define PANEL_BOTTOM_H                    260
+#define PANEL_BOTTOM_H                    300
 
 #define TABLE_SPACING                     3
 #define BORDER_WIDTH                      12
@@ -79,10 +79,11 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 
 #define MAX_CLR_Z                         4.0                                   /* Maximum traverse / clearance Z height, Inches */
 
-#define DEF_UNITS                         GCODE_UNITS_INCH
+#define DEF_UNITS                         GCODE_UNITS_MILLIMETER
 
 #define GCAM_STOCK_EDIT_TRANSLATE         "gcam-edit-translate"
 #define GCAM_STOCK_EDIT_ROTATE            "gcam-edit-rotate"
+#define GCAM_STOCK_EDIT_MIRROR            "gcam-edit-mirror"
 #define GCAM_STOCK_EDIT_SCALE             "gcam-edit-scale"
 #define GCAM_STOCK_EDIT_ATTRACT_PREV      "gcam-edit-attract-prev"
 #define GCAM_STOCK_EDIT_ATTRACT_NEXT      "gcam-edit-attract-next"
@@ -106,6 +107,7 @@ static const gfloat_t GCODE_OPENGL_VOXEL_POINT_SIZE = 2;
 
 #define GCAM_STOCK_VIEW_PERSPECTIVE       "gcam-view-perspective"
 #define GCAM_STOCK_VIEW_ORTHOGRAPHIC      "gcam-view-orthographic"
+#define GCAM_STOCK_VIEW_ISO               "gcam-view-iso"
 #define GCAM_STOCK_VIEW_TOP               "gcam-view-top"
 #define GCAM_STOCK_VIEW_LEFT              "gcam-view-left"
 #define GCAM_STOCK_VIEW_RIGHT             "gcam-view-right"

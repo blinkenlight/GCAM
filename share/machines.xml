@@ -8,8 +8,8 @@
 		<setting max_ipm_z='12.0'/>
 		<setting spindle_control='no'/>
 		<setting tool_change='manual'/>
-                <setting home_switches='no'/>
-                <setting coolant='no'/>
+		<setting home_switches='no'/>
+		<setting coolant='no'/>
 	</machine>
 	<machine name='Haas OM-2A'>
 		<setting travel_x='10.0'/>
@@ -20,7 +20,7 @@
 		<setting max_ipm_z='60.0'/>
 		<setting spindle_control='yes'/>
 		<setting tool_change='auto'/>
-                <setting home_switches='yes'/>
-                <setting coolant='yes'/>
+		<setting home_switches='yes'/>
+		<setting coolant='yes'/>
 	</machine>
 </list>
