@@ -1,22 +1,81 @@
-ChangeLog
-Source code file for G-Code generation, simulation, and visualization
-ibrary.
 
-Copyright (C) 2006 - 2010 by Justin Shumaker
-Copyright (C) 2014 - 2020 by Asztalos Attila Oszkár
+v.2020-05-13:
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+New features:
+  - Increased window and left panel sizes to also accommodate larger fonts
+  - Added new action 'Mirror' under the 'Edit' menu
+  - Changed default units for new projects to 'metric' and default pocketing
+    strategy to 'serpentine'
+  - Added a new isometric view preset and hotkeys to the 'View' menu
+  - The Gerber file import dialog now pre-selects the smallest tool
+  - Added limited support for 'rounded rectangle' pads to Gerber file import -
+    only vertical/horizontal pads are supported currently, rotated ones are not
+  - Added ability to control the number of linear segments used to approximate
+    arbitrary curves on SVG file import via a new setting in 'settings.xml'
+  - Added extra processing to contour offsetting that attempts to fix some of
+    the simpler issues caused by the known limits of GCAM's contour offsetting
+    algorithm when short segments and large tools are involved
+  - Added ability to control the raster overlap and contour padding used during
+    pocketing via a new setting in 'settings.xml'
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Bug fixes:
+  - Fixed locale settings causing g-code export to use the incorrect decimal
+    separator symbol
+  - Fixed long file names causing comment fields to overflow on file import
+  - Fixed a drill file import incompatibility caused by recent changes in the
+    file format related to decimal point handling
+  - Fixed imperial/metric unit switching in 'New Project' and 'Project Settings'
+  - Fixed inability to handle a lack of G54 statements on Gerber file import
+  - Fixed a bug in Gerber file handling that could cause a crash
+  - Fixed potentially incorrect plunging speed in 'Bolt Holes' blocks
+  - Fixed a bug in contour offsetting that caused arcs milled with equal-radius
+    tools and arcs spanning exactly 180 degrees to be skipped completely
+  - Fixed some of the raster lines occasionally missing during pocketing
+  - Fixed proposed values for rotation and mirroring not resulting in in-place
+    transformations as they should if accepted
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+v.2015-05-13:
 
-See GCAM Bugzilla
-http://gcam.js.cx/bugzilla/
+New features:
+  - Added an option to use a slightly different pocketing strategy (that avoids
+    z-axis moves if possible) to the g-code export dialog
+
+Bug fixes:
+  - Fixed a UI 'left panel' failure to update when a new object is inserted
+  - Fixed missing Q word for G83 when peck depth is zero
+  - Fixed main menu failing to become appropriately disabled under Unity
+
+v.2015-04-13 (First GCAM Special Edition release)
+
+New features:
+  - Added a new XML-based file format for saving/loading GCAM projects (.gcamx)
+  - Added ability to specify a file to load as a command line parameter
+  - Added new actions 'Translate' and 'Rotate' under the 'Edit' menu
+  - Added 'red square' discontinuity point markers for non-closed sketches
+  - Added ability to handle a contiguous sketch as closed even if its elements
+    are not listed in sequence of continuity in the block list
+  - Added new action 'Optimize Order' under the 'Edit' menu, to sort (and flip)
+    elements of a sketch into the actual order they are connected to each other
+  - Added an option to use an equivalent sequence of basic motions instead of
+    G8x "canned cycle" g-codes for drilling to the g-code export dialog
+  - Added support for 'obround' (oval) pads to Gerber file import
+  - Added a pass that reduces multiple smaller elements to fewer larger ones if
+    possible during Gerber file import
+  - Added original icon set for actions not covered by Gnome standard icons
+
+Bug fixes:
+  - Too many to list individually but they include various computation bugs
+  typically involving arcs, block list drag-and-drop bugs, pocketing/extrusion
+  bugs, removing originally disabled (and not implemented) STL file import from
+  the 'File' menu, fixing originally non-functional perspective view rendering,
+  fixing originally non-functional SVG file import (paths only, no transforms)
+  and fixing Gerber file import
+  - Many parts of the code have also seen substantial structural changes not
+  strictly tied to a specific bug
+
+v.2010-07-27 and earlier GCAM versions:
+
+  No information available
+
+  See GCAM Bugzilla
+  http://gcam.js.cx/bugzilla/
